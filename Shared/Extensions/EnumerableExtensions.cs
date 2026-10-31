@@ -1,4 +1,4 @@
-namespace MeloongCore.Extensions;
+﻿namespace MeloongCore.Extensions;
 public static class EnumerableExtensions {
 
     #region 查找
@@ -33,6 +33,8 @@ public static class EnumerableExtensions {
             }
         }
     }
+#if !NET6_0_OR_GREATER
+    // .NET 6+ 的 System.Linq.Enumerable 已内置 DistinctBy，避免重复定义导致调用歧义
     /// <summary>
     /// 按对象的指定值去重。
     /// </summary>
@@ -42,6 +44,7 @@ public static class EnumerableExtensions {
             if (seen.Add(selector(element))) yield return element;
         }
     }
+#endif
     /// <summary>
     /// 按对象的指定值去重。
     /// </summary>
@@ -155,6 +158,8 @@ public static class EnumerableExtensions {
         return results;
     }
 
+#if !NET6_0_OR_GREATER
+    // .NET 6+ 的 System.Linq.Enumerable 已内置 MaxBy，避免重复定义导致调用歧义
     /// <summary>
     /// 选择最大值对应的对象。
     /// 若没有元素则返回 null。
@@ -189,6 +194,9 @@ public static class EnumerableExtensions {
         }
         return maxItem;
     }
+#endif
+#if !NET6_0_OR_GREATER
+    // .NET 6+ 的 System.Linq.Enumerable 已内置 MinBy，避免重复定义导致调用歧义
     /// <summary>
     /// 选择最小值对应的对象。
     /// 若没有元素则返回 null。
@@ -224,7 +232,8 @@ public static class EnumerableExtensions {
         return minItem;
     }
 
-    #endregion
+    #endif
+#endregion
 
     #region 排序
 

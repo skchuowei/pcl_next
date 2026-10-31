@@ -1,7 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
-		<TargetFramework>net48</TargetFramework>
+		<TargetFramework>net10.0-windows</TargetFramework>
+		<UseWPF>true</UseWPF>
 		<OutputType>Library</OutputType>
 		<AllowUnsafeBlocks>True</AllowUnsafeBlocks>
 		<OutDir>bin\</OutDir>
@@ -29,6 +30,7 @@
 		<Using Include="System.Collections.Generic" />
 		<Using Include="System.Collections.Concurrent" />
 		<Using Include="System.Text" />
+		<Using Include="System.IO" />
 		<Using Include="System.Net" />
 		<Using Include="System.Runtime.CompilerServices" />
 		<Using Include="System.Runtime.InteropServices" />
@@ -40,13 +42,6 @@
 
 	<ItemGroup>
 		<ProjectReference Include="..\Shared\MeloongCore.csproj" />
-	</ItemGroup>
-
-	<ItemGroup>
-		<Reference Include="System.Windows.Forms" />
-		<Reference Include="PresentationCore" />
-		<Reference Include="PresentationFramework" />
-		<Reference Include="System.Xaml" />
 	</ItemGroup>
 
 	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
