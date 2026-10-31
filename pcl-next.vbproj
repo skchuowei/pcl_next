@@ -124,9 +124,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\MeloongCore\Shared\MeloongCore.csproj" />
-    <ProjectReference Include="..\MeloongCore\Wpf\MeloongCore.Wpf.csproj" />
-    <ProjectReference Include="..\PCLCS\PCLCS.csproj" />
+    <ProjectReference Include="MeloongCore\Shared\MeloongCore.csproj" />
+    <ProjectReference Include="MeloongCore\Wpf\MeloongCore.Wpf.csproj" />
+    <ProjectReference Include="PCLCS\PCLCS.csproj" />
   </ItemGroup>
 
 </Project>
