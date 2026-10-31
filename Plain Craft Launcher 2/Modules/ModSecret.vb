@@ -15,7 +15,10 @@ Friend Module ModSecret
 
 #Region "网络鉴权"
 
-    Public Const RestrictMcDownload As Boolean = True
+    'MC 下载功能的开关已从编译期常量下移为部署期配置，
+    '改由 ModDownloadPolicy（Modules/Base/ModDownloadPolicy.vb）提供同名只读属性：
+    '优先读环境变量 PCL_ALLOW_MC_DOWNLOAD，其次读启动器目录下的 DownloadPolicy.ini，
+    '均未配置时取内置默认值。
     Friend Function SecretCdnSign(UrlWithMark As String) As String
         If Not UrlWithMark.EndsWithF("{CDN}") Then Return UrlWithMark
         Return UrlWithMark.Replace("{CDN}", "").Replace(" ", "%20")
