@@ -321,7 +321,7 @@ internal sealed class FileTask
             response = await ctx.Client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, connectCts.Token)
                 .WaitAsync(connectCts.Token).ConfigureAwait(false);
             if (!response.IsSuccessStatusCode)
-                throw new HttpRequestCodeException(
+                throw new HttpStatusCodeException(
                     $"错误码 {(int)response.StatusCode}，{source.Url}", (int)response.StatusCode);
             if (State == DownloadFileState.Canceled) return;
 
@@ -464,7 +464,7 @@ internal sealed class FileTask
         }
         catch (Exception ex)
         {
-            if (ex is HttpRequestCodeException { StatusCode: 416 })
+            if (ex is HttpStatusCodeException { StatusCode: 416 })
                 ex = new RangeNotSupportedException(ex.Message);
             if (ex is OperationCanceledException && cancellationToken.IsCancellationRequested) throw;
             OnChunkFailure(chunk, ex, isMergeFailure: false, options, ctx);
@@ -776,9 +776,9 @@ internal sealed class FileTask
 }
 
 /// <summary>带状态码的 HTTP 异常（便于引擎判断 4xx/5xx）。</summary>
-public sealed class HttpRequestCodeException : HttpRequestException
+public sealed class HttpStatusCodeException : HttpRequestException
 {
-    public HttpRequestCodeException(string message, int statusCode) : base(message)
+    public HttpStatusCodeException(string message, int statusCode) : base(message)
     {
         StatusCode = statusCode;
     }
