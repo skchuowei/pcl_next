@@ -4,7 +4,7 @@ Public Class Settings
 
     '「历史最高版本号」按渠道分别记录：正式通道（含 SP 修订）用 SystemHighestPcVersionReg，
     '内测用 SystemHighestAlphaVersionReg，公测用 SystemHighestBetaVersionReg，
-    '内部渠道（开发 / 收敛）用 SystemHighestDevVersionReg，
+    '收敛用 SystemHighestSlushVersionReg，开发用 SystemHighestDevVersionReg，
     '避免不同渠道的版本号互相污染升级判定，详见 ModBuildChannel.ChannelHighestVersionKey
     Public Shared ReadOnly Entries As Dictionary(Of String, Setting) = (New List(Of Setting) From {
         New Setting("Identify", "", Source:=Sources.Registry),
@@ -34,6 +34,7 @@ Public Class Settings
         New Setting("SystemHighestBetaVersionReg", 0, Source:=Sources.Registry, Encrypted:=True),
         New Setting("SystemHighestAlphaVersionReg", 0, Source:=Sources.Registry, Encrypted:=True),
         New Setting("SystemHighestPcVersionReg", 0, Source:=Sources.Registry, Encrypted:=True),
+        New Setting("SystemHighestSlushVersionReg", 0, Source:=Sources.Registry, Encrypted:=True),
         New Setting("SystemHighestDevVersionReg", 0, Source:=Sources.Registry, Encrypted:=True),
         New Setting("SystemHelpVersion", 0, Source:=Sources.Registry),
         New Setting("SystemDebugMode", False, Source:=Sources.Registry, OnChanged:=Sub() Logger.Instance.MinLevel = If(ModeDebug, LogLevel.Trace, LogLevel.Info)),

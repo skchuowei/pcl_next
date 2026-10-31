@@ -10,8 +10,10 @@ Public Module ModBase
     Public Const CommitHash As String = "" 'Commit Hash，由 GitHub Workflow 自动替换
     '版本号按《分支与发布规范》§5.2 的号段表分配，必须全局单调递增，否则会误触发降级：
     '   周期基址 base = 5000 + 100 × 周期序号（周期 1 = 2.100 → 5000）
-    '   alpha = base+0…39，beta = base+40…69，PC = base+70…79，SP = base+80…99
-    '   开发 / 收敛版不占发布号段，取 base-1，避免污染正式通道的升级判定
+    '   dev = base+0…9，slush = base+10…19，alpha = base+20…59，beta = base+60…89
+    '   PC = base+90…94，SP = base+95…99
+    '   号段按代号阶梯严格递增，且每个代号都占独立区间——
+    '   dev 与 slush 若共用同一号段，切换时代会被判成版本倒退而误弹降级提示。
     Public Const VersionCode As Integer = ModBuildChannel.ChannelVersionCodeBase + ModBuildChannel.ChannelVersionCodeOffset
 
     '版本信息

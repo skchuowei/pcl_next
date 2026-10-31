@@ -7,10 +7,12 @@
     本脚本是该流程的唯一入口，两种用法：
 
     1. 发布（给定 -Tag）：版本名、版本号一律由标签推导，不接受人工填写。
-         v2.100.0.1-alpha.1  →  内测版，版本名 2.100.0.1，版本号 5000
-         v2.100.0.7-beta.3    →  公测版，版本名 2.100.0.7，版本号 5042
-         v2.100.0.0           →  正式版，版本名 2.100.0.0，版本号 5070
-         v2.100.1.0-sp1       →  快照版，版本名 2.100.1.0，版本号 5080
+         v2.100.0.1-dev.1     →  开发版，版本名 2.100.0.1，版本号 5000
+         v2.100.0.2-slush.1   →  收敛版，版本名 2.100.0.2，版本号 5010
+         v2.100.0.3-alpha.1   →  内测版，版本名 2.100.0.3，版本号 5020
+         v2.100.0.7-beta.3    →  公测版，版本名 2.100.0.7，版本号 5062
+         v2.100.0.0           →  正式版，版本名 2.100.0.0，版本号 5090
+         v2.100.1.0-sp1       →  快照版，版本名 2.100.1.0，版本号 5095
 
     2. 内部构建（不给 -Tag）：按 -Channel 与源码里已有的版本名推导版本号，
        用于 dev / slush 等不对外分发的渠道。
@@ -50,7 +52,9 @@ while ($Root -and -not (Test-Path (Join-Path $Root 'pcl-next\pcl-next.vbproj')))
 if (-not $Root) { throw '未找到仓库根目录（应包含 pcl-next\pcl-next.vbproj）' }
 
 # ── 号段表（《分支与发布规范》§5.2）：base + 偏移 ──────────────────────────────
-$Offset = @{ Dev = -1; Slush = -1; Alpha = 0; Beta = 40; Pc = 70; Snapshot = 80 }
+# 号段按代号阶梯严格递增，且每个代号占独立区间：
+#   dev = +0，slush = +10，alpha = +20，beta = +60，PC = +90，SP = +95
+$Offset = @{ Dev = 0; Slush = 10; Alpha = 20; Beta = 60; Pc = 90; Snapshot = 95 }
 # 首个周期（2.100）的基址为 5000，周期 2（2.101）为 5100，依此类推（周期序号从 0 计）
 $BaseOfCycle = 5000
 $FirstCycleMinor = 100
@@ -80,7 +84,7 @@ $VersionName = $null
 $Sequence = 1
 
 if ($Tag) {
-    $m = [regex]::Match($Tag, '^(?:v)?(?<major>\d+)\.(?<minor>\d+)\.(?<patch>\d+)\.(?<build>\d+)(?:-(?<chan>alpha|beta|pc|sp|snapshot)\.?(?<seq>\d+)?)?$')
+    $m = [regex]::Match($Tag, '^(?:v)?(?<major>\d+)\.(?<minor>\d+)\.(?<patch>\d+)\.(?<build>\d+)(?:-(?<chan>dev|slush|alpha|beta|pc|sp|snapshot)\.?(?<seq>\d+)?)?$')
     if (-not $m.Success) { throw "无法解析版本标签：$Tag" }
     $VersionName = "$($m.Groups['major'].Value).$($m.Groups['minor'].Value).$($m.Groups['patch'].Value).$($m.Groups['build'].Value)"
     $cycle = [int]$m.Groups['minor'].Value - $FirstCycleMinor
@@ -88,6 +92,8 @@ if ($Tag) {
     $chan = $m.Groups['chan'].Value
     if ($chan) {
         switch ($chan) {
+            'dev' { $Channel = 'Dev' }
+            'slush' { $Channel = 'Slush' }
             'alpha' { $Channel = 'Alpha' }
             'beta' { $Channel = 'Beta' }
             'pc' { $Channel = 'Pc' }
@@ -112,12 +118,15 @@ else {
 }
 
 # ── 计算版本号（§5.2 号段表）────────────────────────────────────────────────
+# dev / slush / alpha / beta 均为「每构建 +1」，故按序号递增；
+# PC 首发固定取该段首位；SP 按 SP 序号递增。
 switch ($Channel) {
+    'Dev' { $VersionCode = $Base + $Offset['Dev'] + ($Sequence - 1) }
+    'Slush' { $VersionCode = $Base + $Offset['Slush'] + ($Sequence - 1) }
     'Alpha' { $VersionCode = $Base + $Offset['Alpha'] + ($Sequence - 1) }
     'Beta' { $VersionCode = $Base + $Offset['Beta'] + ($Sequence - 1) }
     'Pc' { $VersionCode = $Base + $Offset['Pc'] }
     'Snapshot' { $VersionCode = $Base + $Offset['Snapshot'] + ($Sequence - 1) }
-    default { $VersionCode = $Base + $Offset[$Channel] }
 }
 
 Write-Host "渠道：$Channel    版本名：$VersionName    版本号：$VersionCode    号段基址：$Base"

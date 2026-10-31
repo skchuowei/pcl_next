@@ -1,5 +1,5 @@
-''' <summary>
-''' pcl-next 的渠道（发布通道）代号。
+﻿''' <summary>
+''' pcl-next 的代号（发布通道）。
 '''
 ''' 与《分支与发布规范》的六条长期分支一一对应，命名与分类均以该文档为准：
 ''' <list type="bullet">
@@ -11,17 +11,20 @@
 ''' <item><c>snapshot</c> —— 快照版：正式版的 SP 维护线，只出 SP 补丁包。</item>
 ''' </list>
 '''
-''' 渠道由 CI 按分支注入编译期常量决定，见《分支与发布规范》§5.4
+''' 代号由 CI 按分支注入编译期常量决定，见《分支与发布规范》§5.6
 ''' （pcl-next.vbproj 的 <c>PclChannel</c> 属性，本模块的 <c>#If</c> 链）。
-''' 本模块是「分支名 ↔ 渠道 ↔ 显示名 ↔ 版本号段 ↔ 制品名」的唯一事实源，
-''' 其它模块一律从这里取值，不得再自行硬编码渠道名。
+''' 本模块是「分支名 ↔ 代号 ↔ 显示名 ↔ 版本号段 ↔ 遥测 ↔ 制品名」的唯一事实源，
+''' 其它模块一律从这里取值，不得再自行硬编码代号名。
 '''
+''' 号段按代号阶梯严格递增（dev < slush < alpha < beta < PC < SP），
+''' 且每个代号都占独立区间——dev 与 slush 若共用同一号段，切换时代会被判成版本倒退。
+''' 详见《分支与发布规范》§5.2。
 ''' 所有公开成员一律以 <c>Channel</c> 开头，避免与既有代码里的局部变量重名。
 ''' </summary>
 Public Module ModBuildChannel
 
     ''' <summary>
-    ''' 渠道枚举。数值仅用于内部区分，不参与任何比较运算。
+    ''' 代号枚举。数值仅用于内部区分，不参与任何比较运算。
     ''' </summary>
     Public Enum Channels As Integer
         Dev = 0
@@ -39,7 +42,7 @@ Public Module ModBuildChannel
     Public Const ChannelId As Integer = 2
     Public Const ChannelCode As String = "alpha"
     Public Const ChannelDisplay As String = "内测版"
-    Public Const ChannelVersionCodeOffset As Integer = 0
+    Public Const ChannelVersionCodeOffset As Integer = 20
     Public Const ChannelAllowTelemetry As Boolean = False
     Public Const ChannelHighestVersionKey As String = "SystemHighestAlphaVersionReg"
 #ElseIf BETA Then
@@ -47,7 +50,7 @@ Public Module ModBuildChannel
     Public Const ChannelId As Integer = 3
     Public Const ChannelCode As String = "beta"
     Public Const ChannelDisplay As String = "公测版"
-    Public Const ChannelVersionCodeOffset As Integer = 40
+    Public Const ChannelVersionCodeOffset As Integer = 60
     Public Const ChannelAllowTelemetry As Boolean = True
     Public Const ChannelHighestVersionKey As String = "SystemHighestBetaVersionReg"
 #ElseIf RELEASE Then
@@ -55,7 +58,7 @@ Public Module ModBuildChannel
     Public Const ChannelId As Integer = 4
     Public Const ChannelCode As String = "pc"
     Public Const ChannelDisplay As String = "正式版"
-    Public Const ChannelVersionCodeOffset As Integer = 70
+    Public Const ChannelVersionCodeOffset As Integer = 90
     Public Const ChannelAllowTelemetry As Boolean = True
     Public Const ChannelHighestVersionKey As String = "SystemHighestPcVersionReg"
 #ElseIf SNAPSHOT Then
@@ -63,7 +66,7 @@ Public Module ModBuildChannel
     Public Const ChannelId As Integer = 5
     Public Const ChannelCode As String = "snapshot"
     Public Const ChannelDisplay As String = "正式版"
-    Public Const ChannelVersionCodeOffset As Integer = 80
+    Public Const ChannelVersionCodeOffset As Integer = 95
     Public Const ChannelAllowTelemetry As Boolean = True
     Public Const ChannelHighestVersionKey As String = "SystemHighestPcVersionReg"
 #ElseIf SLUSH Then
@@ -71,15 +74,15 @@ Public Module ModBuildChannel
     Public Const ChannelId As Integer = 1
     Public Const ChannelCode As String = "slush"
     Public Const ChannelDisplay As String = "收敛版"
-    Public Const ChannelVersionCodeOffset As Integer = -1
+    Public Const ChannelVersionCodeOffset As Integer = 10
     Public Const ChannelAllowTelemetry As Boolean = False
-    Public Const ChannelHighestVersionKey As String = "SystemHighestDevVersionReg"
+    Public Const ChannelHighestVersionKey As String = "SystemHighestSlushVersionReg"
 #Else
     '功能集成主线（dev 分支）——《分支与发布规范》§1.1
     Public Const ChannelId As Integer = 0
     Public Const ChannelCode As String = "dev"
     Public Const ChannelDisplay As String = "开发版"
-    Public Const ChannelVersionCodeOffset As Integer = -1
+    Public Const ChannelVersionCodeOffset As Integer = 0
     Public Const ChannelAllowTelemetry As Boolean = False
     Public Const ChannelHighestVersionKey As String = "SystemHighestDevVersionReg"
 #End If
@@ -145,11 +148,13 @@ Public Module ModBuildChannel
     End Property
 
     ''' <summary>
-    ''' 制品名（不含扩展名）。格式见《分支与发布规范》§5.3：PCL-版本名-渠道。
+    ''' 制品名（不含扩展名）。格式见《分支与发布规范》§5.3：PCL-版本名-代号。
+    ''' PC 与 SP 分列两支：PC 用代号本身，SP 用 SP 序号。
     ''' </summary>
     Public ReadOnly Property ChannelArtifactName As String
         Get
             Dim Suffix = ChannelCode
+            If Channel = Channels.Pc Then Suffix = "pc"
             If Channel = Channels.Snapshot Then Suffix = If(ChannelPatchNumber > 0, "SP" & ChannelPatchNumber.ToString, "SP")
             Return $"PCL-{VersionBaseName}-{Suffix}"
         End Get

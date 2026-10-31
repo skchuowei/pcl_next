@@ -60,13 +60,15 @@ jobs:
     - name: Pack artifact
       shell: pwsh
       run: |
-        # 制品命名：PCL-<版本名>-<渠道>.zip（《分支与发布规范》§5.3）
+        # 制品命名：PCL-<版本名>-<代号>.zip（《分支与发布规范》§5.3）
         $version = (Select-String -Path "pcl-next\Modules\Base\ModBase.vb" -Pattern 'VersionBaseName As String = "([^"]+)"').Matches[0].Groups[1].Value
         $channel = switch -Regex ('${{ github.ref_name }}') {
-            '-alpha\.' { 'alpha' }
-            '-beta\.'  { 'beta' }
-            '-sp\d+'   { 'sp' }
-            default    { 'pc' }
+            '-dev\.'    { 'dev' }
+            '-slush\.'  { 'slush' }
+            '-alpha\.'  { 'alpha' }
+            '-beta\.'   { 'beta' }
+            '-sp\d+'    { 'sp' }
+            default     { 'pc' }
         }
         $suffix = if ($channel -eq 'sp') {
           $patch = ($version -split '\.')[2]
@@ -88,5 +90,7 @@ jobs:
         $notes = "ReleaseNotes\${{ github.ref_name }}.md"
         $args = @('release', 'create', '${{ github.ref_name }}', '${{ steps.pack.outputs.artifact }}', '--verify-tag', '--title', '${{ github.ref_name }}')
         if (Test-Path $notes) { $args += @('--notes-file', $notes) } else { $args += @('--generate-notes') }
-        if ('${{ github.ref_name }}' -match '-alpha\.|-beta\.|-sp\d+') { $args += '--prerelease' }
+        # 除正式版（pc）外一律标记为预发布：dev / slush 不对外分发，
+        # alpha / beta / sp 为测试通道，《分支与发布规范》§5.3
+        if ('${{ github.ref_name }}' -notmatch '^v[\d\.]+$') { $args += '--prerelease' }
         gh @args

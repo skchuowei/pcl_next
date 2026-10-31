@@ -25,7 +25,7 @@ on:
   workflow_dispatch:
     inputs:
       channel:
-        description: '构建渠道（Dev / Slush / Alpha / Beta / Pc / Snapshot）；留空则按分支推断'
+        description: '构建代号（Dev / Slush / Alpha / Beta / Pc / Snapshot）；留空则按分支推断'
         required: false
         default: ''
         type: string
@@ -56,7 +56,7 @@ jobs:
       id: channel
       shell: pwsh
       run: |
-        # 渠道由分支决定，而不是由构建配置决定（见《分支与发布规范》§5.4）
+        # 代号由分支决定，而不是由构建配置决定（见《分支与发布规范》§5.6）
         $channel = '${{ inputs.channel }}'
         if ([string]::IsNullOrWhiteSpace($channel)) {
           $channel = switch -Regex ('${{ github.ref_name }}') {
@@ -70,7 +70,7 @@ jobs:
           }
         }
         "channel=$channel" >> $env:GITHUB_OUTPUT
-        Write-Host "构建渠道：$channel（分支 ${{ github.ref_name }}）"
+        Write-Host "构建代号：$channel（分支 ${{ github.ref_name }}）"
 
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
