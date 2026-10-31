@@ -698,6 +698,15 @@ Retry:
         Public SimulateBrowserHeaders As Boolean
 
         ''' <summary>
+        ''' C# 下载引擎接管标记：0 = 未接管，1 = 已接管（由 NetInterop 通过 CAS 设置）。
+        ''' </summary>
+        Public CSharpDownloadStarted As Integer = 0
+        ''' <summary>
+        ''' C# 下载引擎对应的取消源；由 NetInterop 管理。
+        ''' </summary>
+        Public CSharpCts As CancellationTokenSource = Nothing
+
+        ''' <summary>
         ''' 上次记速时的时间。
         ''' </summary>
         Private SpeedLastTime As Long = GetTimeMs()
@@ -810,6 +819,15 @@ Retry:
         ''' </summary>
         Public Function TryBeginThread() As NetThread
             Try
+
+                'C# 下载引擎接管：在文件的首个线程时机改由 PCL.Download 引擎执行整个文件下载
+                '（CAS 保证只启动一次；后续追加线程的调用一律返回 Nothing）
+                If NetInterop.IsCSharpDownloadEnabled AndAlso Interlocked.CompareExchange(CSharpDownloadStarted, 1, 0) = 0 Then
+                    NetInterop.RunCSharpDownload(Me)
+                    Return Nothing
+                ElseIf NetInterop.IsCSharpDownloadEnabled Then
+                    Return Nothing '引擎已接管，VB 侧不再新增下载线程
+                End If
 
                 Dim StartPosition As Long, StartSource As NetSource = Nothing
                 Dim Th As Thread, ThreadInfo As NetThread
@@ -1251,7 +1269,7 @@ Retry:
         ''' <summary>
         ''' 下载失败。
         ''' </summary>
-        Private Sub Fail(Optional RaiseEx As Exception = Nothing)
+        Friend Sub Fail(Optional RaiseEx As Exception = Nothing)
             SyncLock LockState
                 If State >= NetState.Finished Then Return
                 If RaiseEx IsNot Nothing Then Ex.Add(RaiseEx)

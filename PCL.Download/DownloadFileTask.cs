@@ -313,7 +313,7 @@ internal sealed class FileTask
             if (source.IsFailed && source.SingleChunk != chunk) return;
 
             request = new HttpRequestMessage(HttpMethod.Get, source.Url);
-            ApplyBrowserHeaders(request, Request.SimulateBrowserHeaders);
+            ApplyBrowserHeaders(request, Request, chunk.Source.Url);
             var connectCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             connectCts.CancelAfter(timeout);
             if (!firstThread) request.Headers.Range = new RangeHeaderValue(chunk.Start, null);
@@ -483,9 +483,15 @@ internal sealed class FileTask
         }
     }
 
-    private static void ApplyBrowserHeaders(HttpRequestMessage request, bool simulate)
+    private static void ApplyBrowserHeaders(HttpRequestMessage request, DownloadFileRequest fileRequest, string url)
     {
-        if (!simulate) return;
+        if (fileRequest.HeaderProvider is not null)
+        {
+            foreach (var (key, value) in fileRequest.HeaderProvider(url))
+                request.Headers.TryAddWithoutValidation(key, value);
+            return; // 自定义请求头拥有最高优先级，直接接管
+        }
+        if (!fileRequest.SimulateBrowserHeaders) return;
         request.Headers.UserAgent.ParseAdd(
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36");
         request.Headers.Referrer = new Uri("https://www.minecraft.net/");

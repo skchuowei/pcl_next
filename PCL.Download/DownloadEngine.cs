@@ -275,6 +275,8 @@ public sealed class DownloadEngine : IDownloadEngine
 
                 if (progress is null) continue;
                 double newProgress = 0, totalProgress = 0;
+                long totalExpected = 0;
+                var allSizesKnown = true;
                 foreach (var task in tasks)
                 {
                     if (task.IsLocalReuse)
@@ -287,12 +289,16 @@ public sealed class DownloadEngine : IDownloadEngine
                         newProgress += task.Progress;
                         totalProgress += 1;
                     }
+                    // 统计总大小；未知大小（IsUnknownSize）时不计入并整体标记为未知
+                    if (task.FileSize >= 0) totalExpected += task.FileSize;
+                    else if (!task.IsLocalReuse) allSizesKnown = false;
                 }
                 if (totalProgress > 0 && !double.IsNaN(totalProgress)) newProgress /= totalProgress;
                 progress.Report(new DownloadProgress
                 {
                     OverallProgress = newProgress,
                     TotalBytesDone = Interlocked.Read(ref context.TotalBytesDone),
+                    TotalBytesExpected = allSizesKnown ? totalExpected : -1,
                     Speed = Interlocked.Read(ref context.CurrentSpeed),
                     ActiveChunks = (int)Interlocked.Read(ref context.ActiveChunks),
                 });

@@ -119,6 +119,12 @@ public sealed class DownloadFileRequest
 
     /// <summary>是否模拟浏览器的 UserAgent 与 Referer。</summary>
     public bool SimulateBrowserHeaders { get; init; }
+
+    /// <summary>
+    /// 按 URL 提供自定义请求头（User-Agent / Referer / 鉴权键等）。
+    /// 设置后拥有最高优先级，覆盖 SimulateBrowserHeaders 的默认行为。
+    /// </summary>
+    public Func<string, IEnumerable<KeyValuePair<string, string>>>? HeaderProvider { get; init; }
 }
 
 /// <summary>
@@ -181,6 +187,8 @@ public sealed class DownloadProgress
     public required double OverallProgress { get; init; }
     /// <summary>已下载字节数。</summary>
     public required long TotalBytesDone { get; init; }
+    /// <summary>预计总字节数（未知大小的文件不计入；尚有未知时为 -1）。</summary>
+    public long TotalBytesExpected { get; init; } = -1;
     /// <summary>全局估计速度（Byte/s）。</summary>
     public required long Speed { get; init; }
     /// <summary>活动中的下载数。</summary>
