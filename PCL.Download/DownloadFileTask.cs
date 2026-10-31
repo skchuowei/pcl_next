@@ -429,6 +429,7 @@ internal sealed class FileTask
                 source.FailCount = 0;
                 Interlocked.Add(ref ctx.TotalBytesDone, real);
                 Interlocked.Add(ref DownloadDone, real);
+                Interlocked.Add(ref BytesDownloaded, real);
                 chunk.Done += real;
                 if (useMemory) _cache!.Write(buffer, 0, real);
                 else await fileStream!.WriteAsync(buffer.AsMemory(0, real), cancellationToken).ConfigureAwait(false);
