@@ -6,10 +6,23 @@
     PanScroll="PanBack" RenderOptions.BitmapScalingMode="LowQuality">
     <local:MyScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" x:Name="PanBack">
         <StackPanel x:Name="PanMain" Margin="25,10" Grid.IsSharedSizeScope="True">
-            <local:MyCard Margin="0,15" Title="关于">
+            <local:MyCard Margin="0,15" Title="关于 pcl-next">
+                <StackPanel Margin="25,39,23,20">
+                    <TextBlock TextWrapping="Wrap" LineHeight="18" Margin="0,0,0,4"
+                               Text="pcl-next 是基于 Plain Craft Launcher 2 的第三方修改版，目标是用 C# 完整重写 PCL，并迁移到 .NET 10。本项目与 PCL 官方无隶属关系，非 Minecraft 官方产品。" />
+                    <TextBlock TextWrapping="Wrap" LineHeight="18" Margin="0,10,0,4"
+                               Text="当前状态：项目处于开发阶段（代号 dev），尚未完成 C# 重写，主程序仍有较多部分沿用 PCL2 的 VB 实现，功能与行为都可能发生较大变化。详见下方「项目进度」与各版本发布说明。" />
+                    <StackPanel Orientation="Horizontal" Height="35" HorizontalAlignment="Left" Margin="0,12,0,0">
+                        <local:MyButton Text="项目仓库" Width="140" Padding="13,0" Margin="0,0,20,0"
+                                        local:CustomEventService.EventType="打开网页" local:CustomEventService.EventData="https://github.com/skchuowei/pcl_next" />
+                        <local:MyButton Text="检查更新" Width="140" Padding="13,0"
+                                        x:Name="BtnAboutUpdate" />
+                    </StackPanel>
+                </StackPanel>
+            </local:MyCard>
+            <local:MyCard Margin="0,0,0,15" Title="当前版本">
                 <Grid Margin="21,40,21,16">
                     <Grid.RowDefinitions>
-                        <RowDefinition Height="45" />
                         <RowDefinition Height="45" />
                         <RowDefinition Height="45" />
                     </Grid.RowDefinitions>
@@ -18,31 +31,68 @@
                         <ColumnDefinition />
                         <ColumnDefinition Width="150" />
                     </Grid.ColumnDefinitions>
-                    <local:MyListItem IsHitTestVisible="False" Title="龙腾猫跃" Margin="-5,0,15,0" Info="Plain Craft Launcher 的开发者！" Grid.Row="0" Grid.Column="1" />
-                    <local:MyListItem IsHitTestVisible="False" Title="HerobrineXia" Margin="-5,0,15,0" Info="Plain Craft Launcher 的协力开发者！" Grid.Row="1" Grid.Column="1" />
-                    <local:MyListItem IsHitTestVisible="False" Title="pcl-next" Margin="-5,0,15,0" Info="当前版本：%VERSION%（%VERSIONCODE%.%BRANCH%）" Grid.Row="2" Grid.Column="1" x:Name="ItemAboutPcl" />
-                    <Image Source="/pcl-next;component/Images/Heads/LTCat.jpg" Grid.Row="0" Margin="3">
+                    <local:MyListItem IsHitTestVisible="False" Title="pcl-next" Margin="-5,0,15,0" Info="当前版本：%VERSION%（%VERSIONCODE%.%BRANCH%）" Grid.Row="0" Grid.Column="1" x:Name="ItemAboutPcl" />
+                    <local:MyListItem IsHitTestVisible="False" Title="项目状态" Margin="-5,0,15,0" Info="开发阶段（代号 dev），C# 重写进行中，尚未达到 alpha 标准" Grid.Row="1" Grid.Column="1" />
+                    <Image Source="/pcl-next;component/Images/Heads/Logo.png" Grid.Row="0" Margin="3">
                         <Image.Clip>
                             <EllipseGeometry Center="17 17" RadiusX="17" RadiusY="17" />
                         </Image.Clip>
                     </Image>
-                    <Image Source="/pcl-next;component/Images/Heads/HerobrineXia.png" Grid.Row="1" Margin="3">
+                    <Image Source="/pcl-next;component/Images/Heads/PCL2.png" Grid.Row="1" Margin="3">
                         <Image.Clip>
                             <EllipseGeometry Center="17 17" RadiusX="17" RadiusY="17" />
                         </Image.Clip>
                     </Image>
-                    <Image Source="/pcl-next;component/Images/Heads/Logo.png" Grid.Row="2" Margin="3">
-                        <Image.Clip>
-                            <EllipseGeometry Center="17 17" RadiusX="17" RadiusY="17" />
-                        </Image.Clip>
-                    </Image>
-                    <local:MyButton Text="赞助 PCL !" Grid.Column="2" Grid.Row="0" Height="35" ColorType="Highlight"
-                                    local:CustomEventService.EventType="打开网页" local:CustomEventService.EventData="https://meloong.com/afd/a/LTCat" />
-                    <local:MyButton Text="检查更新" Grid.Column="2" Grid.Row="2" Height="35" 
-                                    x:Name="BtnAboutUpdate" />
                 </Grid>
             </local:MyCard>
-            <local:MyCard Margin="0,0,0,15" Title="特别鸣谢">
+            <local:MyCard Margin="0,0,0,15" Title="项目进度">
+                <StackPanel Margin="25,39,23,20">
+                    <TextBlock TextWrapping="Wrap" LineHeight="18" Text="本项目以 C# 完整重写 PCL 为目标，按《PCL2 下载服务 C# 替换迁移计划》分阶段推进：" />
+                    <TextBlock TextWrapping="Wrap" LineHeight="18" Margin="0,8,0,0"
+                               Text="· Phase 0/1　下载服务契约与 C# 传输引擎（已完成）&#xa;· Phase 2　　C# 引擎接入 VB 编排层（已完成）&#xa;· Phase 3–6　资源子系统、UI 重指、下线 VB 下载模块（进行中）&#xa;· 运行时　　主程序迁移至 .NET 10，自包含单文件发布（已完成）" />
+                    <TextBlock TextWrapping="Wrap" LineHeight="18" Margin="0,10,0,0"
+                               Text="尚未完成的部分包括：资源子系统的 C# 化、下载相关 UI 的完全重指、VB 下载模块的下线，以及整合包、Mod 管理等模块的 C# 化。因此当前版本仍有较多 PCL2 的原有实现。&#xa;各模块的具体进度与已知问题，请见对应版本的发布说明。" />
+                </StackPanel>
+            </local:MyCard>
+            <local:MyCard Margin="0,0,0,15" Title="作者与贡献">
+                <StackPanel Margin="25,39,23,20">
+                    <TextBlock Text="pcl-next 项目" TextWrapping="Wrap" Margin="0,0,0,4" FontWeight="Bold" />
+                    <TextBlock TextWrapping="Wrap" LineHeight="18" Margin="0,0,0,2"
+                               Text="pcl-next 是由社区开发者发起的第三方重写项目，源码以公开仓库形式维护，欢迎所有人参与。" />
+                    <TextBlock Text="上游 PCL 作者" TextWrapping="Wrap" Margin="0,12,0,4" FontWeight="Bold" />
+                    <TextBlock TextWrapping="Wrap" LineHeight="18" Margin="0,0,0,2"
+                               Text="以下为上游 Plain Craft Launcher 2 的作者与贡献者，pcl-next 基于其源码重写，特此致谢并保留署名（依 PCL 分发有限许可）：" />
+                    <Grid Margin="0,8,0,0">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="45" />
+                            <RowDefinition Height="45" />
+                        </Grid.RowDefinitions>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="40" />
+                            <ColumnDefinition />
+                            <ColumnDefinition Width="150" />
+                        </Grid.ColumnDefinitions>
+                        <local:MyListItem IsHitTestVisible="False" Title="龙腾猫跃" Margin="-5,0,15,0" Info="上游 PCL（Plain Craft Launcher 2）的开发者！" Grid.Row="0" Grid.Column="1" />
+                        <local:MyListItem IsHitTestVisible="False" Title="HerobrineXia" Margin="-5,0,15,0" Info="上游 PCL 的协力开发者！" Grid.Row="1" Grid.Column="1" />
+                        <Image Source="/pcl-next;component/Images/Heads/LTCat.jpg" Grid.Row="0" Margin="3">
+                            <Image.Clip>
+                                <EllipseGeometry Center="17 17" RadiusX="17" RadiusY="17" />
+                            </Image.Clip>
+                        </Image>
+                        <Image Source="/pcl-next;component/Images/Heads/HerobrineXia.png" Grid.Row="1" Margin="3">
+                            <Image.Clip>
+                                <EllipseGeometry Center="17 17" RadiusX="17" RadiusY="17" />
+                            </Image.Clip>
+                        </Image>
+                        <local:MyButton Text="赞助上游 PCL !" Grid.Column="2" Grid.Row="0" Height="35" ColorType="Highlight"
+                                        local:CustomEventService.EventType="打开网页" local:CustomEventService.EventData="https://meloong.com/afd/a/LTCat" />
+                    </Grid>
+                    <TextBlock Text="如何参与贡献" TextWrapping="Wrap" Margin="0,12,0,4" FontWeight="Bold" />
+                    <TextBlock TextWrapping="Wrap" LineHeight="18" Margin="0,0,0,2"
+                               Text="pcl-next 采用公开仓库协作，功能改动请提交到 dev 分支的 feat/* 分支（从 dev 拉出、合回 dev），缺陷修复提交到对应代号分支的 fix/* 分支。提交前请确保工程可编译并完成基本冒烟（启动、下载、启动游戏、整合包四条主链路）。&#xa;发现问题或有改进建议，欢迎在项目仓库提交 issue 或发起讨论。" />
+                </StackPanel>
+            </local:MyCard>
+            <local:MyCard Margin="0,0,0,15" Title="特别鸣谢（上游 PCL）">
                 <Grid Margin="21,40,21,16">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="45" />

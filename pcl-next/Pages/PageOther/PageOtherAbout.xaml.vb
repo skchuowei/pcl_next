@@ -11,7 +11,8 @@ Public Class PageOtherAbout
         IsLoaded = True
 
         ItemAboutPcl.Info = ItemAboutPcl.Info.Replace("%VERSION%", VersionDisplay).Replace("%VERSIONCODE%", VersionCode).Replace("%BRANCH%", CInt(BuildType))
-        If BuildType = BuildTypes.Debug Then
+        '开发版不展示上游 PCL 的赞助入口——赞助属于上游作者，与本项目无关
+        If ModBuildChannel.ChannelIsInternal Then
             BtnDonateDonate.Visibility = Visibility.Collapsed
             BtnDonateOutput.Visibility = Visibility.Visible
         End If
