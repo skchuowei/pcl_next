@@ -1,4 +1,4 @@
-Imports System.Runtime.CompilerServices
+﻿Imports System.Runtime.CompilerServices
 Imports System.Xaml
 
 Public Module ModBase
@@ -39,11 +39,11 @@ Public Module ModBase
     ''' <summary>
     ''' 包含程序名的完整路径。
     ''' </summary>
-    Public PathExe As String = Paths.Base & AppDomain.CurrentDomain.SetupInformation.ApplicationName
+    Public PathExe As String = Paths.Base & IO.Path.GetFileName(Environment.ProcessPath)
     ''' <summary>
     ''' 程序内嵌图片文件夹路径，以 / 结尾。
     ''' </summary>
-    Public PathImage As String = "pack://application:,,,/Plain Craft Launcher 2;component/Images/"
+    Public PathImage As String = "pack://application:,,,/pcl-next;component/Images/"
     ''' <summary>
     ''' 程序的缓存文件夹路径，以 \ 结尾。
     ''' </summary>

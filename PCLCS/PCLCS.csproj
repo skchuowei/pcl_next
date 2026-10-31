@@ -1,7 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
-		<TargetFramework>net48</TargetFramework>
+		<TargetFramework>net10.0-windows</TargetFramework>
+		<UseWPF>true</UseWPF>
 		<OutputType>Library</OutputType>
 		<AllowUnsafeBlocks>True</AllowUnsafeBlocks>
 		<OutDir>bin\</OutDir>
@@ -15,6 +16,7 @@
 	</PropertyGroup>
 
 	<ItemGroup>
+		<PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
 		<PackageReference Include="PolySharp" Version="1.15.0">
 			<PrivateAssets>all</PrivateAssets>
 			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
@@ -27,6 +29,7 @@
 		<Using Include="System.Collections.Generic" />
 		<Using Include="System.Collections.Concurrent" />
 		<Using Include="System.Text" />
+		<Using Include="System.IO" />
 		<Using Include="System.Text.RegularExpressions" />
 		<Using Include="System.Net" />
 		<Using Include="System.Runtime.CompilerServices" />
@@ -60,12 +63,6 @@
 		<EmbeddedResource Include="Launch\LwjglUnsafeAgent.jar" LogicalName="Launch\LwjglUnsafeAgent.jar" />
 		<EmbeddedResource Include="Resource\WikiEntries.txt" LogicalName="Resource\WikiEntries.txt" />
 		<EmbeddedResource Include="Minecraft\OptiFineHashes.json" LogicalName="Minecraft\OptiFineHashes.json" />
-	</ItemGroup>
-	<ItemGroup>
-	  <Reference Include="Microsoft.VisualBasic" />
-	  <Reference Include="Newtonsoft.Json">
-	    <HintPath>..\Plain Craft Launcher 2\Resources\Newtonsoft.Json.dll</HintPath>
-	  </Reference>
 	</ItemGroup>
 
 </Project>

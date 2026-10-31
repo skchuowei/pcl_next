@@ -1020,7 +1020,7 @@ NextAni:
                     If TextCount < Text.Length Then
                         Dim NextText As String = Text.Substring(TextCount, 1)
                         If Convert.ToInt32(Convert.ToChar(NextText)) >= Convert.ToInt32(Convert.ToChar(128)) Then
-                            NewText &= Encoding.GetEncoding("GB18030").GetString({RandomInteger(16 + 160, 87 + 160), RandomInteger(1 + 160, 89 + 160)})
+                            NewText &= Encoding.GetEncoding("GB18030").GetString({CByte(RandomInteger(16 + 160, 87 + 160)), CByte(RandomInteger(1 + 160, 89 + 160))})
                         Else
                             NewText &= RandomInteger(0, 85).ConvertRadix(86)
                         End If
