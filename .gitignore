@@ -348,3 +348,6 @@ bin-net10/
 
 # pcl-next 单文件发布配置（不含凭据，需要入库；上面的 *.pubxml 规则会把同类文件当机密忽略）
 !pcl-next/Properties/PublishProfiles/*.pubxml
+
+# 发布制品输出目录（打包给用户下载的 zip）
+ReleaseArtifacts/
