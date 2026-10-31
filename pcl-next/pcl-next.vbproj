@@ -127,6 +127,18 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!--
+      下载策略的部署期配置文件样例。
+      随输出与发布目录一起分发，使这个开关对使用者是可发现、可修改的；
+      放在启动器同级目录，ModDownloadPolicy 会在首次读取策略时解析它。
+    -->
+    <None Update="DownloadPolicy.ini">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\MeloongCore\Shared\MeloongCore.csproj" />
     <ProjectReference Include="..\MeloongCore\Wpf\MeloongCore.Wpf.csproj" />
     <ProjectReference Include="..\PCLCS\PCLCS.csproj" />
