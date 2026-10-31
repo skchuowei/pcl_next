@@ -1,0 +1,92 @@
+name: Release
+# 发布任务由版本标签触发，而不是普通构建（《分支与发布规范》§5.3、§6.1）
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: '版本标签，如 v2.100.0.1-alpha.1'
+        required: true
+        type: string
+
+jobs:
+  release:
+    name: Release
+    runs-on: windows-latest
+    permissions:
+      contents: write
+
+    steps:
+
+    - name: Checkout
+      uses: actions/checkout@v6
+      with:
+        fetch-depth: 0
+        submodules: true
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '10.0.x'
+
+    - name: Update Help
+      run: |
+        Set-Location ..
+        git clone https://github.com/LTCatt/PCL2Help.git -b master --single-branch --depth 1
+        Set-Location PCL2Help
+        Remove-Item -Path *.* -Recurse -Force
+        Compress-Archive -Path .\* -DestinationPath .\Help.zip
+        Copy-Item -Path .\Help.zip -Destination "${{ GITHUB.WORKSPACE }}\pcl-next\Resources\Help.zip" -Force
+        Set-Location ..
+        Remove-Item PCL2Help -Recurse -Force
+        Set-Location ${{ GITHUB.WORKSPACE }}
+
+    - name: Set version info
+      shell: pwsh
+      run: |
+        # 版本名与版本号一律由标签推导（《分支与发布规范》§5.1、§5.2）
+        & "${{ GITHUB.WORKSPACE }}\scripts\Set-VersionInfo.ps1" -Tag "${{ github.ref_name }}" -CommitHash "${{ github.sha }}"
+
+    - name: Replace
+      run: |
+        (gc "pcl-next\Modules\ModSecret.vb") -replace 'Public OAuthClientId As String = If(Environment.GetEnvironmentVariable("PCL_MS_CLIENT_ID"), "")', 'Public OAuthClientId As String = If(Environment.GetEnvironmentVariable("PCL_MS_CLIENT_ID"), "${{ secrets.CLIENT_ID }}")' | Out-File "pcl-next\Modules\ModSecret.vb"
+        (gc "pcl-next\Modules\ModSecret.vb") -replace 'Public CurseForgeAPIKey As String = If(Environment.GetEnvironmentVariable("PCL_CURSEFORGE_API_KEY"), "")', 'Public CurseForgeAPIKey As String = If(Environment.GetEnvironmentVariable("PCL_CURSEFORGE_API_KEY"), "${{ secrets.CURSEFORGE_API_KEY }}")' | Out-File "pcl-next\Modules\ModSecret.vb"
+
+    - name: Publish (self-contained single file)
+      run: dotnet publish "pcl-next\pcl-next.vbproj" -c Release -p:PublishProfile=win-x64-single
+
+    - name: Pack artifact
+      shell: pwsh
+      run: |
+        # 制品命名：PCL-<版本名>-<渠道>.zip（《分支与发布规范》§5.3）
+        $version = (Select-String -Path "pcl-next\Modules\Base\ModBase.vb" -Pattern 'VersionBaseName As String = "([^"]+)"').Matches[0].Groups[1].Value
+        $channel = switch -Regex ('${{ github.ref_name }}') {
+            '-alpha\.' { 'alpha' }
+            '-beta\.'  { 'beta' }
+            '-sp\d+'   { 'sp' }
+            default    { 'pc' }
+        }
+        $suffix = if ($channel -eq 'sp') {
+          $patch = ($version -split '\.')[2]
+          "SP$patch"
+        } else { $channel }
+        $name = "PCL-$version-$suffix"
+        New-Item -ItemType Directory -Path "out" -Force | Out-Null
+        Copy-Item "pcl-next\publish\win-x64\pcl-next.exe" "out\" -Force
+        Copy-Item "pcl-next\publish\win-x64\DownloadPolicy.ini" "out\" -Force -ErrorAction SilentlyContinue
+        Compress-Archive -Path "out\*" -DestinationPath "$name.zip" -Force
+        "artifact=$name.zip" >> $env:GITHUB_OUTPUT
+        Write-Host "制品：$name.zip"
+
+    - name: Create GitHub Release
+      shell: pwsh
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        $notes = "ReleaseNotes\${{ github.ref_name }}.md"
+        $args = @('release', 'create', '${{ github.ref_name }}', '${{ steps.pack.outputs.artifact }}', '--verify-tag', '--title', '${{ github.ref_name }}')
+        if (Test-Path $notes) { $args += @('--notes-file', $notes) } else { $args += @('--generate-notes') }
+        if ('${{ github.ref_name }}' -match '-alpha\.|-beta\.|-sp\d+') { $args += '--prerelease' }
+        gh @args

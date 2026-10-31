@@ -6,11 +6,11 @@ Public Class PageSetupSystem
         '重复加载部分
         PanBack.ScrollToHome()
 
-        If BuildType = BuildTypes.Release Then
+        If ModBuildChannel.ChannelIsOfficial Then
             PanDonate.Visibility = Visibility.Collapsed
         Else
             PanDonate.Visibility = Visibility.Visible
-            ItemSystemUpdateDownload.Content = "在有新版本时自动下载（更新快照版前需要先输入土豆码）"
+            ItemSystemUpdateDownload.Content = "在有新版本时自动下载（更新非正式版前需要先输入土豆码）"
         End If
 
         '非重复加载部分
@@ -112,7 +112,7 @@ Public Class PageSetupSystem
             Dim ServerContent As String = If(FileUtils.TryReadAsString(PathTemp & "Cache\Notice.cfg"), "")
             If ServerContent.Split("|").Count < 3 Then Return Nothing
             '确认是否为最新
-            Return ServerContent.Split("|")(If(BuildType = BuildTypes.Release, 2, 1)) <= VersionCode
+            Return ServerContent.Split("|")(If(ModBuildChannel.ChannelIsOfficial, 2, 1)) <= VersionCode
         Catch ex As Exception
             Logger.Error(ex, "确认启动器更新失败")
             Return Nothing

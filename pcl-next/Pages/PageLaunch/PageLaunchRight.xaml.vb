@@ -6,9 +6,9 @@ Public Class PageLaunchRight
     Private Sub Init() Handles Me.Loaded
         PanBack.ScrollToHome()
         PanLog.Visibility = ModeDebug.ToVisibility
-        '快照版提示
+        '非正式渠道提示
         PanHint.Visibility =
-            (BuildType <> BuildTypes.Release AndAlso VersionBranchMain = "Official" AndAlso
+            (ModBuildChannel.ChannelIsInternal AndAlso VersionBranchMain = "Official" AndAlso
              CurrentRank < DonationRank.Rank23 AndAlso Not Settings.Get(Of Boolean)("HintSnapshot")).ToVisibility
     End Sub
 

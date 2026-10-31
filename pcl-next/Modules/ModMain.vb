@@ -984,7 +984,7 @@ NextFile:
 
     '遥测
     Public Sub Telemetry([Event] As String, ParamArray Datas As String())
-        If BuildType = BuildTypes.Debug Then Return '开发版不上传遥测
+        If Not ModBuildChannel.ChannelAllowTelemetry Then Return '按渠道决定是否上传遥测（见《分支与发布规范》§9 决策点 C：alpha 关闭、beta 开启）
         If Not Settings.Get(Of Boolean)("SystemSystemTelemetry") Then Return '用户关闭了遥测
         If Not ClsBaseUrl.StartsWithF("http") Then Return '开源版没有设置遥测地址
         RunInNewThread(

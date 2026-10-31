@@ -6,28 +6,45 @@ Public Module ModBase
 #Region "声明"
 
     '下列版本信息由更新器自动修改
-    Public Const VersionBaseName As String = "2.99.0.1" '显示用版本名
+    Public Const VersionBaseName As String = "2.100.0.1" '显示用版本名
     Public Const CommitHash As String = "" 'Commit Hash，由 GitHub Workflow 自动替换
-#If RELEASE Then
-    Public Const VersionCode As Integer = 415 '正式版
-#Else
-    Public Const VersionCode As Integer = 416 '快照版
-#End If
+    '版本号按《分支与发布规范》§5.2 的号段表分配，必须全局单调递增，否则会误触发降级：
+    '   周期基址 base = 5000 + 100 × 周期序号（周期 1 = 2.100 → 5000）
+    '   alpha = base+0…39，beta = base+40…69，PC = base+70…79，SP = base+80…99
+    '   开发 / 收敛版不占发布号段，取 base-1，避免污染正式通道的升级判定
+    Public Const VersionCode As Integer = ModBuildChannel.ChannelVersionCodeBase + ModBuildChannel.ChannelVersionCodeOffset
 
     '版本信息
-    Public Const VersionDisplay As String = BuildTypeDisplay & " " & VersionBaseName
-#If DEBUG Then
-    Public Const BuildTypeDisplay As String = "开发版"
-    Public Const BuildType As BuildTypes = BuildTypes.Debug
+    ''' <summary>
+    ''' 显示用版本信息，例如「内测版 2.100.0.1」。
+    ''' SP 渠道额外标注 SP 序号，例如「正式版 2.100.1.0（SP1）」。
+    ''' </summary>
+    Public ReadOnly Property VersionDisplay As String
+        Get
+            Return BuildTypeDisplay & " " & VersionBaseName & ModBuildChannel.ChannelSpSuffix
+        End Get
+    End Property
+    '渠道（发布通道）由 CI 按分支注入编译期常量决定，
+    '详见 ModBuildChannel 与《分支与发布规范》§5.4。
+#If ALPHA Then
+    Public Const BuildType As BuildTypes = BuildTypes.Alpha
+#ElseIf BETA Then
+    Public Const BuildType As BuildTypes = BuildTypes.Beta
 #ElseIf RELEASE Then
-    Public Const BuildTypeDisplay As String = "正式版"
     Public Const BuildType As BuildTypes = BuildTypes.Release
-#Else
-    Public Const BuildTypeDisplay As String = "快照版"
+#ElseIf SNAPSHOT Then
     Public Const BuildType As BuildTypes = BuildTypes.Snapshot
+#ElseIf SLUSH Then
+    Public Const BuildType As BuildTypes = BuildTypes.Slush
+#Else
+    Public Const BuildType As BuildTypes = BuildTypes.Debug
 #End If
+    Public Const BuildTypeDisplay As String = ModBuildChannel.ChannelDisplay
     Public Enum BuildTypes
         Debug = 100
+        Slush = 90
+        Alpha = 80
+        Beta = 70
         Release = 50
         Snapshot = 0
     End Enum

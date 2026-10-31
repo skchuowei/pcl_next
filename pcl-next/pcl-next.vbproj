@@ -29,7 +29,6 @@
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <DefineDebug>false</DefineDebug>
     <DefineTrace>false</DefineTrace>
-    <DefineConstants>SNAPSHOT</DefineConstants>
     <ProduceReferenceAssembly>false</ProduceReferenceAssembly>
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
     <!-- 沿用原工程的 VB 警告豁免 -->
@@ -38,14 +37,52 @@
     <EnableDefaultApplicationDefinition>true</EnableDefaultApplicationDefinition>
   </PropertyGroup>
 
-  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
-    <Optimize>true</Optimize>
-    <DefineConstants>RELEASE</DefineConstants>
+  <!--
+    渠道（发布通道）代号。
+
+    与《分支与发布规范》的六条长期分支一一对应，渠道不再是「构建配置」的附属物，
+    而是「分支」的附属物——因此由 CI 按分支注入编译期常量，见 §5.4：
+
+        Dev      → DEBUG    开发版   （dev 分支）
+        Slush    → SLUSH    收敛版   （slush 分支）
+        Alpha    → ALPHA    内测版   （alpha 分支）
+        Beta     → BETA     公测版   （beta 分支）
+        Pc       → RELEASE  正式版   （pc 分支）
+        Snapshot → SNAPSHOT 快照/SP  （snapshot 分支）
+
+    用法：dotnet build -p:PclChannel=Alpha
+    未显式指定时：Configuration = Snapshot 时取 Snapshot，其余取 Dev（与 dev 分支一致）。
+  -->
+  <PropertyGroup>
+    <PclChannel Condition="'$(PclChannel)' == '' AND '$(Configuration)' == 'Snapshot'">Snapshot</PclChannel>
+    <PclChannel Condition="'$(PclChannel)' == ''">Dev</PclChannel>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(PclChannel)' == 'Dev'">
+    <PclChannelConstant>DEBUG</PclChannelConstant>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(PclChannel)' == 'Slush'">
+    <PclChannelConstant>SLUSH</PclChannelConstant>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(PclChannel)' == 'Alpha'">
+    <PclChannelConstant>ALPHA</PclChannelConstant>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(PclChannel)' == 'Beta'">
+    <PclChannelConstant>BETA</PclChannelConstant>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(PclChannel)' == 'Pc'">
+    <PclChannelConstant>RELEASE</PclChannelConstant>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(PclChannel)' == 'Snapshot'">
+    <PclChannelConstant>SNAPSHOT</PclChannelConstant>
+  </PropertyGroup>
+  <PropertyGroup>
+    <PclDefineConstants Condition="'$(DefineConstants)' != ''">$(DefineConstants);$(PclChannelConstant)</PclDefineConstants>
+    <PclDefineConstants Condition="'$(PclDefineConstants)' == ''">$(PclChannelConstant)</PclDefineConstants>
+    <DefineConstants>$(PclDefineConstants)</DefineConstants>
   </PropertyGroup>
 
-  <PropertyGroup Condition="'$(Configuration)' == 'Snapshot'">
+  <PropertyGroup Condition="'$(Configuration)' == 'Release' Or '$(Configuration)' == 'Snapshot'">
     <Optimize>true</Optimize>
-    <DefineConstants>SNAPSHOT</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>

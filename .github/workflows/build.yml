@@ -1,18 +1,34 @@
 name: Build
 on:
   push:
+    # 仅六条长期分支触发（见《分支与发布规范》§1）；短期分支（feat/*、fix/*）走 PR
+    branches:
+      - dev
+      - slush
+      - alpha
+      - beta
+      - pc
+      - snapshot
     paths:
       - 'pcl-next/**'
       - 'PCLCS/**'
       - 'MeloongCore/**'
+      - 'scripts/**'
       - '.github/workflows/**'
   pull_request:
     paths:
       - 'pcl-next/**'
       - 'PCLCS/**'
       - 'MeloongCore/**'
+      - 'scripts/**'
       - '.github/workflows/**'
   workflow_dispatch:
+    inputs:
+      channel:
+        description: '构建渠道（Dev / Slush / Alpha / Beta / Pc / Snapshot）；留空则按分支推断'
+        required: false
+        default: ''
+        type: string
 
 jobs:
   build:
@@ -36,13 +52,33 @@ jobs:
           describe=`git describe --tags --always`
           echo "describe=$describe" >> $GITHUB_ENV
 
+    - name: Resolve channel
+      id: channel
+      shell: pwsh
+      run: |
+        # 渠道由分支决定，而不是由构建配置决定（见《分支与发布规范》§5.4）
+        $channel = '${{ inputs.channel }}'
+        if ([string]::IsNullOrWhiteSpace($channel)) {
+          $channel = switch -Regex ('${{ github.ref_name }}') {
+            '^dev$'      { 'Dev' }
+            '^slush$'    { 'Slush' }
+            '^alpha$'    { 'Alpha' }
+            '^beta$'     { 'Beta' }
+            '^pc$'       { 'Pc' }
+            '^snapshot$' { 'Snapshot' }
+            default      { 'Dev' }
+          }
+        }
+        "channel=$channel" >> $env:GITHUB_OUTPUT
+        Write-Host "构建渠道：$channel（分支 ${{ github.ref_name }}）"
+
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: '10.0.x'
 
     - name: Update Help
-      run:  |
+      run: |
         Set-Location ..
         git clone https://github.com/LTCatt/PCL2Help.git -b master --single-branch --depth 1
         Set-Location PCL2Help
@@ -54,17 +90,22 @@ jobs:
         Set-Location ${{ GITHUB.WORKSPACE }}
 
 
+    - name: Set version info
+      shell: pwsh
+      run: |
+        # 版本常量由发布流程写入（《分支与发布规范》§2、§5.1、§5.2）
+        & "${{ GITHUB.WORKSPACE }}\scripts\Set-VersionInfo.ps1" -Channel "${{ steps.channel.outputs.channel }}" -CommitHash "${{ github.sha }}"
+
     - name: Replace
       run: |
         (gc "pcl-next\Modules\ModSecret.vb") -replace 'Public OAuthClientId As String = If(Environment.GetEnvironmentVariable("PCL_MS_CLIENT_ID"), "")', 'Public OAuthClientId As String = If(Environment.GetEnvironmentVariable("PCL_MS_CLIENT_ID"), "${{ secrets.CLIENT_ID }}")' | Out-File "pcl-next\Modules\ModSecret.vb"
         (gc "pcl-next\Modules\ModSecret.vb") -replace 'Public CurseForgeAPIKey As String = If(Environment.GetEnvironmentVariable("PCL_CURSEFORGE_API_KEY"), "")', 'Public CurseForgeAPIKey As String = If(Environment.GetEnvironmentVariable("PCL_CURSEFORGE_API_KEY"), "${{ secrets.CURSEFORGE_API_KEY }}")' | Out-File "pcl-next\Modules\ModSecret.vb"
-        (gc "pcl-next\Modules\Base\ModBase.vb") -replace 'Public Const CommitHash As String = ""', 'Public Const CommitHash As String = "${{ github.sha }}"' | Out-File "pcl-next\Modules\Base\ModBase.vb"
 
     - name: Publish (self-contained single file)
-      run: dotnet publish "pcl-next\pcl-next.vbproj" -c ${{ matrix.configuration }} -p:PublishProfile=win-x64-single
+      run: dotnet publish "pcl-next\pcl-next.vbproj" -c ${{ matrix.configuration }} -p:PclChannel=${{ steps.channel.outputs.channel }} -p:PublishProfile=win-x64-single
 
     - name: Upload a Build Artifact
       uses: actions/upload-artifact@v7
       with:
-        name: ${{ matrix.configuration }} ${{ env.describe }}
+        name: ${{ matrix.configuration }} ${{ steps.channel.outputs.channel }} ${{ env.describe }}
         path: pcl-next\publish\win-x64\pcl-next.exe

@@ -10,7 +10,10 @@ Public Class FormMain
         Dim FeatureCount As Integer = 0, BugCount As Integer = 0
         Dim FeatureList As New List(Of KeyValuePair(Of Integer, String))
         '统计更新日志条目
-        If BuildType = BuildTypes.Release Then
+        If ModBuildChannel.ChannelIsOfficial Then
+            If LastVersion < 5070 Then 'PC 2.100.0.0
+                FeatureList.Add(New KeyValuePair(Of Integer, String)(1, "重写：主程序由 .NET Framework 迁移到 .NET 10"))
+            End If
             If LastVersion < 415 Then 'Release 2.99.0.1
                 FeatureList.Add(New KeyValuePair(Of Integer, String)(4, "删除：MC 下载功能相关入口"))
                 FeatureList.Add(New KeyValuePair(Of Integer, String)(1, "优化：为设置更新添加部分黑名单"))
@@ -100,6 +103,12 @@ Public Class FormMain
                 'FeatureList.Add(New KeyValuePair(Of Integer, String)(5, "新增：联机功能！"))
                 FeatureCount += 32
                 BugCount += 21
+            End If
+        ElseIf ModBuildChannel.Channel = ModBuildChannel.Channels.Alpha Then
+            '内测线的更新日志，按《分支与发布规范》§5.1 的版本号段排列
+            If LastVersion < 5000 Then 'alpha.1 2.100.0.1
+                FeatureList.Add(New KeyValuePair(Of Integer, String)(1, "重写：主程序由 .NET Framework 迁移到 .NET 10"))
+                FeatureList.Add(New KeyValuePair(Of Integer, String)(2, "新增：按分支规范区分开发 / 收敛 / 内测 / 公测 / 正式 / 快照六种渠道"))
             End If
         Else
             '5：          FEAT+
@@ -467,13 +476,23 @@ Public Class FormMain
     '根据打开次数触发的事件
     Private Sub RunCountSub()
         Settings.Set("SystemCount", Settings.Get(Of Integer)("SystemCount") + 1)
-        If BuildType = BuildTypes.Snapshot Then
-            Select Case Settings.Get(Of Integer)("SystemCount")
-                Case 1
-                    MyMsgBox("欢迎使用 PCL 快照版！" & vbCrLf &
-                             "快照版包含尚未在正式版发布的测试性功能，仅用于赞助者本人尝鲜。所以请不要发给其他人或者用于制作整合包哦！" & vbCrLf &
-                             "如果你并非通过赞助或赞助者本人邀请进群获得的本程序，那么可能是有人在违规传播，记得提醒他一下啦。", "快照版使用说明")
+        '各渠道的首次运行提示，按《分支与发布规范》§1.2、§1.3、§1.4 的要求分别明示
+        If Settings.Get(Of Integer)("SystemCount") = 1 Then
+            Select Case ModBuildChannel.Channel
+                Case ModBuildChannel.Channels.Alpha
+                    MyMsgBox("欢迎使用 PCL 内测版！" & vbCrLf & vbCrLf &
+                             "内测版仅面向少量受邀用户，可能存在已知缺陷，甚至会导致配置丢失或游戏崩溃。" & vbCrLf &
+                             "请务必先备份好 PCL 的配置与整合包，遇到无法接受的问题请及时反馈。", "内测版使用说明")
+                Case ModBuildChannel.Channels.Beta
+                    MyMsgBox("欢迎使用 PCL 公测版！" & vbCrLf & vbCrLf &
+                             "公测版面向所有用户开放试跑，只修复阻塞使用的问题，仍可能存在少量已知缺陷。" & vbCrLf &
+                             "请不要将公测版用于正式生产环境，遇到无法接受的崩溃请反馈。", "公测版使用说明")
+                Case ModBuildChannel.Channels.Slush
+                    MyMsgBox("欢迎使用 PCL 收敛版！" & vbCrLf & vbCrLf &
+                             "这是功能冻结后的内部候选构建，仅供内部测试使用，请不要对外分发。", "收敛版使用说明")
             End Select
+        End If
+        If ModBuildChannel.ChannelIsInternal Then
             If Settings.Get(Of Integer)("SystemCount") >= 99 Then
                 If ThemeUnlock(6, False) Then
                     MyMsgBox("你已经使用了 99 次 PCL 啦，感谢你长期以来的支持！" & vbCrLf &
@@ -487,8 +506,9 @@ Public Class FormMain
         Logger.Info($"版本号从 {LastVersionCode} 升高到 {VersionCode}")
         Settings.Set("SystemLastVersionReg", VersionCode)
         '检查有记录的最高版本号
+        '不同渠道各记各的，避免开发 / 内测版的高版本号污染正式通道的升级判定
         Dim HighestVersionCode As Integer
-        Const SettingKey = If(BuildType = BuildTypes.Snapshot, "SystemHighestAlphaVersionReg", "SystemHighestBetaVersionReg")
+        Dim SettingKey As String = ModBuildChannel.ChannelHighestVersionKey
         HighestVersionCode = Settings.Get(Of Integer)(SettingKey)
         If HighestVersionCode < VersionCode Then
             Settings.Set(SettingKey, VersionCode)

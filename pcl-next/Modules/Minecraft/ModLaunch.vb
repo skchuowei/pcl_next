@@ -245,7 +245,7 @@ NextInner:
         RunInUiWait(Sub() CheckResult = McLoginAble(McLoginInput()))
         If CheckResult <> "" Then Throw New ArgumentException(CheckResult)
         '求赞助
-        If BuildType = BuildTypes.Release AndAlso CurrentLaunchOptions?.SaveBatch Is Nothing Then '保存脚本时不提示
+        If ModBuildChannel.ChannelIsOfficial AndAlso CurrentLaunchOptions?.SaveBatch Is Nothing Then '保存脚本时不提示
             RunInNewThread(
             Sub()
                 Select Case Settings.Get(Of Integer)("SystemLaunchCount")
