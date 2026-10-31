@@ -220,10 +220,12 @@ Retry:
         Dim Request As HttpRequestMessage = Nothing, CancelToken As CancellationTokenSource = Nothing, Response As HttpResponseMessage = Nothing
         Try
             '构建 RequestClient
-            Directory.CreateDirectory(PathTemp & "Cache\Http\")
+            '缓存目录带 v2 后缀：CacheCow 2.13 的序列化格式与旧版（net45 内嵌程序集）不兼容，
+            '沿用旧目录会读到无法解析的缓存文件并抛 InvalidOperationException，导致请求直接失败。
+            Directory.CreateDirectory(PathTemp & "Cache\HttpV2\")
             SyncLock RequestClientLock
                 If RequestClient Is Nothing Then '延迟初始化，以避免在程序启动前加载 CacheCow 导致 DLL 加载失败
-                    RequestClient = CacheCow.Client.ClientExtensions.CreateClient(New CacheCow.Client.FileCacheStore.FileStore(PathTemp & "Cache/Http/"), New HttpClientHandler With {
+                    RequestClient = CacheCow.Client.ClientExtensions.CreateClient(New CacheCow.Client.FileCacheStore.FileStore(PathTemp & "Cache/HttpV2/"), New HttpClientHandler With {
                         .AutomaticDecompression = DecompressionMethods.Deflate Or DecompressionMethods.GZip,
                         .UseCookies = False '不设为 False 就不能从 Header 手动传入 Cookies
                     })

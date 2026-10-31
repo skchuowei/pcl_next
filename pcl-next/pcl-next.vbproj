@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <!--
     pcl-next：基于 PCL2 的第三方分支，目标运行时 .NET 10（net10.0-windows）。
@@ -107,42 +107,20 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!--
+      第三方依赖统一走 NuGet。
+      原先是从 Resources.resx 内嵌 + AppDomain.AssemblyResolve 动态加载 net45 程序集，
+      在 .NET 10 上已无必要，且会与依赖解析、单文件发布冲突。
+      注：Ookii.Dialogs.Wpf 经核查无任何代码引用，已直接移除；
+          ThrottleDebounce 的 Retrier 仍在 ModNet / ModBase / ClipboardInterceptor 使用，必须保留。
+    -->
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
-    <!-- CacheCow.Client（net45）在运行时依赖 System.Runtime.Caching，.NET 10 需显式引入 -->
-    <PackageReference Include="System.Runtime.Caching" Version="9.0.0" />
+    <PackageReference Include="CacheCow.Client" Version="2.13.1" />
+    <PackageReference Include="CacheCow.Client.FileStore" Version="2.13.1" />
+    <PackageReference Include="NAudio" Version="3.3.0" />
+    <PackageReference Include="Imazen.WebP" Version="11.0.0" />
+    <PackageReference Include="ThrottleDebounce" Version="2.0.2" />
     <PackageReference Include="System.Drawing.Common" Version="9.0.0" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <!-- 暂无 net10 兼容包，先沿用同目录下随仓库分发的程序集 -->
-    <Reference Include="CacheCow.Client">
-      <HintPath>Resources\CacheCow.Client.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
-    <Reference Include="CacheCow.Client.FileStore">
-      <HintPath>Resources\CacheCow.Client.FileStore.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
-    <Reference Include="CacheCow.Common">
-      <HintPath>Resources\CacheCow.Common.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
-    <Reference Include="ThrottleDebounce">
-      <HintPath>Resources\ThrottleDebounce.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
-    <Reference Include="NAudio">
-      <HintPath>Resources\NAudio.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
-    <Reference Include="Ookii.Dialogs.Wpf">
-      <HintPath>Resources\Ookii.Dialogs.Wpf.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
-    <Reference Include="Imazen.WebP">
-      <HintPath>Resources\Imazen.WebP.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
   </ItemGroup>
 
   <ItemGroup>

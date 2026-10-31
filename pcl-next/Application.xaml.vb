@@ -163,8 +163,9 @@ RetryCacheCheck:
                     Return '已有实例异常退出，继续启动
                 End Try
             End If
-            '将已有的 PCL 窗口拖出来
-            Dim WindowHwnd As IntPtr = FindWindow(Nothing, "Plain Craft Launcher　")
+            '将已有的 PCL 窗口拖出来（依次匹配本分支标题与上游标题）
+            Dim WindowHwnd As IntPtr = FindWindow(Nothing, "pcl-next")
+            If WindowHwnd = IntPtr.Zero Then WindowHwnd = FindWindow(Nothing, "Plain Craft Launcher　")
             If WindowHwnd = IntPtr.Zero Then WindowHwnd = FindWindow(Nothing, "Plain Craft Launcher 2　")
             If WindowHwnd <> IntPtr.Zero Then ShowWindowToTop(WindowHwnd)
             '播放提示音并退出
@@ -214,24 +215,10 @@ RetryCacheCheck:
         End If
     End Sub
 
-    '动态 DLL 加载
-    Private Sub New() '这里必须尽早调用，且不能使用任何库，否则加载 MeloongCore 就会导致崩溃
-        Static Prefixes As String() = {"NAudio", "Newtonsoft.Json", "Ookii.Dialogs.Wpf", "Imazen.WebP", "CacheCow.Common", "CacheCow.Client.FileStore", "CacheCow.Client", "ThrottleDebounce", "System.Net.Http.Formatting"}
-        Static LoadedAssemblies As New ConcurrentDictionary(Of String, Lazy(Of Assembly))(StringComparer.Ordinal) '缓存
-        AddHandler AppDomain.CurrentDomain.AssemblyResolve,
-        Function(sender As Object, Args As ResolveEventArgs) As Assembly
-            Dim Prefix As String = Prefixes.FirstOrDefault(Function(p) Args.Name.StartsWith(p, StringComparison.Ordinal))
-            If Prefix Is Nothing Then Return Nothing
-            Dim LazyAssembly = LoadedAssemblies.GetOrAdd(Prefix, Function(p) New Lazy(Of Assembly)(
-            Function()
-                Dim LoadedAssembly = Assembly.Load(DirectCast(My.Resources.ResourceManager.GetObject(p), Byte()))
-                If p = "Imazen.WebP" Then ExtractLibwebp() 'WebP 特判
-                Return LoadedAssembly
-            End Function, LazyThreadSafetyMode.ExecutionAndPublication))
-            Return LazyAssembly.Value
-        End Function
-    End Sub
-    Private Shared Sub ExtractLibwebp() '这个方法会调用 ModBase，进而调用 MeloongCore，所以不能放在 New 里
+    'WebP 原生库解包
+    '托管程序集（Imazen.WebP / NAudio / CacheCow 等）已改由 NuGet 提供，不再需要 AssemblyResolve 动态加载，
+    '这里只负责把内嵌的 libwebp64 释放成 libwebp.dll，供 Imazen.WebP 的 P/Invoke 使用。
+    Friend Shared Sub ExtractLibwebp() '这个方法会调用 ModBase，进而调用 MeloongCore，所以不能放在构造函数里
         SetDllDirectory(PathUtils.RemoveSlashSuffix(PathPure.Value))
         Try
             ExtractResources(PathPure.Value & "libwebp.dll", "libwebp64")

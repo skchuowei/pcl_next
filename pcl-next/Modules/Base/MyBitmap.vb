@@ -125,7 +125,13 @@ Public Class MyBitmap
         End Using
     End Sub
     Private Class WebPDecoder '将代码隔离在另外一个类中，这样只要不调用这个方法就不会加载 Imazen.WebP.dll
+        Private Shared NativeLibraryReady As Boolean
         Public Shared Function DecodeFromBytes(Bytes As Byte()) As System.Drawing.Bitmap
+            'Imazen.WebP 依赖原生 libwebp，首次解码前先把内嵌的 64 位库释放到启动器目录
+            If Not NativeLibraryReady Then
+                NativeLibraryReady = True
+                PCL.Application.ExtractLibwebp()
+            End If
             Return New Imazen.WebP.SimpleDecoder().DecodeFromBytes(Bytes, Bytes.Length)
         End Function
     End Class
