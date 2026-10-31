@@ -3,10 +3,14 @@ on:
   push:
     paths:
       - 'pcl-next/**'
+      - 'PCLCS/**'
+      - 'MeloongCore/**'
       - '.github/workflows/**'
   pull_request:
     paths:
       - 'pcl-next/**'
+      - 'PCLCS/**'
+      - 'MeloongCore/**'
       - '.github/workflows/**'
   workflow_dispatch:
 
@@ -14,9 +18,9 @@ jobs:
   build:
     name: Build
     runs-on: windows-latest
-    strategy:  
-       matrix:  
-         configuration: [Debug, Release]
+    strategy:
+      matrix:
+        configuration: [Debug, Release]
 
     steps:
 
@@ -32,11 +36,11 @@ jobs:
           describe=`git describe --tags --always`
           echo "describe=$describe" >> $GITHUB_ENV
 
-    - name: Setup MSBuild.exe
-      uses: microsoft/setup-msbuild@v3
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
       with:
-        msbuild-architecture: x64
-    
+        dotnet-version: '10.0.x'
+
     - name: Update Help
       run:  |
         Set-Location ..
@@ -55,15 +59,12 @@ jobs:
         (gc "pcl-next\Modules\ModSecret.vb") -replace 'Public OAuthClientId As String = If(Environment.GetEnvironmentVariable("PCL_MS_CLIENT_ID"), "")', 'Public OAuthClientId As String = If(Environment.GetEnvironmentVariable("PCL_MS_CLIENT_ID"), "${{ secrets.CLIENT_ID }}")' | Out-File "pcl-next\Modules\ModSecret.vb"
         (gc "pcl-next\Modules\ModSecret.vb") -replace 'Public CurseForgeAPIKey As String = If(Environment.GetEnvironmentVariable("PCL_CURSEFORGE_API_KEY"), "")', 'Public CurseForgeAPIKey As String = If(Environment.GetEnvironmentVariable("PCL_CURSEFORGE_API_KEY"), "${{ secrets.CURSEFORGE_API_KEY }}")' | Out-File "pcl-next\Modules\ModSecret.vb"
         (gc "pcl-next\Modules\Base\ModBase.vb") -replace 'Public Const CommitHash As String = ""', 'Public Const CommitHash As String = "${{ github.sha }}"' | Out-File "pcl-next\Modules\Base\ModBase.vb"
-        
-    - name: Restore NuGet Packages
-      run: dotnet restore PCLCS\PCLCS.csproj
 
-    - name: Build
-      run: msbuild "pcl-next\Plain Craft Launcher 2.vbproj" -p:Configuration=${{ matrix.configuration }}
+    - name: Publish (self-contained single file)
+      run: dotnet publish "pcl-next\pcl-next.vbproj" -c ${{ matrix.configuration }} -p:PublishProfile=win-x64-single
 
     - name: Upload a Build Artifact
       uses: actions/upload-artifact@v7
       with:
         name: ${{ matrix.configuration }} ${{ env.describe }}
-        path: pcl-next\obj\${{ matrix.configuration }}\Plain Craft Launcher 2.exe
+        path: pcl-next\publish\win-x64\pcl-next.exe

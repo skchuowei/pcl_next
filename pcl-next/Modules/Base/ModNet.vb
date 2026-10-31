@@ -225,7 +225,8 @@ Retry:
             Directory.CreateDirectory(PathTemp & "Cache\HttpV2\")
             SyncLock RequestClientLock
                 If RequestClient Is Nothing Then '延迟初始化，以避免在程序启动前加载 CacheCow 导致 DLL 加载失败
-                    RequestClient = CacheCow.Client.ClientExtensions.CreateClient(New CacheCow.Client.FileCacheStore.FileStore(PathTemp & "Cache/HttpV2/"), New HttpClientHandler With {
+                    Dim FileStore As New CacheCow.Client.FileCacheStore.FileStore(PathTemp & "Cache/HttpV2/")
+                    RequestClient = CacheCow.Client.ClientExtensions.CreateClient(New ResilientCacheStore(FileStore), New HttpClientHandler With {
                         .AutomaticDecompression = DecompressionMethods.Deflate Or DecompressionMethods.GZip,
                         .UseCookies = False '不设为 False 就不能从 Header 手动传入 Cookies
                     })

@@ -6,6 +6,11 @@ Public Class Application
     '开始
     Private Sub Application_Startup(sender As Object, e As StartupEventArgs) Handles Me.Startup
         Try
+            '注册代码页编码（GBK / GB2312 / GB18030 等）
+            '.NET Core 起运行时只自带 UTF-8 等少数编码，缺了这个提供程序，
+            'StrConv(..., SimplifiedChinese)、Encoding.GetEncoding("GB18030")、
+            '以及写 launcher_profiles.json 都会抛 NotSupportedException
+            Encoding.RegisterProvider(CodePagesEncodingProvider.Instance)
             '核心初始化
             MeloongCore.Main.Init("PCL")
             MeloongCore.Wpf.Main.Init()

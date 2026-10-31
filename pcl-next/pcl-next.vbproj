@@ -2,8 +2,9 @@
 
   <!--
     pcl-next：基于 PCL2 的第三方分支，目标运行时 .NET 10（net10.0-windows）。
-    本工程与同目录下遗留的 “Plain Craft Launcher 2.vbproj”（net48，非 SDK 风格）并存，
-    源码完全共用；两者互不覆盖（SDK 工程输出到 bin-net10）。
+    同目录下原有的 net48 工程（Plain Craft Launcher 2.vbproj）已于本分支弃用并删除，
+    因此本工程是该目录的唯一入口；构建输出到 bin-net10，单文件发布配置见
+    Properties/PublishProfiles/win-x64-single.pubxml。
   -->
 
   <PropertyGroup>
@@ -121,6 +122,8 @@
     <PackageReference Include="Imazen.WebP" Version="11.0.0" />
     <PackageReference Include="ThrottleDebounce" Version="2.0.2" />
     <PackageReference Include="System.Drawing.Common" Version="9.0.0" />
+    <!-- GBK/GB18030 等代码页编码：.NET Core 起需显式引入并在启动时注册提供程序 -->
+    <PackageReference Include="System.Text.Encoding.CodePages" Version="9.0.0" />
   </ItemGroup>
 
   <ItemGroup>
@@ -128,5 +131,17 @@
     <ProjectReference Include="..\MeloongCore\Wpf\MeloongCore.Wpf.csproj" />
     <ProjectReference Include="..\PCLCS\PCLCS.csproj" />
   </ItemGroup>
+
+  <!--
+    单文件发布收尾：被引用工程仍会把 .pdb 与 app.config 派生的 *.dll.config 复制到发布目录，
+    单文件模式下这两类文件既无用、也让「产物只有一个 exe」的说法失真，这里统一清掉。
+  -->
+  <Target Name="PclCleanSingleFileLeftovers" AfterTargets="Publish" Condition="'$(PublishSingleFile)' == 'true'">
+    <ItemGroup>
+      <_PclPublishLeftover Include="$(PublishDir)*.pdb" />
+      <_PclPublishLeftover Include="$(PublishDir)*.dll.config" />
+    </ItemGroup>
+    <Delete Files="@(_PclPublishLeftover)" ContinueOnError="true" />
+  </Target>
 
 </Project>

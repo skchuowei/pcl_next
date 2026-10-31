@@ -345,3 +345,6 @@ MaskFiles/
 
 # pcl-next（net10）构建输出
 bin-net10/
+
+# pcl-next 单文件发布配置（不含凭据，需要入库；上面的 *.pubxml 规则会把同类文件当机密忽略）
+!pcl-next/Properties/PublishProfiles/*.pubxml
