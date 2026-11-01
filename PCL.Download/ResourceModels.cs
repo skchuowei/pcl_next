@@ -208,4 +208,37 @@ internal static class VbCompat
         if (string.IsNullOrEmpty(word)) return word;
         return $"{char.ToUpperInvariant(word[0])}{word[1..].ToLowerInvariant()}";
     }
+
+    /// <summary>
+    /// VB 的 <c>Val</c>：解析字符串前导数字部分（可选符号 + 数字 + 至多一个小数点），
+    /// 其余字符（含首个非数字字符起）一律截断。无有效数字则返回 0。
+    /// 用于 <see cref="LocalResourceFile"/> 的 Display/Version 判定（纯数字串不当作名称）。
+    /// </summary>
+    public static double Val(string? value)
+    {
+        if (string.IsNullOrEmpty(value)) return 0;
+        int i = 0;
+        while (i < value.Length && char.IsWhiteSpace(value[i])) i++;
+        if (i >= value.Length) return 0;
+        bool neg = false;
+        if (value[i] == '-') { neg = true; i++; }
+        else if (value[i] == '+') { i++; }
+        int j = i;
+        bool hasDot = false;
+        while (j < value.Length)
+        {
+            char c = value[j];
+            if (c == '.')
+            {
+                if (hasDot) break;
+                hasDot = true;
+                j++;
+            }
+            else if (char.IsDigit(c)) j++;
+            else break;
+        }
+        if (j == i) return 0;
+        double.TryParse(value.Substring(i, j - i), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double result);
+        return neg ? -result : result;
+    }
 }
