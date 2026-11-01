@@ -14,7 +14,8 @@ Public Module ModBase
     '   PC = base+90…94，SP = base+95…99
     '   号段按代号阶梯严格递增，且每个代号都占独立区间——
     '   dev 与 slush 若共用同一号段，切换时代会被判成版本倒退而误弹降级提示。
-    Public Const VersionCode As Integer = ModBuildChannel.ChannelVersionCodeBase + ModBuildChannel.ChannelVersionCodeOffset
+    '   本值由 scripts\Set-VersionInfo.ps1 依据标签写入，不可手工填写。
+    Public Const VersionCode As Integer = 5000
 
     '版本信息
     ''' <summary>
