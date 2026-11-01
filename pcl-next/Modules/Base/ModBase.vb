@@ -6,7 +6,7 @@ Public Module ModBase
 #Region "声明"
 
     '下列版本信息由更新器自动修改
-    Public Const VersionBaseName As String = "2.100.0.2" '显示用版本名
+    Public Const VersionBaseName As String = "2.100.0.3" '显示用版本名
     Public Const CommitHash As String = "" 'Commit Hash，由 GitHub Workflow 自动替换
     '版本号按《分支与发布规范》§5.2 的号段表分配，必须全局单调递增，否则会误触发降级：
     '   周期基址 base = 5000 + 100 × 周期序号（周期 1 = 2.100 → 5000）
@@ -15,7 +15,7 @@ Public Module ModBase
     '   号段按代号阶梯严格递增，且每个代号都占独立区间——
     '   dev 与 slush 若共用同一号段，切换时代会被判成版本倒退而误弹降级提示。
     '   本值由 scripts\Set-VersionInfo.ps1 依据标签写入，不可手工填写。
-    Public Const VersionCode As Integer = 5001
+    Public Const VersionCode As Integer = 5002
 
     '版本信息
     ''' <summary>

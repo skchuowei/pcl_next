@@ -73,11 +73,12 @@ jobs:
     - name: Publish (self-contained single file)
       run: dotnet publish "pcl-next\pcl-next.vbproj" -c Release -p:PclChannel=${{ steps.channel.outputs.channel }} -p:PublishProfile=win-x64-single
 
-    - name: Pack artifact
+    - name: Prepare artifacts (exe + ini as separate files, not bundled)
       id: pack
       shell: pwsh
       run: |
-        # 制品命名：PCL-<版本名>-<代号>.zip（《分支与发布规范》§5.3）
+        # 制品命名：PCL-<版本名>-<代号>.exe（《分支与发布规范》§5.3）
+        # 注意：exe 与 DownloadPolicy.ini 作为两个独立文件分别上传到 GitHub Release，不打包成 zip
         $version = (Select-String -Path "pcl-next\Modules\Base\ModBase.vb" -Pattern 'VersionBaseName As String = "([^"]+)"').Matches[0].Groups[1].Value
         $channel = switch -Regex ('${{ github.ref_name }}') {
             '-dev\.'    { 'dev' }
@@ -85,7 +86,7 @@ jobs:
             '-alpha\.'  { 'alpha' }
             '-beta\.'   { 'beta' }
             '-sp\d+'    { 'sp' }
-            default     { 'pc' }
+            default     { 'rc' }
         }
         $suffix = if ($channel -eq 'sp') {
           $patch = ($version -split '\.')[2]
@@ -94,21 +95,27 @@ jobs:
         $name = "PCL-$version-$suffix"
         $publishDir = "pcl-next\publish\win-x64\${{ steps.channel.outputs.channel }}"
         New-Item -ItemType Directory -Path "out" -Force | Out-Null
-        Copy-Item "$publishDir\pcl-next.exe" "out\" -Force
-        Copy-Item "$publishDir\DownloadPolicy.ini" "out\" -Force -ErrorAction SilentlyContinue
-        Compress-Archive -Path "out\*" -DestinationPath "$name.zip" -Force
-        "artifact=$name.zip" >> $env:GITHUB_OUTPUT
-        Write-Host "制品：$name.zip"
+        # exe：重命名为带版本与代号的主程序（GitHub Release 主附件）
+        Copy-Item "$publishDir\pcl-next.exe" "out\$name.exe" -Force
+        "exe=$name.exe" >> $env:GITHUB_OUTPUT
+        # ini：部署期可选开关，作为独立附件上传（缺失时 exe 走内置默认，仍可运行）
+        Copy-Item "$publishDir\DownloadPolicy.ini" "out\DownloadPolicy.ini" -Force -ErrorAction SilentlyContinue
+        if (Test-Path "out\DownloadPolicy.ini") { "ini=DownloadPolicy.ini" >> $env:GITHUB_OUTPUT }
+        Write-Host "制品：$name.exe$(if (Test-Path 'out\DownloadPolicy.ini') { ' + DownloadPolicy.ini（分别独立上传）' })"
 
-    - name: Create GitHub Release
+    - name: Create GitHub Release (exe + ini as separate assets)
       shell: pwsh
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         $notes = "ReleaseNotes\${{ github.ref_name }}.md"
-        $args = @('release', 'create', '${{ github.ref_name }}', '${{ steps.pack.outputs.artifact }}', '--verify-tag', '--title', '${{ github.ref_name }}')
-        if (Test-Path $notes) { $args += @('--notes-file', $notes) } else { $args += @('--generate-notes') }
-        # 除正式版（pc）外一律标记为预发布：dev / slush 不对外分发，
+        # 附件分别上传：主程序 exe + 可选的 DownloadPolicy.ini（不打包在一起）
+        # 直接用扁平数组拼接，避免嵌套数组导致路径被拼成一个参数
+        $args = @('release', 'create', '${{ github.ref_name }}', "out\${{ steps.pack.outputs.exe }}")
+        if ('${{ steps.pack.outputs.ini }}' -ne '') { $args += "out\${{ steps.pack.outputs.ini }}" }
+        $args += '--verify-tag', '--title', '${{ github.ref_name }}'
+        if (Test-Path $notes) { $args += '--notes-file', $notes } else { $args += '--generate-notes' }
+        # 除正式版（rc）外一律标记为预发布：dev / slush 不对外分发，
         # alpha / beta / sp 为测试通道，《分支与发布规范》§5.3
         if ('${{ github.ref_name }}' -notmatch '^v[\d\.]+$') { $args += '--prerelease' }
         gh @args

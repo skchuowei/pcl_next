@@ -230,8 +230,12 @@ public class ResourceSearcherTests
         var req = new ResourceSearcher.SearchRequest(ResourceTypes.Mod, storage, 100) { SearchText = "中文测试" };
         ResourceSearcher.Search(req, _api);
         //两个平台的请求都应使用反查出的英文 "jei"，而非原文 "中文测试"
-        Assert.Contains(_api.Requests, r => r.Url.Contains("searchFilter=jei"));
-        Assert.Contains(_api.Requests, r => r.Url.Contains("query=jei"));
+        var diagnostics = string.Join(Environment.NewLine, _api.Requests.Select(r => r.Url)) +
+                          Environment.NewLine + "ErrorMessage: " + (storage.ErrorMessage ?? "(null)");
+        Assert.True(_api.Requests.Any(r => r.Url.Contains("searchFilter=jei")),
+            "未看到 CurseForge 的改写请求：\n" + diagnostics);
+        Assert.True(_api.Requests.Any(r => r.Url.Contains("query=jei")),
+            "未看到 Modrinth 的改写请求：\n" + diagnostics);
         Assert.DoesNotContain(_api.Requests, r => r.Url.Contains("中文测试"));
     }
 }

@@ -31,6 +31,14 @@ Public Module ModDevNotes
     Public ReadOnly Property DevStageNotice As String
         Get
             Select Case VersionCode
+                Case 5002 ' dev 2.100.0.3
+                    Return "你正在使用 PCL 的开发版（dev）。本项目仍在用 C# 重写 PCL，本版把资源子系统的" &
+                           "搜索、版本解析、本地扫描三块平移到了 C#，但尚未接入界面，实际使用仍是旧实现。" & vbCrLf & vbCrLf &
+                           "本版本已知限制：" & vbCrLf &
+                           "- C# 资源模块已就位但未接管，搜索 / 本地 Mod 识别行为与上一版一致；" & vbCrLf &
+                           "- 资源子系统的联网半边（平台接口、密钥、在线反查）仍是旧实现，尚未迁移；" & vbCrLf &
+                           "- 本版未做真机验证：下载、安装、启动链路未实际跑通，遇到异常请附 PCL/Log1.txt；" & vbCrLf &
+                           "- 配置与存档结构可能在后续版本调整，建议定期备份。"
                 Case 5000 ' dev 2.100.0.1
                     Return "你正在使用 PCL 的开发版（dev）。本项目仍处于用 C# 重写 PCL 的过程中，" &
                            "主程序以 VB 为主、下载服务 C# 化尚在推进，功能可能随时变动、存在已知缺陷。" & vbCrLf & vbCrLf &
@@ -51,6 +59,16 @@ Public Module ModDevNotes
     Public ReadOnly Property DevChangelog As String
         Get
             Select Case VersionCode
+                Case 5002 ' dev 2.100.0.3
+                    Return "· 重写：资源子系统前半平移为 C#（PCL.Download，net10.0）——" &
+                           "统一 HashType（MD5/SHA1/SHA256/SHA512/MurmurHash2）、ResourceProject/ResourceVersion 双平台解析、" &
+                           "ResourceSearcher 双站融合搜索与 IsLike 跨站去重、LocalResourceFile/Scanner 本地双哈希识别与归类。" & vbCrLf &
+                           "· 优化：资源侧运行时数据改由 ResourceConfig 静态钩子注入（MC 百科条目、繁简转换），" &
+                           "不再反向引用主工程，C# 侧可在非 Windows 环境编译与跑单测。" & vbCrLf &
+                           "· 修复：CF 指纹只移除 0x09/0x0A/0x0D/0x20 四类空白（误删 0x0B/0x0C 会导致指纹与 CF 官方不一致）。" & vbCrLf &
+                           "· 修复：MurmurHash2 尾块按上游逐项赋值语义实现，未照搬标准 fall-through 累加。" & vbCrLf &
+                           "· 修复：CF 文件对象判别严格按 gameId 存在性，判别错会走 Modrinth 分支并丢失加载器标记。" & vbCrLf &
+                           "· 保留：IsLike 中「游戏版本 Drops 完全相同即判为不同工程」的上游反判怪癖，未按常理化改写。"
                 Case 5001 ' dev 2.100.0.2
                     Return "· 修复：渠道条件编译常量不一致——PclChannelConstant 与代码判断的" &
                            " PCL_CHANNEL_* 不匹配，除 dev 外的所有渠道都会被编成 dev。" &
