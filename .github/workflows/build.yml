@@ -25,7 +25,7 @@ on:
   workflow_dispatch:
     inputs:
       channel:
-        description: '构建代号（Dev / Slush / Alpha / Beta / Pc / Snapshot）；留空则按分支推断'
+        description: '构建代号（Dev / Slush / Alpha / Beta / Rc / Snapshot）；留空则按分支推断'
         required: false
         default: ''
         type: string
@@ -64,7 +64,7 @@ jobs:
             '^slush$'    { 'Slush' }
             '^alpha$'    { 'Alpha' }
             '^beta$'     { 'Beta' }
-            '^pc$'       { 'Pc' }
+            '^rc$'       { 'Rc' }
             '^snapshot$' { 'Snapshot' }
             default      { 'Dev' }
           }
@@ -108,4 +108,4 @@ jobs:
       uses: actions/upload-artifact@v7
       with:
         name: ${{ matrix.configuration }} ${{ steps.channel.outputs.channel }} ${{ env.describe }}
-        path: pcl-next\publish\win-x64\pcl-next.exe
+        path: pcl-next\publish\win-x64\${{ steps.channel.outputs.channel }}\pcl-next.exe

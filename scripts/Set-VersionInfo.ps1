@@ -23,7 +23,7 @@
       · pcl-next/My Project/AssemblyInfo.vb      → AssemblyVersion / AssemblyFileVersion
 
 .PARAMETER Channel
-    渠道：Dev / Slush / Alpha / Beta / Pc / Snapshot。
+    渠道：Dev / Slush / Alpha / Beta / Rc / Snapshot。
 
 .PARAMETER Tag
     版本标签，如 v2.100.0.1-alpha.1。
@@ -37,7 +37,7 @@
 #>
 [CmdletBinding()]
 param(
-    [ValidateSet('Dev', 'Slush', 'Alpha', 'Beta', 'Pc', 'Snapshot')]
+    [ValidateSet('Dev', 'Slush', 'Alpha', 'Beta', 'Rc', 'Snapshot')]
     [string]$Channel = 'Dev',
     [string]$Tag = '',
     [string]$CommitHash = ''
@@ -54,7 +54,7 @@ if (-not $Root) { throw '未找到仓库根目录（应包含 pcl-next\pcl-next.
 # ── 号段表（《分支与发布规范》§5.2）：base + 偏移 ──────────────────────────────
 # 号段按代号阶梯严格递增，且每个代号占独立区间：
 #   dev = +0，slush = +10，alpha = +20，beta = +60，PC = +90，SP = +95
-$Offset = @{ Dev = 0; Slush = 10; Alpha = 20; Beta = 60; Pc = 90; Snapshot = 95 }
+$Offset = @{ Dev = 0; Slush = 10; Alpha = 20; Beta = 60; Rc = 90; Snapshot = 95 }
 # 首个周期（2.100）的基址为 5000，周期 2（2.101）为 5100，依此类推（周期序号从 0 计）
 $BaseOfCycle = 5000
 $FirstCycleMinor = 100
@@ -84,7 +84,7 @@ $VersionName = $null
 $Sequence = 1
 
 if ($Tag) {
-    $m = [regex]::Match($Tag, '^(?:v)?(?<major>\d+)\.(?<minor>\d+)\.(?<patch>\d+)\.(?<build>\d+)(?:-(?<chan>dev|slush|alpha|beta|pc|sp|snapshot)\.?(?<seq>\d+)?)?$')
+    $m = [regex]::Match($Tag, '^(?:v)?(?<major>\d+)\.(?<minor>\d+)\.(?<patch>\d+)\.(?<build>\d+)(?:-(?<chan>dev|slush|alpha|beta|rc|sp|snapshot)\.?(?<seq>\d+)?)?$')
     if (-not $m.Success) { throw "无法解析版本标签：$Tag" }
     $VersionName = "$($m.Groups['major'].Value).$($m.Groups['minor'].Value).$($m.Groups['patch'].Value).$($m.Groups['build'].Value)"
     $cycle = [int]$m.Groups['minor'].Value - $FirstCycleMinor
@@ -96,12 +96,12 @@ if ($Tag) {
             'slush' { $Channel = 'Slush' }
             'alpha' { $Channel = 'Alpha' }
             'beta' { $Channel = 'Beta' }
-            'pc' { $Channel = 'Pc' }
+            'rc' { $Channel = 'Rc' }
             'sp' { $Channel = 'Snapshot' }
             'snapshot' { $Channel = 'Snapshot' }
         }
     }
-    else { $Channel = 'Pc' }
+    else { $Channel = 'Rc' }
     $Sequence = if ($m.Groups['seq'].Success) { [int]$m.Groups['seq'].Value } else { 1 }
 }
 else {
@@ -114,7 +114,7 @@ else {
     $Base = $BaseOfCycle + 100 * $cycle
     $Sequence = [int]$parts[3]
     if ($Channel -eq 'Snapshot') { $Sequence = [int]$parts[2] }
-    if ($Channel -eq 'Pc') { $Sequence = 1 }
+    if ($Channel -eq 'Rc') { $Sequence = 1 }
 }
 
 # ── 计算版本号（§5.2 号段表）────────────────────────────────────────────────
@@ -125,7 +125,7 @@ switch ($Channel) {
     'Slush' { $VersionCode = $Base + $Offset['Slush'] + ($Sequence - 1) }
     'Alpha' { $VersionCode = $Base + $Offset['Alpha'] + ($Sequence - 1) }
     'Beta' { $VersionCode = $Base + $Offset['Beta'] + ($Sequence - 1) }
-    'Pc' { $VersionCode = $Base + $Offset['Pc'] }
+    'Rc' { $VersionCode = $Base + $Offset['Rc'] }
     'Snapshot' { $VersionCode = $Base + $Offset['Snapshot'] + ($Sequence - 1) }
 }
 

@@ -43,6 +43,22 @@ jobs:
         Remove-Item PCL2Help -Recurse -Force
         Set-Location ${{ GITHUB.WORKSPACE }}
 
+    - name: Resolve channel
+      id: channel
+      shell: pwsh
+      run: |
+        # 渠道由标签决定（《分支与发布规范》§5.3、§5.6）
+        $channel = switch -Regex ('${{ github.ref_name }}') {
+            '-dev\.'    { 'Dev' }
+            '-slush\.'  { 'Slush' }
+            '-alpha\.'  { 'Alpha' }
+            '-beta\.'   { 'Beta' }
+            '-sp\d+'    { 'Snapshot' }
+            default     { 'Rc' }
+        }
+        "channel=$channel" >> $env:GITHUB_OUTPUT
+        Write-Host "构建代号：$channel（标签 ${{ github.ref_name }}）"
+
     - name: Set version info
       shell: pwsh
       run: |
@@ -55,7 +71,7 @@ jobs:
         (gc "pcl-next\Modules\ModSecret.vb") -replace 'Public CurseForgeAPIKey As String = If(Environment.GetEnvironmentVariable("PCL_CURSEFORGE_API_KEY"), "")', 'Public CurseForgeAPIKey As String = If(Environment.GetEnvironmentVariable("PCL_CURSEFORGE_API_KEY"), "${{ secrets.CURSEFORGE_API_KEY }}")' | Out-File "pcl-next\Modules\ModSecret.vb"
 
     - name: Publish (self-contained single file)
-      run: dotnet publish "pcl-next\pcl-next.vbproj" -c Release -p:PublishProfile=win-x64-single
+      run: dotnet publish "pcl-next\pcl-next.vbproj" -c Release -p:PclChannel=${{ steps.channel.outputs.channel }} -p:PublishProfile=win-x64-single
 
     - name: Pack artifact
       shell: pwsh
@@ -75,9 +91,10 @@ jobs:
           "SP$patch"
         } else { $channel }
         $name = "PCL-$version-$suffix"
+        $publishDir = "pcl-next\publish\win-x64\${{ steps.channel.outputs.channel }}"
         New-Item -ItemType Directory -Path "out" -Force | Out-Null
-        Copy-Item "pcl-next\publish\win-x64\pcl-next.exe" "out\" -Force
-        Copy-Item "pcl-next\publish\win-x64\DownloadPolicy.ini" "out\" -Force -ErrorAction SilentlyContinue
+        Copy-Item "$publishDir\pcl-next.exe" "out\" -Force
+        Copy-Item "$publishDir\DownloadPolicy.ini" "out\" -Force -ErrorAction SilentlyContinue
         Compress-Archive -Path "out\*" -DestinationPath "$name.zip" -Force
         "artifact=$name.zip" >> $env:GITHUB_OUTPUT
         Write-Host "制品：$name.zip"

@@ -29,15 +29,15 @@ Public Module ModBase
     End Property
     '渠道（发布通道）由 CI 按分支注入编译期常量决定，
     '详见 ModBuildChannel 与《分支与发布规范》§5.4。
-#If ALPHA Then
+#If PCL_CHANNEL_ALPHA Then
     Public Const BuildType As BuildTypes = BuildTypes.Alpha
-#ElseIf BETA Then
+#ElseIf PCL_CHANNEL_BETA Then
     Public Const BuildType As BuildTypes = BuildTypes.Beta
-#ElseIf RELEASE Then
+#ElseIf PCL_CHANNEL_RC Then
     Public Const BuildType As BuildTypes = BuildTypes.Release
-#ElseIf SNAPSHOT Then
+#ElseIf PCL_CHANNEL_SNAPSHOT Then
     Public Const BuildType As BuildTypes = BuildTypes.Snapshot
-#ElseIf SLUSH Then
+#ElseIf PCL_CHANNEL_SLUSH Then
     Public Const BuildType As BuildTypes = BuildTypes.Slush
 #Else
     Public Const BuildType As BuildTypes = BuildTypes.Debug

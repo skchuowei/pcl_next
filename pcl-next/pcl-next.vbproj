@@ -25,7 +25,7 @@
     <ApplicationIcon>Images\icon.ico</ApplicationIcon>
     <!-- 不使用面向 .NET Framework 的 App.config（其中的 system.net 段在 net10 上会直接报错） -->
     <AppConfig>App.net10.config</AppConfig>
-    <OutputPath>bin-net10\</OutputPath>
+    <OutputPath>bin-net10\$(PclChannel)\</OutputPath>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <DefineDebug>false</DefineDebug>
     <DefineTrace>false</DefineTrace>
@@ -43,12 +43,12 @@
     与《分支与发布规范》的六条长期分支一一对应，渠道不再是「构建配置」的附属物，
     而是「分支」的附属物——因此由 CI 按分支注入编译期常量，见 §5.4：
 
-        Dev      → DEBUG    开发版   （dev 分支）
-        Slush    → SLUSH    收敛版   （slush 分支）
-        Alpha    → ALPHA    内测版   （alpha 分支）
-        Beta     → BETA     公测版   （beta 分支）
-        Pc       → RELEASE  正式版   （pc 分支）
-        Snapshot → SNAPSHOT 快照/SP  （snapshot 分支）
+        Dev      → PCL_CHANNEL_DEV       开发版   （dev 分支）
+        Slush    → PCL_CHANNEL_SLUSH     收敛版   （slush 分支）
+        Alpha    → PCL_CHANNEL_ALPHA     内测版   （alpha 分支）
+        Beta     → PCL_CHANNEL_BETA      公测版   （beta 分支）
+        Rc       → PCL_CHANNEL_RC        正式版   （rc 分支）
+        Snapshot → PCL_CHANNEL_SNAPSHOT  快照/SP  （snapshot 分支）
 
     用法：dotnet build -p:PclChannel=Alpha
     未显式指定时：Configuration = Snapshot 时取 Snapshot，其余取 Dev（与 dev 分支一致）。
@@ -58,22 +58,22 @@
     <PclChannel Condition="'$(PclChannel)' == ''">Dev</PclChannel>
   </PropertyGroup>
   <PropertyGroup Condition="'$(PclChannel)' == 'Dev'">
-    <PclChannelConstant>DEBUG</PclChannelConstant>
+    <PclChannelConstant>PCL_CHANNEL_DEV</PclChannelConstant>
   </PropertyGroup>
   <PropertyGroup Condition="'$(PclChannel)' == 'Slush'">
-    <PclChannelConstant>SLUSH</PclChannelConstant>
+    <PclChannelConstant>PCL_CHANNEL_SLUSH</PclChannelConstant>
   </PropertyGroup>
   <PropertyGroup Condition="'$(PclChannel)' == 'Alpha'">
-    <PclChannelConstant>ALPHA</PclChannelConstant>
+    <PclChannelConstant>PCL_CHANNEL_ALPHA</PclChannelConstant>
   </PropertyGroup>
   <PropertyGroup Condition="'$(PclChannel)' == 'Beta'">
-    <PclChannelConstant>BETA</PclChannelConstant>
+    <PclChannelConstant>PCL_CHANNEL_BETA</PclChannelConstant>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(PclChannel)' == 'Pc'">
-    <PclChannelConstant>RELEASE</PclChannelConstant>
+  <PropertyGroup Condition="'$(PclChannel)' == 'Rc'">
+    <PclChannelConstant>PCL_CHANNEL_RC</PclChannelConstant>
   </PropertyGroup>
   <PropertyGroup Condition="'$(PclChannel)' == 'Snapshot'">
-    <PclChannelConstant>SNAPSHOT</PclChannelConstant>
+    <PclChannelConstant>PCL_CHANNEL_SNAPSHOT</PclChannelConstant>
   </PropertyGroup>
   <PropertyGroup>
     <PclDefineConstants Condition="'$(DefineConstants)' != ''">$(DefineConstants);$(PclChannelConstant)</PclDefineConstants>
@@ -181,6 +181,32 @@
     <ProjectReference Include="..\PCLCS\PCLCS.csproj" />
     <ProjectReference Include="..\PCL.Download\PCL.Download.csproj" />
   </ItemGroup>
+
+  <!--
+    渠道切换时强制重新编译。
+
+    VB 的增量编译只比对源文件与程序集的时间戳，不会因为 DefineConstants 变化而重新编译，
+    因此切换渠道后若沿用同一份中间产物，就会把上一个渠道的常量编译进产物
+    （曾出现「传 -p:PclChannel=Dev 却跑出 rc 渠道」的产物）。
+    这里记录上次编译的渠道，与本次不一致时删除中间程序集，逼编译器重编。
+
+    注：不能通过自定义 IntermediateOutputPath 来隔离渠道——
+    WPF 的标记编译会生成临时工程并复用同一份中间目录，自定义路径会让两遍编译互相污染。
+  -->
+  <Target Name="PclChannelGuard" BeforeTargets="CoreCompile">
+    <PropertyGroup>
+      <_PclChannelStamp>$(IntermediateOutputPath)PclChannel.stamp</_PclChannelStamp>
+    </PropertyGroup>
+    <ReadLinesFromFile File="$(_PclChannelStamp)" Condition="Exists('$(_PclChannelStamp)')">
+      <Output TaskParameter="Lines" ItemName="_PclChannelRecorded" />
+    </ReadLinesFromFile>
+    <PropertyGroup>
+      <_PclChannelRecordedValue>@(_PclChannelRecorded)</_PclChannelRecordedValue>
+    </PropertyGroup>
+    <Delete Files="@(IntermediateAssembly)" Condition="'$(_PclChannelRecordedValue)' != '$(PclChannel)'" />
+    <Message Importance="high" Text="PclChannelGuard: recorded=[$(_PclChannelRecordedValue)] current=[$(PclChannel)] const=[$(PclChannelConstant)] defines=[$(DefineConstants)] asm=[@(IntermediateAssembly)]" />
+    <WriteLinesToFile File="$(_PclChannelStamp)" Lines="$(PclChannel)" Overwrite="true" WriteOnlyWhenDifferent="true" />
+  </Target>
 
   <!--
     单文件发布收尾：被引用工程仍会把 .pdb 与 app.config 派生的 *.dll.config 复制到发布目录，

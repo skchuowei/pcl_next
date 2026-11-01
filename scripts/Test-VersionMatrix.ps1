@@ -44,7 +44,7 @@ $Ranges = [ordered]@{
     'slush'   = @(($Base + 10), ($Base + 19))
     'alpha'   = @(($Base + 20), ($Base + 59))
     'beta'    = @(($Base + 60), ($Base + 89))
-    'pc'      = @(($Base + 90), ($Base + 94))
+    'rc'      = @(($Base + 90), ($Base + 94))
     'snapshot'= @(($Base + 95), ($Base + 99))
 }
 

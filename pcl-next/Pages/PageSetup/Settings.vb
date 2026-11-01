@@ -2,10 +2,13 @@ Imports System.Security.Cryptography
 
 Public Class Settings
 
-    '「历史最高版本号」按渠道分别记录：正式通道（含 SP 修订）用 SystemHighestPcVersionReg，
+    '「历史最高版本号」按渠道分别记录：正式通道（含 SP 修订）用 SystemHighestRcVersionReg，
     '内测用 SystemHighestAlphaVersionReg，公测用 SystemHighestBetaVersionReg，
     '收敛用 SystemHighestSlushVersionReg，开发用 SystemHighestDevVersionReg，
     '避免不同渠道的版本号互相污染升级判定，详见 ModBuildChannel.ChannelHighestVersionKey
+    '
+    '另：SystemLastVersionReg 只记录「上次运行的版本号」，不参与升级 / 降级判定——
+    '判定一律用上面按渠道隔离的历史最高版本号，否则跨渠道切换会被误判成版本倒退。
     Public Shared ReadOnly Entries As Dictionary(Of String, Setting) = (New List(Of Setting) From {
         New Setting("Identify", "", Source:=Sources.Registry),
         New Setting("WindowHeight", 550),
@@ -33,7 +36,7 @@ Public Class Settings
         New Setting("SystemHighestSavedBetaVersionReg", 0, Source:=Sources.Registry, Encrypted:=True),
         New Setting("SystemHighestBetaVersionReg", 0, Source:=Sources.Registry, Encrypted:=True),
         New Setting("SystemHighestAlphaVersionReg", 0, Source:=Sources.Registry, Encrypted:=True),
-        New Setting("SystemHighestPcVersionReg", 0, Source:=Sources.Registry, Encrypted:=True),
+        New Setting("SystemHighestRcVersionReg", 0, Source:=Sources.Registry, Encrypted:=True),
         New Setting("SystemHighestSlushVersionReg", 0, Source:=Sources.Registry, Encrypted:=True),
         New Setting("SystemHighestDevVersionReg", 0, Source:=Sources.Registry, Encrypted:=True),
         New Setting("SystemHelpVersion", 0, Source:=Sources.Registry),

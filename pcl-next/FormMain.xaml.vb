@@ -329,7 +329,11 @@ Public Class FormMain
         FrmLaunchLeft = New PageLaunchLeft
         FrmLaunchRight = New PageLaunchRight
         '版本号改变
-        Dim LastVersion As Integer = Settings.Get(Of Integer)("SystemLastVersionReg")
+        '「历史最高版本号」按渠道隔离，比较时也必须用渠道自己那份记录：
+        '若用全局的 SystemLastVersionReg，跨渠道切换会被误判成「版本倒退」
+        '（例如从正式通道的 5090 切到开发通道的 5000），
+        '结果是该渠道的更新日志不显示、最高版本号也不落库。
+        Dim LastVersion As Integer = Settings.Get(Of Integer)(ModBuildChannel.ChannelHighestVersionKey)
         If LastVersion < VersionCode Then
             '触发升级
             UpgradeSub(LastVersion)
@@ -489,10 +493,7 @@ Public Class FormMain
             End Try
             '上报
             Telemetry("启动")
-            '开源版本提示
-            If VersionBranchMain = "OpenSource" Then
-                MyMsgBox($"该版本中无法使用以下特性：{vbCrLf}- CurseForge API 调用：需要自行申请 API Key，然后添加到 ModSecret.vb 的开头{vbCrLf}- 正版登录：需要自行向微软申请 Client ID，然后添加到 ModSecret.vb 的开头{vbCrLf}- 更新与联网通知：避免滥用隐患{vbCrLf}- 主题切换：这是需要赞助解锁的纪念性质的功能，别让赞助者太伤心啦……{vbCrLf}- 百宝箱：开发早期往里面塞了些开发工具，整理起来太麻烦了……", "开源版本说明")
-            End If
+            '开发阶段提示与开发日志改由 RunCountSub（首次启动）与 UpgradeSub（版本升级）统一触发，见 ShowDevNotes。
         End Sub, "初始化", ThreadPriority.Lowest)
 
         Logger.Info($"第三阶段加载用时：{GetTimeMs() - ApplicationStartTick} ms")
@@ -515,6 +516,7 @@ Public Class FormMain
                     MyMsgBox("欢迎使用 PCL 收敛版！" & vbCrLf & vbCrLf &
                              "这是功能冻结后的内部候选构建，仅供内部测试使用，请不要对外分发。", "收敛版使用说明")
             End Select
+            ShowDevNotes()
         End If
         If ModBuildChannel.ChannelIsInternal Then
             If Settings.Get(Of Integer)("SystemCount") >= 99 Then
@@ -524,6 +526,16 @@ Public Class FormMain
                 End If
             End If
         End If
+    End Sub
+    '开发阶段提示与开发日志（内置，每版本硬编码）
+    '仅开发阶段渠道（dev / slush / alpha / beta）在首次启动与版本升级时弹出；RC / 正式 / SP 不显示。
+    '内容见 ModDevNotes（按 VersionCode 分支，由开发人员每版本写入）。
+    Private Sub ShowDevNotes()
+        If ModBuildChannel.ChannelIsOfficial Then Return
+        Dim Notice = ModDevNotes.DevStageNotice
+        If Notice <> "" Then MyMsgBox(Notice, "开发阶段提示")
+        Dim Log = ModDevNotes.DevChangelog
+        If Log <> "" Then MyMsgBox(Log, "开发日志 · " & ModBuildChannel.ChannelDisplay & " " & VersionBaseName)
     End Sub
     '升级与降级事件
     Private Sub UpgradeSub(LastVersionCode As Integer)
@@ -602,6 +614,7 @@ Public Class FormMain
         If LastVersionCode <= 0 Then Return
         If HighestVersionCode >= VersionCode Then Return
         ShowUpdateLog(HighestVersionCode)
+        ShowDevNotes()
     End Sub
     Private Sub DowngradeSub(LastVersionCode As Integer)
         Logger.Info($"版本号从 {LastVersionCode} 降低到 {VersionCode}")

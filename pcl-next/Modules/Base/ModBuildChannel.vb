@@ -7,7 +7,7 @@
 ''' <item><c>slush</c>    —— 收敛版：功能冻结线，产物只给内部测试。</item>
 ''' <item><c>alpha</c>    —— 内测版：小范围内测，允许带已知缺陷发布。</item>
 ''' <item><c>beta</c>     —— 公测版：面向所有用户试跑，只留可容忍缺陷。</item>
-''' <item><c>pc</c>       —— 正式版：对外正式发布，只允许发版与紧急修复。</item>
+''' <item><c>rc</c>       —— 正式版（RC）：对外正式发布，只允许发版与紧急修复。</item>
 ''' <item><c>snapshot</c> —— 快照版：正式版的 SP 维护线，只出 SP 补丁包。</item>
 ''' </list>
 '''
@@ -16,7 +16,7 @@
 ''' 本模块是「分支名 ↔ 代号 ↔ 显示名 ↔ 版本号段 ↔ 遥测 ↔ 制品名」的唯一事实源，
 ''' 其它模块一律从这里取值，不得再自行硬编码代号名。
 '''
-''' 号段按代号阶梯严格递增（dev < slush < alpha < beta < PC < SP），
+''' 号段按代号阶梯严格递增（dev < slush < alpha < beta < RC < SP），
 ''' 且每个代号都占独立区间——dev 与 slush 若共用同一号段，切换时代会被判成版本倒退。
 ''' 详见《分支与发布规范》§5.2。
 ''' 所有公开成员一律以 <c>Channel</c> 开头，避免与既有代码里的局部变量重名。
@@ -31,13 +31,17 @@ Public Module ModBuildChannel
         Slush = 1
         Alpha = 2
         Beta = 3
-        Pc = 4
+        Rc = 4
         Snapshot = 5
     End Enum
 
 #Region "编译期注入"
 
-#If ALPHA Then
+'注意：这里的条件编译常量必须带 PCL_CHANNEL_ 前缀。
+'RELEASE / DEBUG 是 .NET SDK 在 Release / Debug 配置下内建定义的常量
+'（DefineConstants 会带上 TRACE;RELEASE;...），若直接用 RELEASE 做渠道开关，
+'Release 构建下该分支会恒成立，导致除 alpha / beta 之外的渠道全部被编成正式版。
+#If PCL_CHANNEL_ALPHA Then
     '内测线（alpha 分支）——《分支与发布规范》§1.3
     Public Const ChannelId As Integer = 2
     Public Const ChannelCode As String = "alpha"
@@ -45,7 +49,7 @@ Public Module ModBuildChannel
     Public Const ChannelVersionCodeOffset As Integer = 20
     Public Const ChannelAllowTelemetry As Boolean = False
     Public Const ChannelHighestVersionKey As String = "SystemHighestAlphaVersionReg"
-#ElseIf BETA Then
+#ElseIf PCL_CHANNEL_BETA Then
     '公测线（beta 分支）——《分支与发布规范》§1.4
     Public Const ChannelId As Integer = 3
     Public Const ChannelCode As String = "beta"
@@ -53,23 +57,23 @@ Public Module ModBuildChannel
     Public Const ChannelVersionCodeOffset As Integer = 60
     Public Const ChannelAllowTelemetry As Boolean = True
     Public Const ChannelHighestVersionKey As String = "SystemHighestBetaVersionReg"
-#ElseIf RELEASE Then
-    '正式发布线（pc 分支）——《分支与发布规范》§1.5
+#ElseIf PCL_CHANNEL_RC Then
+    '正式发布线（rc 分支）——《分支与发布规范》§1.5
     Public Const ChannelId As Integer = 4
-    Public Const ChannelCode As String = "pc"
+    Public Const ChannelCode As String = "rc"
     Public Const ChannelDisplay As String = "正式版"
     Public Const ChannelVersionCodeOffset As Integer = 90
     Public Const ChannelAllowTelemetry As Boolean = True
-    Public Const ChannelHighestVersionKey As String = "SystemHighestPcVersionReg"
-#ElseIf SNAPSHOT Then
+    Public Const ChannelHighestVersionKey As String = "SystemHighestRcVersionReg"
+#ElseIf PCL_CHANNEL_SNAPSHOT Then
     '正式版的 SP 维护线（snapshot 分支）——《分支与发布规范》§1.6、§4
     Public Const ChannelId As Integer = 5
     Public Const ChannelCode As String = "snapshot"
     Public Const ChannelDisplay As String = "正式版"
     Public Const ChannelVersionCodeOffset As Integer = 95
     Public Const ChannelAllowTelemetry As Boolean = True
-    Public Const ChannelHighestVersionKey As String = "SystemHighestPcVersionReg"
-#ElseIf SLUSH Then
+    Public Const ChannelHighestVersionKey As String = "SystemHighestRcVersionReg"
+#ElseIf PCL_CHANNEL_SLUSH Then
     '收敛 / 冻结线（slush 分支）——《分支与发布规范》§1.2
     Public Const ChannelId As Integer = 1
     Public Const ChannelCode As String = "slush"
@@ -110,7 +114,7 @@ Public Module ModBuildChannel
     ''' </summary>
     Public ReadOnly Property ChannelIsOfficial As Boolean
         Get
-            Return Channel = Channels.Pc OrElse Channel = Channels.Snapshot
+            Return Channel = Channels.Rc OrElse Channel = Channels.Snapshot
         End Get
     End Property
 
@@ -149,12 +153,12 @@ Public Module ModBuildChannel
 
     ''' <summary>
     ''' 制品名（不含扩展名）。格式见《分支与发布规范》§5.3：PCL-版本名-代号。
-    ''' PC 与 SP 分列两支：PC 用代号本身，SP 用 SP 序号。
+    ''' RC 与 SP 分列两支：RC 用代号本身，SP 用 SP 序号。
     ''' </summary>
     Public ReadOnly Property ChannelArtifactName As String
         Get
             Dim Suffix = ChannelCode
-            If Channel = Channels.Pc Then Suffix = "pc"
+            If Channel = Channels.Rc Then Suffix = "rc"
             If Channel = Channels.Snapshot Then Suffix = If(ChannelPatchNumber > 0, "SP" & ChannelPatchNumber.ToString, "SP")
             Return $"PCL-{VersionBaseName}-{Suffix}"
         End Get
