@@ -31,6 +31,13 @@ Public Module ModDevNotes
     Public ReadOnly Property DevStageNotice As String
         Get
             Select Case VersionCode
+                Case 5003 ' dev 2.100.0.4
+                    Return "你正在使用 PCL 的开发版（dev）。本版补齐了资源子系统的联网半边（平台接口、密钥降级、" &
+                           "在线反查），并把下载页的搜索与列表切到了 C# 实现；dev.2 起欠下的四项真机验证已清偿。" & vbCrLf & vbCrLf &
+                           "本版本已知限制：" & vbCrLf &
+                           "- 未配置环境变量 PCL_CURSEFORGE_API_KEY 时只有 Modrinth 源，资源页会给出提示；" & vbCrLf &
+                           "- 下载 UI 的其余部分（安装流程、任务列表）与 Mod 管理页的本地更新检测仍是旧实现；" & vbCrLf &
+                           "- 配置与存档结构可能在后续版本调整，建议定期备份；遇到异常请附 PCL/Log1.txt。"
                 Case 5002 ' dev 2.100.0.3
                     Return "你正在使用 PCL 的开发版（dev）。本项目仍在用 C# 重写 PCL，本版把资源子系统的" &
                            "搜索、版本解析、本地扫描三块平移到了 C#，但尚未接入界面，实际使用仍是旧实现。" & vbCrLf & vbCrLf &
@@ -59,6 +66,22 @@ Public Module ModDevNotes
     Public ReadOnly Property DevChangelog As String
         Get
             Select Case VersionCode
+                Case 5003 ' dev 2.100.0.4
+                    Return "· 重写：资源子系统联网半边入 PCL.Download——IResourceProvider（工程查询/批量/版本枚举/指纹反查/搜索分页）、" &
+                           "CurseForge/Modrinth 适配器、候选源解析（官方+MCIM 多镜像，逐候选超时）、请求签名（UA/Referer/x-api-key/{CDN}）。" & vbCrLf &
+                           "· 重写：LocalResourceOnlineLoader——指纹反查（CF Murmur2 去空白 / Modrinth SHA1）→ 工程回填 → 更新检测 → " &
+                           "下载源合并，缓存键为「指纹 + 原版版本 + 加载器」、时效 6 小时。" & vbCrLf &
+                           "· 重写：下载页搜索与列表的数据源由 VB 改由 ResourceProviderRegistry.Search 提供（Phase 4 首步）；" &
+                           "融合/IsLike 去重/评分排序仍单点在 C# ResourceSearcher 内，registry 只做源收敛。" & vbCrLf &
+                           "· 修复：宿主从未注入 ResourceApi.Default，C# 联网方法一律抛「未注入 IResourceApi」；现于启动时注入 " &
+                           "ResourceSigningOptions.Default 与 HttpResourceApi（失败仅告警）。" & vbCrLf &
+                           "· 修复：DelegatingHandler 的同步 Send 路径不经 SendAsync，只重写后者会丢失 UA 与 x-api-key；" &
+                           "已同时重写同步 Send（由单测抓出）。" & vbCrLf &
+                           "· 修复：CF exactMatches 的 file 对象缺 gameId 会被 FromPlatformJson 误判为 Modrinth 并丢加载器标记，Provider 侧补注入。" & vbCrLf &
+                           "· 修复：dev.3 标签构建漏含引擎修复（工作区未提交），线上仍会 NeoForge 卡 2%/16%、速度掉零不补分块、进度 NaN%；" &
+                           "已纳入本版：分块退避、429/503 主机冷却、读停滞超时、首包对冲、死源快判、慢源换源续传、MaxChunksPerHost、进度原子镜像。" & vbCrLf &
+                           "· 限流：429/5xx 冷却 5000ms 后换下一个候选（尊重 Retry-After，上限同值）；4xx 立即失败不换源。" & vbCrLf &
+                           "· 降级：PCL_CURSEFORGE_API_KEY 缺失时 CurseForge 源置灰并给出可展示文案，请求自动改由 Modrinth 承接，不抛错中断。"
                 Case 5002 ' dev 2.100.0.3
                     Return "· 重写：资源子系统前半平移为 C#（PCL.Download，net10.0）——" &
                            "统一 HashType（MD5/SHA1/SHA256/SHA512/MurmurHash2）、ResourceProject/ResourceVersion 双平台解析、" &
