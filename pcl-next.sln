@@ -11,6 +11,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MeloongCore", "MeloongCore\
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MeloongCore.Wpf", "MeloongCore\Wpf\MeloongCore.Wpf.csproj", "{2DFFE2A0-1101-816B-D240-F644B2D74A68}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PCL.Cli", "PCL.Cli\PCL.Cli.csproj", "{2E5A0600-FE43-4F9F-8883-2937AD984B31}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -42,6 +44,12 @@ Global
 		{2DFFE2A0-1101-816B-D240-F644B2D74A68}.Release|Any CPU.Build.0 = Release|Any CPU
 		{2DFFE2A0-1101-816B-D240-F644B2D74A68}.Snapshot|Any CPU.ActiveCfg = Snapshot|Any CPU
 		{2DFFE2A0-1101-816B-D240-F644B2D74A68}.Snapshot|Any CPU.Build.0 = Snapshot|Any CPU
+		{2E5A0600-FE43-4F9F-8883-2937AD984B31}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2E5A0600-FE43-4F9F-8883-2937AD984B31}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2E5A0600-FE43-4F9F-8883-2937AD984B31}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2E5A0600-FE43-4F9F-8883-2937AD984B31}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2E5A0600-FE43-4F9F-8883-2937AD984B31}.Snapshot|Any CPU.ActiveCfg = Snapshot|Any CPU
+		{2E5A0600-FE43-4F9F-8883-2937AD984B31}.Snapshot|Any CPU.Build.0 = Snapshot|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -13,6 +13,9 @@ on:
       - 'pcl-next/**'
       - 'PCLCS/**'
       - 'MeloongCore/**'
+      - 'PCL.Download/**'
+      - 'PCL.Cli/**'
+      - 'Directory.Build.props'
       - 'scripts/**'
       - '.github/workflows/**'
   pull_request:
@@ -20,6 +23,9 @@ on:
       - 'pcl-next/**'
       - 'PCLCS/**'
       - 'MeloongCore/**'
+      - 'PCL.Download/**'
+      - 'PCL.Cli/**'
+      - 'Directory.Build.props'
       - 'scripts/**'
       - '.github/workflows/**'
   workflow_dispatch:
@@ -100,6 +106,22 @@ jobs:
       run: |
         (gc "pcl-next\Modules\ModSecret.vb") -replace 'Public OAuthClientId As String = If(Environment.GetEnvironmentVariable("PCL_MS_CLIENT_ID"), "")', 'Public OAuthClientId As String = If(Environment.GetEnvironmentVariable("PCL_MS_CLIENT_ID"), "${{ secrets.CLIENT_ID }}")' | Out-File "pcl-next\Modules\ModSecret.vb"
         (gc "pcl-next\Modules\ModSecret.vb") -replace 'Public CurseForgeAPIKey As String = If(Environment.GetEnvironmentVariable("PCL_CURSEFORGE_API_KEY"), "")', 'Public CurseForgeAPIKey As String = If(Environment.GetEnvironmentVariable("PCL_CURSEFORGE_API_KEY"), "${{ secrets.CURSEFORGE_API_KEY }}")' | Out-File "pcl-next\Modules\ModSecret.vb"
+
+    - name: Build CLI + offline selftest
+      shell: pwsh
+      run: |
+        # 内核前端（PCL.Cli）：构建即校验架构护栏（Directory.Build.props §3），
+        # 再跑不联网的 offline 套件，确认内核在无 WPF 前提下可用。
+        dotnet build "PCL.Cli\PCL.Cli.csproj" -c ${{ matrix.configuration }} -p:PclChannel=${{ steps.channel.outputs.channel }}
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+        $exe = Get-ChildItem -Path "bin-net10" -Filter "pclcli.exe" -Recurse -ErrorAction SilentlyContinue |
+               Select-Object -First 1
+        if (-not $exe) { throw "未找到 pclcli.exe，产物路径可能未落在 bin-net10 三段树内" }
+        Write-Host "CLI 产物：$($exe.FullName)"
+
+        & $exe.FullName selftest --suite offline --workdir "$env:RUNNER_TEMP\pclcli"
+        if ($LASTEXITCODE -ne 0) { throw "pclcli 离线自检失败，退出码 $LASTEXITCODE" }
 
     - name: Publish (self-contained single file)
       run: dotnet publish "pcl-next\pcl-next.vbproj" -c ${{ matrix.configuration }} -p:PclChannel=${{ steps.channel.outputs.channel }} -p:PublishProfile=win-x64-single

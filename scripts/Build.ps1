@@ -34,8 +34,15 @@
 .PARAMETER Clean
     构建前清空目标目录（保留 PCL\ 启动器运行数据目录）。
 
+.PARAMETER WithCli
+    同时构建 CLI 内核前端（PCL.Cli），产物落在同一三段路径下的 cli\ 子层。
+    默认关闭：CLI 只用于回归与排错，不参与 GUI 发布制品。
+
 .EXAMPLE
     ./scripts/Build.ps1 -Channel Alpha -Clean
+
+.EXAMPLE
+    ./scripts/Build.ps1 -WithCli          # 同时产出 .../<版本>/<RID>/cli/pclcli.exe
 #>
 [CmdletBinding()]
 param(
@@ -46,7 +53,8 @@ param(
     [string]$Version,
     [ValidateSet('Release', 'Debug')]
     [string]$Configuration = 'Release',
-    [switch]$Clean
+    [switch]$Clean,
+    [switch]$WithCli
 )
 
 $ErrorActionPreference = 'Stop'
@@ -91,6 +99,20 @@ if ($LASTEXITCODE -ne 0) {
     throw "dotnet build 失败，退出码 $LASTEXITCODE"
 }
 
+# --- 4.5 可选：构建 CLI 内核前端（§0.1 允许的三段树内 cli\ 子层） ---------------
+if ($WithCli) {
+    $CliProj = Join-Path $RepoRoot 'PCL.Cli\PCL.Cli.csproj'
+    if (-not (Test-Path $CliProj)) {
+        throw "找不到 $CliProj；-WithCli 需要 PCL.Cli 工程（见 docs/plans/计划-内核与GUI拆分（CLI）.md）"
+    }
+    Write-Host "==> 构建 CLI：$CliProj" -ForegroundColor Cyan
+    # 框架依赖即可：CLI 只在装有 .NET 10 的开发机/CI 上跑，不随发布制品分发
+    dotnet build $CliProj -c $Configuration -r $Rid -p:PclChannel=$Channel
+    if ($LASTEXITCODE -ne 0) {
+        throw "PCL.Cli 构建失败，退出码 $LASTEXITCODE"
+    }
+}
+
 # --- 5. 防呆检查（§5.3）：产物只允许出现在三段路径下 ----------------------------
 $stray = @()
 $stray += Get-ChildItem -Path (Join-Path $RepoRoot 'pcl-next\bin-net10') -File -ErrorAction SilentlyContinue
@@ -114,4 +136,17 @@ if (Test-Path $Exe) {
 }
 else {
     Write-Warning "构建命令已执行，但未找到 $Exe —— 请检查输出日志。"
+}
+
+# --- 7. CLI 产物提示（仅在 -WithCli 时） ---------------------------------------
+if ($WithCli) {
+    $CliExe = Join-Path $OutPath 'cli\pclcli.exe'
+    if (Test-Path $CliExe) {
+        $cliItem = Get-Item $CliExe
+        Write-Host ("    cli：{0}（{1:yyyy-MM-dd HH:mm}，{2:N0} KB）" -f `
+            $cliItem.FullName, $cliItem.LastWriteTime, ($cliItem.Length / 1KB))
+    }
+    else {
+        Write-Warning "未找到 $CliExe —— CLI 产物路径可能被 -p:OutputPath 意外覆盖。"
+    }
 }

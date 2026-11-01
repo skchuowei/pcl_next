@@ -118,6 +118,32 @@ public class ResourceSearcherTests
     }
 
     [Fact]
+    public void GetModrinthAddress_Any类型不下发project_type()
+    {
+        // Any 表示「不限种类」，必须省略该 facet——Modrinth 对未知的 project_type 取值
+        // 直接返回 0 命中，此前传 "any" 会让默认（不限种类）搜索永远搜不到任何结果。
+        var req = new ResourceSearcher.SearchRequest(ResourceTypes.Any, new ResourceSearcher.SearchResult(), 40)
+        {
+            SearchText = "sodium",
+        };
+        var url = req.GetModrinthAddress("sodium", ignoreModLoaderFilter: false);
+        Assert.DoesNotContain("project_type", url);
+        Assert.Contains("query=sodium", url);
+    }
+
+    [Fact]
+    public void GetModrinthAddress_组合类型用同组OR表达()
+    {
+        // ModOrDataPack 这类组合值不能拼成 "modordatapack"（无此取值），
+        // 而应展开成同组 OR 的多个 facet。
+        var req = new ResourceSearcher.SearchRequest(ResourceTypes.ModOrDataPack, new ResourceSearcher.SearchResult(), 40);
+        var url = req.GetModrinthAddress("", ignoreModLoaderFilter: false);
+        Assert.Contains("project_type:mod", url);
+        Assert.Contains("project_type:datapack", url);
+        Assert.DoesNotContain("modordatapack", url);
+    }
+
+    [Fact]
     public void GetModrinthAddress_带分类与多加载器与版本()
     {
         var req = new ResourceSearcher.SearchRequest(ResourceTypes.Mod, new ResourceSearcher.SearchResult(), 40)

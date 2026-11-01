@@ -1,0 +1,92 @@
+<Project>
+
+  <!--
+    仓库级公共属性（《AGENTS.md》§0.1 / §0.3 / 《计划-内核与GUI拆分（CLI）》§5.5）。
+
+    本文件只做两件事，**不得**在此处做任何与具体工程业务相关的设置：
+      1. 提供渠道 / 版本 / 内核产物路径的统一默认值（三段树 bin-net10\<代号>\<版本>\<RID>\）；
+      2. 为「无 GUI 内核工程」提供可 CI 校验的架构护栏（PclIsGuiFree）。
+
+    主工程 pcl-next.vbproj 在自己的工程体内设置了 OutputPath，按 MSBuild 求值顺序
+    （Directory.Build.props 先于工程体导入）会覆盖本文件的默认值，行为不变。
+  -->
+
+  <!-- ── 1. 渠道与版本默认值 ─────────────────────────────────────────────── -->
+
+  <PropertyGroup>
+    <!-- 与 pcl-next.vbproj 的 PclChannel 大小写规则保持一致（Dev / Slush / Alpha / Beta / Rc / Snapshot） -->
+    <PclChannel Condition="'$(PclChannel)' == '' AND '$(Configuration)' == 'Snapshot'">Snapshot</PclChannel>
+    <PclChannel Condition="'$(PclChannel)' == ''">Dev</PclChannel>
+
+    <!--
+      版本名直接取自 ModBase.vb 的 VersionBaseName，避免各处手抄版本导致漂移。
+      求值期用属性函数读取并正则抽取，不做任何缓存文件。
+    -->
+    <PclModBaseFile>$(MSBuildThisFileDirectory)pcl-next\Modules\Base\ModBase.vb</PclModBaseFile>
+    <PclVersion Condition="'$(PclVersion)' == '' AND Exists('$(PclModBaseFile)')">$([System.Text.RegularExpressions.Regex]::Match($([System.IO.File]::ReadAllText('$(PclModBaseFile)')), 'VersionBaseName[^&quot;]*&quot;([0-9][0-9.]*)&quot;').Groups[1].Value)</PclVersion>
+  </PropertyGroup>
+
+  <!-- ── 2. 三段树路径片段（供各工程自行拼 OutputPath，见 AGENTS §0.1） ──── -->
+
+  <PropertyGroup>
+    <!-- 未指定 -r 时（普通 dotnet build）用 any 占位，避免出现空的 RID 段 -->
+    <PclRidSegment Condition="'$(RuntimeIdentifier)' != ''">$(RuntimeIdentifier)</PclRidSegment>
+    <PclRidSegment Condition="'$(PclRidSegment)' == ''">any</PclRidSegment>
+
+    <!-- bin-net10\<代号>\<版本>\<RID>\ ——各工程在此之下再取自己的子层 -->
+    <PclTreeRoot>$(MSBuildThisFileDirectory)bin-net10\$(PclChannel)\$(PclVersion)\$(PclRidSegment)\</PclTreeRoot>
+  </PropertyGroup>
+
+  <!-- ── 3. 架构护栏：内核工程的引用闭包不得出现 WPF 与主工程程序集 ───────── -->
+
+  <!--
+    护栏生效条件：工程体内显式声明 <PclIsGuiFree>true</PclIsGuiFree>。
+    目前只有 PCL.Download 与 PCL.Cli 声明；新增 C# 内核工程请一律声明，
+    这是 T2 正式拆壳之前唯一能阻止架构腐化的机械手段。
+
+    注意：本开关**不能**放进「Condition="'$(PclIsGuiFree)'=='true'" 的 PropertyGroup」里——
+    Directory.Build.props 在工程体之前求值，那时 PclIsGuiFree 还是空，开关永远设为 false，
+    整条护栏会静默失效。
+  -->
+  <PropertyGroup>
+    <PclArchGuardEnabled Condition="'$(PclArchGuardEnabled)' == ''">true</PclArchGuardEnabled>
+  </PropertyGroup>
+
+  <Target Name="PclGuiFreeArchGuard"
+          AfterTargets="ResolveReferences"
+          Condition="'$(PclIsGuiFree)' == 'true' AND '$(PclArchGuardEnabled)' == 'true'">
+
+    <ItemGroup>
+      <!--
+        先只取程序集短名，再用 WithMetadataValue 精确筛。
+        不用「ItemGroup 里写 %() 条件」的写法：那种批处理在 Target 内不可靠，
+        曾实测漏判（护栏静默失效比没有护栏更糟）。
+        另外**故意不含 WindowsBase**：它在 Microsoft.NETCore.App 引用包里人人都有，
+        拿它当 WPF 证据会 100% 误报。
+      -->
+      <_PclRefName Include="@(ReferencePath->'%(Filename)')" />
+
+      <_PclForbiddenWpfRef Include="@(_PclRefName->WithMetadataValue('Identity', 'PresentationFramework'))" />
+      <_PclForbiddenWpfRef Include="@(_PclRefName->WithMetadataValue('Identity', 'PresentationCore'))" />
+      <_PclForbiddenWpfRef Include="@(_PclRefName->WithMetadataValue('Identity', 'System.Windows.Forms'))" />
+      <_PclForbiddenWpfRef Include="@(_PclRefName->WithMetadataValue('Identity', 'System.Xaml'))" />
+      <_PclForbiddenWpfRef Include="@(_PclRefName->WithMetadataValue('Identity', 'ReachFramework'))" />
+
+      <!-- GUI 宿主与上位工程：内核不得反向依赖 -->
+      <_PclForbiddenHostRef Include="@(_PclRefName->WithMetadataValue('Identity', 'pcl-next'))" />
+      <_PclForbiddenHostRef Include="@(_PclRefName->WithMetadataValue('Identity', 'PCLCS'))" />
+      <_PclForbiddenHostRef Include="@(_PclRefName->WithMetadataValue('Identity', 'MeloongCore'))" />
+      <_PclForbiddenHostRef Include="@(_PclRefName->WithMetadataValue('Identity', 'MeloongCore.Wpf'))" />
+    </ItemGroup>
+
+    <Error Condition="'@(_PclForbiddenWpfRef)' != ''"
+           Text="架构护栏：工程「$(MSBuildProjectName)」声明了 PclIsGuiFree=true，但引用闭包内出现 WPF/GUI 程序集：@(_PclForbiddenWpfRef, ', ')。内核工程不得依赖 GUI 框架，详见 docs/plans/计划-内核与GUI拆分（CLI）.md §5.5。" />
+
+    <Error Condition="'@(_PclForbiddenHostRef)' != ''"
+           Text="架构护栏：工程「$(MSBuildProjectName)」声明了 PclIsGuiFree=true，但引用闭包内出现 GUI 宿主程序集：@(_PclForbiddenHostRef, ', ')。内核不得反向依赖 pcl-next / PCLCS / MeloongCore，详见 docs/plans/计划-内核与GUI拆分（CLI）.md §5.5。" />
+
+    <Message Importance="normal"
+             Text="架构护栏通过：$(MSBuildProjectName) 引用闭包内无 WPF / GUI 宿主程序集（共 @(_PclRefName->Count()) 个引用）。" />
+  </Target>
+
+</Project>

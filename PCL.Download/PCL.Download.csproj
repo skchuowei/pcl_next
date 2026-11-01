@@ -9,6 +9,12 @@
     <LangVersion>13.0</LangVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+
+    <!--
+      架构护栏（Directory.Build.props §3）：本工程属「无 GUI 内核」，引用闭包内
+      不得出现 WPF/WinForms 与 pcl-next/PCLCS/MeloongCore。CI 构建即校验。
+    -->
+    <PclIsGuiFree>true</PclIsGuiFree>
   </PropertyGroup>
 
   <!-- 纯 BCL 实现，不引入任何第三方依赖；宿主通过 DI/选项注入日志与策略 -->

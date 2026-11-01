@@ -216,3 +216,57 @@ PCL_ALLOW_MC_DOWNLOAD=False pclcli install --version-json <x> --dir /tmp/i   # �
 | 架构护栏误伤 | 临时注释 `Directory.Build.props` 中的闭包检查，**记入待核对清单**后一周内修好 | 不留长期豁免 |
 
 回滚时按《AGENTS.md》§六 出具回退报告（`回退报告-CLI.md`），禁止静默回退。
+
+---
+
+## 9. 执行记录（T1 已落地）
+
+### 9.1 实际交付物
+
+| 文件 | 内容 |
+|---|---|
+| `Directory.Build.props`（新增，仓库级） | ① `PclChannel` / `PclVersion`（正则读 `ModBase.vb`，不手抄版本）/ `PclRidSegment` / `PclTreeRoot`；② 架构护栏 `PclGuiFreeArchGuard` |
+| `PCL.Cli/`（新增 9 个文件） | `Program` / `CliArguments` / `CliOutput` / `CliPolicy` / `CliSession` / `McSource` / `McVersionJson` / `McVersionResolver`、`Commands/{Download,Install,Resource,SelfTest}Command` |
+| `PCL.Download/PCL.Download.csproj` | 声明 `PclIsGuiFree=true`（接入护栏） |
+| `PCL.Download/ResourceSearcher.cs` | 修 Modrinth `project_type` facet（见 9.4） |
+| `PCL.Download.Tests/ResourceSearcherTests.cs` | 补 2 个回归用例 |
+| `pcl-next.sln` / `scripts/Build.ps1` / `.github/workflows/build.yml` | 注册工程、`-WithCli` 开关、CI 构建 + 离线冒烟 |
+
+### 9.2 架构护栏的三次修正（重要，避免后人重踩）
+
+1. **首版静默失效**：把 `PclArchGuardEnabled` 的默认值放进了 `Condition="'$(PclIsGuiFree)'=='true'"` 的 `PropertyGroup`——`Directory.Build.props` 在工程体之前求值，那时 `PclIsGuiFree` 仍是空，开关永远为 false，整条护栏不执行。**已改为无条件默认 true**。
+2. **ItemGroup 内 `%(...)` 条件不可靠**：`Include="@(ReferencePath)" Condition="'%(Filename)'=='x'"` 在 Target 内实测漏判，改为 `@(_PclRefName->WithMetadataValue('Identity','x'))`。
+3. **不能把 `WindowsBase` 当 WPF 证据**：它在 `Microsoft.NETCore.App` 引用包里人人都有（实测 `net10.0` 工程的 `ReferencePath` 恒含 `WindowsBase`），拿它判定会 100% 误报。最终禁列：`PresentationFramework` / `PresentationCore` / `System.Windows.Forms` / `System.Xaml` / `ReachFramework` + `pcl-next` / `PCLCS` / `MeloongCore` / `MeloongCore.Wpf`。
+
+护栏已做**双向验证**：正常构建放行；人为把 `PCL.Download` 加进禁列后，构建以 `error : 架构护栏：工程「PCL.Cli」……` 失败。
+
+### 9.3 实测证据（本机，2026-11-01）
+
+| 项 | 命令 | 结果 |
+|---|---|---|
+| 全量构建 | `dotnet build pcl-next.sln -c Release` | **0 错误** / 2445 警告（含既有 CA1416） |
+| 单元测试 | `dotnet test PCL.Download.Tests` | 258 通过 / 1 失败（`SlowSource_IsRotatedToFastSource`，**偶发**，单独复跑通过，非本次改动引入）/ 新增 4 个 `GetModrinthAddress` 用例全通过 |
+| 离线自检 | `pclcli selftest --suite offline` | 6 项全过（arch / hash / file-check-rule / policy / version-json / resource-registry） |
+| **B1** | `pclcli selftest --suite b1` | 最新正式版 client jar **39.6MB / 8.7s**，日志含「开始分块」×N、「下载结束，开始合并 10 个分块」，`verify ok`，退出码 0 |
+| **B2** | `pclcli selftest --suite b2` | `install --only client,assets` 成功，2 文件 / 42MB / 10.6s，退出码 0 |
+| **B5** | `pclcli selftest --suite b5` | `sodium` 20 条、`钠` 8 条；CF 缺 Key 时给 notice 不抛异常；指纹反查正常返回（原版 jar 无命中，符合预期） |
+| 策略同源 | `PCL_ALLOW_MC_DOWNLOAD=False pclcli install …` | 退出码 **4**，stdout 有 `policy_blocked` 事件 |
+| stdout 纯净 | `pclcli selftest 2>/dev/null` | 仅 JSON Lines，无杂字符 |
+
+产物落点：`PCL2/bin-net10/Dev/2.100.0.3/any/cli/pclcli.exe`（三段树内 `cli/` 子层）。
+
+### 9.4 与计划的偏离（三处，均有理由）
+
+| 偏离 | 原因 |
+|---|---|
+| 走 `FlagsOf` 展开而非 `Type.ToString()` 直接拼 facet | `ResourceTypes.Any` 会拼出 `project_type:any`，Modrinth 视为未知取值**直接返回 0 命中**——即「不限种类搜索」此前根本搜不到东西。`ModOrDataPack` 同样会拼成非法值。这是内核真 bug，已修 + 补测试 |
+| `--mirror` 默认 `auto`（官方优先 + BMCLAPI 兜底），未完全照抄 VB 的 `DlSourcePreferMojang` 设置 | CLI 没有 Settings 存储；VB 的源顺序依赖用户设置项，CLI 用「全部候选交给引擎 failover」表达同一语义，且 `ForLibrary` 对 forge/fabric/neoforge 的「不加官方源」规则已逐条对齐 |
+| 架构护栏用 Target + `WithMetadataValue`，而非计划里「props 里加一条约束」的笼统说法 | 见 9.2，简单写法实测静默失效 |
+
+### 9.5 已知遗留（交接项，按优先级）
+
+1. **与 `McVersionManifestClient` 合流（必须做）**：并行工作线正在内核里加 `PCL.Download/McVersionManifest.cs`（版本清单获取器，含 Mojang/BMCLAPI 双源竞速）。落地后 `PCL.Cli/McVersionResolver.ResolveTextAsync` 的「拉清单 + 找 id + 取 url」应改为调用它，**删除 CLI 侧的清单解析**，避免同一契约两处实现。当前刻意不耦合：该文件在本次提交时仍在写入中、未经构建验证。
+2. **`--objects` / natives 未完整**：`--objects` 可下载 assets 全部对象，但 natives 分类器既未下载也未解压，`inheritsFrom` 未合并。保持「明确不做」优于「做一半」。
+3. **Windows 独占**：`DownloadEngine` 要求本地路径含 `:\\`，故 `pclcli` 只能在 Windows 跑（TFM 为 `net10.0` 不限制，但运行期受限）。CI 为 `windows-latest`，无影响。
+4. **`MeloongCore` / `PCLCS` 的 `OutDir` 仍指向各自 `bin\`**（AGENTS §0.3 点名要求改）。本次未动：它们属 GUI 侧且有发布流程依赖，改动风险大于收益，建议并入 T2 拆壳时统一处理。
+5. **`SlowSource_IsRotatedToFastSource` 偶发失败**：与本次改动无关（下载引擎慢源轮换依赖真实时钟），单跑稳定通过，建议后续加时间注入。

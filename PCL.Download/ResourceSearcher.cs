@@ -87,7 +87,16 @@ public static class ResourceSearcher
             if (Storage.ModrinthOffset > 0) address += "&offset=" + Storage.ModrinthOffset;
             //facets=[["categories:'game-mechanics'"],["categories:forge","categories:fabric"],["versions:1.19.3"],["project_type:mod"]]
             var facets = new List<string>();
-            facets.Add($"[\"project_type:{Type.ToString().ToLowerInvariant()}\"]");
+            // project_type：Any 表示「不限种类」，必须**不设**该 facet——Modrinth 对未知的
+            // project_type 取值直接返回 0 命中（此前传 "any" 会让默认搜索永远搜不到东西）。
+            // 组合类型（如 ModOrDataPack）用「同组 OR」表达，语义与 CurseForge 的 classId 缺省一致。
+            if (Type != ResourceTypes.Any)
+            {
+                var projectTypes = Type.FlagsOf()
+                    .Select(flag => $"\"project_type:{flag.ToString().ToLowerInvariant()}\"")
+                    .ToList();
+                if (projectTypes.Count > 0) facets.Add("[" + string.Join(",", projectTypes) + "]");
+            }
             if (!string.IsNullOrEmpty(Tag)) facets.Add($"[\"categories:'{Tag.AfterLast("/")}'\"]");
             if (ModLoaders != ModLoaders.None && !ignoreModLoaderFilter)
                 facets.Add("[" + string.Join(",", ModLoaders.FlagsOf().Select(f => $"\"categories:{f.ToString().ToLowerInvariant()}\"")) + "]");
