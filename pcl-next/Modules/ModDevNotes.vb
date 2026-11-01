@@ -58,7 +58,8 @@ Public Module ModDevNotes
                            "· 修复：命中 HTTP 缓存的响应整体失败——缓存响应头残留 Transfer-Encoding，需在落盘前剥离。" & vbCrLf &
                            "· 修复：旧版 HTTP 缓存目录不可读，切换到 Cache/HttpV2 并做兼容回退。" & vbCrLf &
                            "· 修复：帮助页加载报未知类型 MyCard——内联 XAML 的 assembly= 引用漏改 10 处。" & vbCrLf &
-                           "· 修复：单例检查与自动更新残留清理遗漏更名后的 pcl-next.exe。"
+                           "· 修复：单例检查与自动更新残留清理遗漏更名后的 pcl-next.exe。" & vbCrLf &
+                           "· 修复：全源连接挂起时的静默卡死——连接超时转义为明确 TimeoutException，新增 MinConnectTimeoutMilliseconds 并补换源留痕日志（真机 NeoForge 复现）。"
                 Case Else
                     Return ""
             End Select
