@@ -148,22 +148,10 @@ Friend Module ModSecret
 
 #Region "更新"
 
+    'pcl-next 没有内置自动更新服务器，检查更新时统一引导用户前往 GitHub 仓库 Releases 获取新版本。
+    '仓库地址：https://github.com/skchuowei/pcl_next
     Friend Sub UpdateCheckByButton()
-        Hint("该版本中不包含更新功能……")
-    End Sub
-
-    Friend IsUpdateWaitingRestart As Boolean = False
-    Public Sub UpdateRestart(TriggerRestartAndByEnd As Boolean)
-    End Sub
-    Public Sub UpdateReplace(ProcessId As Integer, OldFileName As String, NewFileName As String, TriggerRestart As Boolean)
-    End Sub
-
-    ''' <summary>
-    ''' 确保 PathTemp/Latest.exe 是最新正式版的 PCL，它会被用于整合包打包。
-    ''' 如果不是，则下载一个。
-    ''' </summary>
-    Friend Sub DownloadLatestPCL(Optional LoaderToSyncProgress As LoaderBase = Nothing)
-        '注意：如果要自行实现这个功能，请换用另一个文件路径，以免与官方版本冲突
+        OpenWebsite("https://github.com/skchuowei/pcl_next/releases")
     End Sub
 
 #End Region

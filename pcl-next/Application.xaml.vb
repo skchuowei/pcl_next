@@ -43,11 +43,7 @@ Public Class Application
             End Try
             '检查参数调用
             If e.Args.Length > 0 Then
-                If e.Args(0) = "--update" Then
-                    '自动更新
-                    UpdateReplace(e.Args(1), e.Args(2).Trim(""""), e.Args(3).Trim(""""), e.Args(4))
-                    Environment.Exit(ProcessReturnValues.TaskDone)
-                ElseIf e.Args(0) = "--gpu" Then
+                If e.Args(0) = "--gpu" Then
                     '调整显卡设置
                     Try
                         SetGPUPreference(e.Args(1).Trim(""""))

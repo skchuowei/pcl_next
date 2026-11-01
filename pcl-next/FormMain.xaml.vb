@@ -115,22 +115,24 @@ Public Class FormMain
             '开发线 / 收敛线的更新日志，按《分支与发布规范》§5.1 的版本号段排列
             '说明：本项目仍在 C# 重写过程中，此处的「修复」条目大多为开发期自测发现的问题
             If LastVersion >= 5000 AndAlso LastVersion < 5010 Then 'slush.1 2.100.0.2
+                '收敛版：功能与 dev 相同，只做收敛、清理与回归，不再新增功能
+                FeatureList.Add(New KeyValuePair(Of Integer, String)(3, "收敛：dev 分支功能已全部合入，本版为内部候选，功能与 dev 相同"))
+                FeatureCount += 1
+            End If
+            If LastVersion < 5000 Then 'dev.1 2.100.0.1
+                FeatureList.Add(New KeyValuePair(Of Integer, String)(1, "重写：主程序由 .NET Framework 4.8 迁移到 .NET 10，改为自包含单文件发布"))
+                FeatureList.Add(New KeyValuePair(Of Integer, String)(2, "新增：按分支规范区分开发 / 收敛 / 内测 / 公测 / 正式 / 快照六种代号"))
+                FeatureList.Add(New KeyValuePair(Of Integer, String)(2, "新增：MC 下载功能恢复，开关改为部署期配置"))
                 FeatureList.Add(New KeyValuePair(Of Integer, String)(3, "新增：下载服务完成 C# 化并接入主程序（多源并发 / 分片续传 / 断点续传 / 校验）"))
+                FeatureList.Add(New KeyValuePair(Of Integer, String)(2, "重写：下线内置自动更新模块，检查更新改为打开本项目 GitHub Releases"))
                 FeatureList.Add(New KeyValuePair(Of Integer, String)(2, "修复：社区资源加载器全部失败——.NET Core 需显式注册 GBK 等代码页"))
                 FeatureList.Add(New KeyValuePair(Of Integer, String)(2, "修复：命中 HTTP 缓存的请求整体失败——缓存响应头残留 Transfer-Encoding"))
                 FeatureList.Add(New KeyValuePair(Of Integer, String)(1, "修复：旧版 HTTP 缓存目录无法读取，切换到 Cache/HttpV2"))
                 FeatureList.Add(New KeyValuePair(Of Integer, String)(1, "修复：帮助页加载报未知类型 MyCard——内联 XAML 的 assembly= 漏改 10 处"))
                 FeatureList.Add(New KeyValuePair(Of Integer, String)(1, "修复：单例检查与自动更新残留清理遗漏更名后的 pcl-next.exe"))
                 FeatureList.Add(New KeyValuePair(Of Integer, String)(1, "修复：dev 与 slush 版本号相同，切回时被误判成版本倒退"))
-                FeatureCount += 8
+                FeatureCount += 5
                 BugCount += 6
-            End If
-            If LastVersion < 5000 Then 'dev.1 2.100.0.1
-                FeatureList.Add(New KeyValuePair(Of Integer, String)(1, "重写：主程序由 .NET Framework 4.8 迁移到 .NET 10，改为自包含单文件发布"))
-                FeatureList.Add(New KeyValuePair(Of Integer, String)(2, "新增：按分支规范区分开发 / 收敛 / 内测 / 公测 / 正式 / 快照六种代号"))
-                FeatureList.Add(New KeyValuePair(Of Integer, String)(2, "新增：MC 下载功能恢复，开关改为部署期配置"))
-                FeatureCount += 3
-                BugCount += 3
             End If
         Else
             '5：          FEAT+
@@ -670,7 +672,6 @@ Public Class FormMain
         On Error Resume Next
         IsProgramEnding = True
         AniControlEnabled += 1
-        If IsUpdateWaitingRestart Then UpdateRestart(False)
         If ReturnCode = ProcessReturnValues.Exception Then
             If Not IsLogShown Then
                 FeedbackInfo()

@@ -473,18 +473,6 @@ Public Class PageInstanceExport
         '构造步骤加载器
         Dim Loaders As New List(Of LoaderBase)
 
-#Region "准备 PCL 文件"
-
-        If Not ModBuildChannel.ChannelIsOfficial AndAlso IncludePCL Then
-            Loaders.Add(New LoaderTask(Of Integer, Integer)("下载 PCL 正式版",
-            Sub(Loader As LoaderTask(Of Integer, Integer))
-                DownloadLatestPCL(Loader)
-                FileUtils.Copy(PathTemp & "Latest.exe", CacheFolder & "Plain Craft Launcher.exe")
-            End Sub) With {.ProgressWeight = 0.5, .Block = False})
-        End If
-
-#End Region
-
 #Region "复制文件"
 
         Loaders.Add(New LoaderTask(Of Integer, List(Of LocalResourceFile))("复制导出内容",
