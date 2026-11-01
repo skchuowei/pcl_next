@@ -90,7 +90,7 @@ public sealed class HttpResourceApiOptions
 /// 每个候选使用自己的超时；差异在于**错误分类**——4xx（429 除外）视为不可恢复，立即抛出而不再换源，
 /// 429 与 5xx 则按冷却退避后换下一个候选。
 /// </summary>
-public sealed class HttpResourceApi : IResourceApi, IDisposable
+public sealed class HttpResourceApi : IResourceApi, IDirectResourceApi, IDisposable
 {
     private readonly HttpClient _client;
     private readonly bool _ownsClient;
@@ -157,6 +157,27 @@ public sealed class HttpResourceApi : IResourceApi, IDisposable
     }
 
     /// <summary>
+    /// 请求单个地址，不走候选源轮换（供 MC 下载源这类「两条独立地址、由用户选择顺序」的场景使用）。
+    /// </summary>
+    /// <param name="url">请求地址，原样使用。</param>
+    /// <param name="timeout">本次请求的超时；内部按整秒向上取整，最小 1 秒。</param>
+    public JsonNode RequestDirect(string url, TimeSpan timeout)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(url);
+        var seconds = timeout <= TimeSpan.Zero ? 1 : (int)Math.Ceiling(timeout.TotalSeconds);
+        var candidate = new ResourceSourceCandidate(url, Math.Max(1, seconds), false);
+        try
+        {
+            return SendOnce(candidate, null, null, null);
+        }
+        catch (ResourceRequestException ex)
+        {
+            DownloadLog.Warn($"直连请求失败（{ex.Kind}，{candidate.TimeoutSeconds}s 超时，{url}）：{ex.Message}");
+            throw;
+        }
+    }
+
+    /// <summary>
     /// 分类一个 HTTP 状态码；供测试与上层复用。
     /// </summary>
     public static ResourceRequestErrorKind Classify(HttpStatusCode statusCode) => (int)statusCode switch
@@ -213,6 +234,13 @@ public sealed class HttpResourceApi : IResourceApi, IDisposable
         catch (HttpRequestException ex)
         {
             throw new ResourceRequestException(ResourceRequestErrorKind.Network, candidate.Url, ex.Message, null, ex);
+        }
+        catch (Exception ex) when (cts.IsCancellationRequested && ex is not ResourceRequestException)
+        {
+            // 超时取消后，底层可能已经释放响应对象（同步读取会抛 ObjectDisposedException 等），
+            // 一律按超时归类，避免把「慢」误报成「对象已释放」这类无法处置的错误。
+            throw new ResourceRequestException(ResourceRequestErrorKind.Timeout, candidate.Url,
+                $"请求超时（{candidate.TimeoutSeconds}s）", null, ex);
         }
         finally
         {

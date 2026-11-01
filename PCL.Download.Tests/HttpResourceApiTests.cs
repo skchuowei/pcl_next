@@ -120,6 +120,38 @@ public class HttpResourceApiTests
     public void Classify_MapsStatusCodes(HttpStatusCode status, ResourceRequestErrorKind expected)
         => Assert.Equal(expected, HttpResourceApi.Classify(status));
 
+    // ---- 直连路径（MC 下载源等「两条独立地址」的场景） ----
+
+    [Fact]
+    public void RequestDirect_DoesNotExpandCandidates()
+    {
+        var handler = new StubHandler(_ => Json("{\"versions\": []}"));
+        using var api = new HttpResourceApi(new ResourceSigningOptions(), FastOptions(), handler);
+
+        api.RequestDirect(McVersionSources.MojangUrl, TimeSpan.FromSeconds(5));
+
+        // 普通 Request 对无镜像映射的地址会重试两次；直连只打一次
+        Assert.Single(handler.Calls);
+        Assert.Equal(McVersionSources.MojangUrl, handler.Calls[0].Url);
+    }
+
+    [Fact]
+    public void RequestDirect_TimeoutIsClassifiedAsTimeout()
+    {
+        var handler = new StubHandler(_ =>
+        {
+            Thread.Sleep(1500);
+            return Json("{}");
+        });
+        using var api = new HttpResourceApi(new ResourceSigningOptions(), FastOptions(), handler);
+
+        var ex = Assert.Throws<ResourceRequestException>(
+            () => api.RequestDirect(McVersionSources.BmclapiUrl, TimeSpan.FromSeconds(1)));
+
+        Assert.Equal(ResourceRequestErrorKind.Timeout, ex.Kind);
+        Assert.True(ex.IsTransient);
+    }
+
     private sealed class StubHandler(Func<HttpRequestMessage, HttpResponseMessage> respond) : HttpMessageHandler
     {
         public List<(string Url, Dictionary<string, string> Headers)> Calls { get; } = [];

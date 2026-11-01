@@ -195,33 +195,63 @@ Public Module ModDownload
     ''' </summary>
     Public DlClientListLoader As New LoaderTask(Of String, DlClientListResult)("DlClientList Main", AddressOf DlClientListMain)
     Private Sub DlClientListMain(Loader As LoaderTask(Of String, DlClientListResult))
-        Select Case Settings.Get(Of Integer)("ToolDownloadVersion")
-            Case 0
-                DlSourceLoader(Loader, New List(Of KeyValuePair(Of LoaderTask(Of String, DlClientListResult), Integer)) From {
-                    New KeyValuePair(Of LoaderTask(Of String, DlClientListResult), Integer)(DlClientListBmclapiLoader, 30),
-                    New KeyValuePair(Of LoaderTask(Of String, DlClientListResult), Integer)(DlClientListMojangLoader, 30 + 60)
-                }, Loader.IsForceRestarting)
-            Case 1
-                DlSourceLoader(Loader, New List(Of KeyValuePair(Of LoaderTask(Of String, DlClientListResult), Integer)) From {
-                    New KeyValuePair(Of LoaderTask(Of String, DlClientListResult), Integer)(DlClientListMojangLoader, 5),
-                    New KeyValuePair(Of LoaderTask(Of String, DlClientListResult), Integer)(DlClientListBmclapiLoader, 5 + 30)
-                }, Loader.IsForceRestarting)
-            Case Else
-                DlSourceLoader(Loader, New List(Of KeyValuePair(Of LoaderTask(Of String, DlClientListResult), Integer)) From {
-                    New KeyValuePair(Of LoaderTask(Of String, DlClientListResult), Integer)(DlClientListMojangLoader, 60),
-                    New KeyValuePair(Of LoaderTask(Of String, DlClientListResult), Integer)(DlClientListBmclapiLoader, 60 + 60)
-                }, Loader.IsForceRestarting)
-        End Select
-        '提取所有 Drop 序数
-        Dim Drops As New List(Of Integer)
-        For Each Version As JObject In Loader.Output.Value("versions")
-            Dim Id As String = Version("id").ToString
-            If Id.Contains("-") Then Continue For
-            Dim Drop As Integer = McVersion.VersionToDrop(Id)
-            If Drop = 209 Then Continue For
-            Drops.Add(Drop)
-        Next
-        AllDrops = Drops.Distinct.OrderByDescending(Function(d) d).ToList()
+        'Phase 4：版本清单的获取、解析、源收敛与 Drop 提取已迁至 C#（PCL.Download.McVersionManifestClient）。
+        '本方法只把结果套回 VB 的 LoaderTask 契约，UI 侧读取方式保持不变。
+        Dim Mode As PCL.Download.McVersionSourceMode =
+            CType(Settings.Get(Of Integer)("ToolDownloadVersion"), PCL.Download.McVersionSourceMode)
+        Dim Manifest As PCL.Download.McVersionManifest =
+            New PCL.Download.McVersionManifestClient().Fetch(Mode, Loader.Input, ExtraVersionsPath)
+        ApplyClientList(Loader, Manifest)
+    End Sub
+
+    ''' <summary>
+    ''' PCL 特供版本缓存文件（存在时由 C# 侧合并进清单）；不存在时返回 Nothing。
+    ''' </summary>
+    Private ReadOnly Property ExtraVersionsPath As String
+        Get
+            Dim FilePath As String = PathTemp & "Cache\download.json"
+            Return If(FileUtils.Exists(FilePath), FilePath, Nothing)
+        End Get
+    End Property
+
+    ''' <summary>
+    ''' 把 C# 侧的版本清单结果写回 VB 的加载器契约，并处理官方源耗时探测与 MC 更新提示。
+    ''' </summary>
+    Private Sub ApplyClientList(Loader As LoaderTask(Of String, DlClientListResult), Manifest As PCL.Download.McVersionManifest)
+        Loader.Output = New DlClientListResult With {
+            .IsOfficial = Manifest.IsOfficial,
+            .SourceName = Manifest.SourceName,
+            .Value = JObject.Parse(Manifest.RawJson)
+        }
+        AllDrops = Manifest.Drops.ToList()
+        If Not Manifest.IsOfficial Then Return
+        '确定官方源是否可用：只在尚未判定时探测一次（与 VB 原行为一致）
+        If Not DlPreferMojang Then
+            DlPreferMojang = Manifest.ElapsedMilliseconds < 4000
+            Logger.Info($"Mojang 官方源加载耗时：{Manifest.ElapsedMilliseconds}ms，{If(DlPreferMojang, "可优先使用官方源", "不优先使用官方源")}")
+        End If
+        CheckClientUpdateHint(Manifest.LatestSnapshot, Manifest.LatestRelease, Loader.Output.Value)
+    End Sub
+
+    ''' <summary>是否已经弹出过 MC 更新提示（对应原实现里的 Static IsHinted）。</summary>
+    Private IsClientUpdateHinted As Boolean = False
+
+    ''' <summary>
+    ''' MC 更新提示：快照版与正式版各自比对上次记录的版本，只在首次命中时提示一次。
+    ''' </summary>
+    Private Sub CheckClientUpdateHint(SnapshotVersion As String, ReleaseVersion As String, Json As JObject)
+        If Settings.Get(Of Boolean)("ToolUpdateSnapshot") AndAlso Settings.Get(Of String)("ToolUpdateSnapshotLast") <> "" AndAlso
+           Settings.Get(Of String)("ToolUpdateSnapshotLast") <> SnapshotVersion AndAlso Not IsClientUpdateHinted Then
+            IsClientUpdateHinted = True
+            McDownloadClientUpdateHint(SnapshotVersion, Json)
+        End If
+        Settings.Set("ToolUpdateSnapshotLast", If(SnapshotVersion, "Nothing"))
+        If Settings.Get(Of Boolean)("ToolUpdateRelease") AndAlso Settings.Get(Of String)("ToolUpdateReleaseLast") <> "" AndAlso
+           Settings.Get(Of String)("ToolUpdateReleaseLast") <> ReleaseVersion AndAlso Not IsClientUpdateHinted Then
+            IsClientUpdateHinted = True
+            McDownloadClientUpdateHint(ReleaseVersion, Json)
+        End If
+        Settings.Set("ToolUpdateReleaseLast", If(ReleaseVersion, "Nothing"))
     End Sub
 
     '各个下载源的分加载器
@@ -230,65 +260,20 @@ Public Module ModDownload
     ''' </summary>
     Public DlClientListMojangLoader As New LoaderTask(Of String, DlClientListResult)("DlClientList Mojang", AddressOf DlClientListMojangMain)
     Private Sub DlClientListMojangMain(Loader As LoaderTask(Of String, DlClientListResult))
-        Dim StartTime As Long = GetTimeMs()
-        Dim Json As JObject = NetRequestByClientRetry("https://launchermeta.mojang.com/mc/game/version_manifest.json", RequireJson:=True).DeserializeJson()
-        Try
-            Dim Versions As JArray = Json("versions")
-            If Versions.Count < 200 Then Throw New Exception("获取到的版本列表长度不足（" & Json.ToString & "）")
-            '确定官方源是否可用
-            If Not DlPreferMojang Then
-                Dim DeltaTime = GetTimeMs() - StartTime
-                DlPreferMojang = DeltaTime < 4000
-                Logger.Info($"Mojang 官方源加载耗时：{DeltaTime}ms，{If(DlPreferMojang, "可优先使用官方源", "不优先使用官方源")}")
-            End If
-            '返回
-            Loader.Output = New DlClientListResult With {.IsOfficial = True, .SourceName = "Mojang 官方源", .Value = Json}
-            'MC 更新提示
-            Static IsHinted As Boolean = False
-            Dim Version As String
-            '快照版
-            Version = Json("latest")("snapshot")
-            If Settings.Get(Of Boolean)("ToolUpdateSnapshot") AndAlso Not Settings.Get(Of String)("ToolUpdateSnapshotLast") = "" AndAlso
-               Settings.Get(Of String)("ToolUpdateSnapshotLast") <> Version AndAlso Not IsHinted Then
-                IsHinted = True
-                McDownloadClientUpdateHint(Version, Json)
-            End If
-            Settings.Set("ToolUpdateSnapshotLast", If(Version, "Nothing"))
-            '正式版
-            Version = Json("latest")("release")
-            If Settings.Get(Of Boolean)("ToolUpdateRelease") AndAlso Not Settings.Get(Of String)("ToolUpdateReleaseLast") = "" AndAlso
-               Settings.Get(Of String)("ToolUpdateReleaseLast") <> Version AndAlso Not IsHinted Then
-                IsHinted = True
-                McDownloadClientUpdateHint(Version, Json)
-            End If
-            Settings.Set("ToolUpdateReleaseLast", Version)
-        Catch ex As Exception
-            Throw New Exception("Minecraft 官方源版本列表解析失败", ex)
-        End Try
+        '只取官方源；不校验输入版本（与 VB 原行为一致：官方源不做 #5195 的镜像缺失检查）
+        Dim Manifest As PCL.Download.McVersionManifest = New PCL.Download.McVersionManifestClient().Fetch(
+            New PCL.Download.McVersionSource() {PCL.Download.McVersionSources.Mojang()})
+        ApplyClientList(Loader, Manifest)
     End Sub
     ''' <summary>
     ''' Minecraft 客户端 版本列表，BMCLAPI 源加载器。
     ''' </summary>
     Public DlClientListBmclapiLoader As New LoaderTask(Of String, DlClientListResult)("DlClientList Bmclapi", AddressOf DlClientListBmclapiMain)
     Private Sub DlClientListBmclapiMain(Loader As LoaderTask(Of String, DlClientListResult))
-        Dim Json As JObject = NetRequestByClientRetry("https://bmclapi2.bangbang93.com/mc/game/version_manifest.json", RequireJson:=True).DeserializeJson()
-        Try
-            Dim Versions As JArray = Json("versions")
-            If Versions.Count < 200 Then Throw New Exception("获取到的版本列表长度不足（" & Json.ToString & "）")
-            '添加 PCL 特供项
-            If FileUtils.Exists(PathTemp & "Cache\download.json") Then Versions.Merge(FileUtils.ReadAsJson(PathTemp & "Cache\download.json"))
-            '检查是否有要求的版本（#5195）
-            If Not String.IsNullOrEmpty(Loader.Input) Then
-                Dim Id = Loader.Input
-                If DlClientListLoader.Output.Value IsNot Nothing AndAlso Not DlClientListLoader.Output.Value("versions").Any(Function(v) v("id") = Id) Then
-                    Throw New Exception("BMCLAPI 源未包含目标版本 " & Id)
-                End If
-            End If
-            '返回
-            Loader.Output = New DlClientListResult With {.IsOfficial = False, .SourceName = "BMCLAPI", .Value = Json}
-        Catch ex As Exception
-            Throw New Exception("Minecraft BMCLAPI 版本列表解析失败（" & Json.ToString & "）", ex)
-        End Try
+        '镜像源额外合并 PCL 特供版本；目标版本校验（#5195）由 C# 侧对本源执行
+        Dim Manifest As PCL.Download.McVersionManifest = New PCL.Download.McVersionManifestClient().Fetch(
+            New PCL.Download.McVersionSource() {PCL.Download.McVersionSources.Bmclapi()}, Loader.Input, ExtraVersionsPath)
+        ApplyClientList(Loader, Manifest)
     End Sub
 
     ''' <summary>

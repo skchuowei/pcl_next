@@ -21,6 +21,25 @@ public interface IResourceApi
 }
 
 /// <summary>
+/// 支持「单地址 + 显式超时」请求的可选能力。
+/// <para>
+/// 资源站接口走的是「官方 + MCIM 镜像」候选源轮换（<see cref="ResourceSourceResolver"/>），
+/// 但 MC 下载源（Mojang / BMCLAPI）是两条互不映射的独立地址，候选顺序由用户的
+/// 「版本列表源」设置决定。这类请求不能用资源站的候选解析，否则会被当成
+/// 「没有镜像映射的官方源」反复重试同一地址，超时也不受控。
+/// </para>
+/// </summary>
+public interface IDirectResourceApi
+{
+    /// <summary>
+    /// 请求单个地址，超时由调用方指定；不展开候选源、不重试。
+    /// </summary>
+    /// <param name="url">请求地址（原样使用，不做镜像映射）。</param>
+    /// <param name="timeout">本次请求的超时。</param>
+    JsonNode RequestDirect(string url, TimeSpan timeout);
+}
+
+/// <summary>
 /// <see cref="IResourceApi"/> 的全局默认实例持有者。
 /// </summary>
 public static class ResourceApi
