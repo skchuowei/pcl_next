@@ -47,7 +47,6 @@ Public Module ModBuildChannel
     Public Const ChannelCode As String = "alpha"
     Public Const ChannelDisplay As String = "内测版"
     Public Const ChannelVersionCodeOffset As Integer = 20
-    Public Const ChannelAllowTelemetry As Boolean = False
     Public Const ChannelHighestVersionKey As String = "SystemHighestAlphaVersionReg"
 #ElseIf PCL_CHANNEL_BETA Then
     '公测线（beta 分支）——《分支与发布规范》§1.4
@@ -55,7 +54,6 @@ Public Module ModBuildChannel
     Public Const ChannelCode As String = "beta"
     Public Const ChannelDisplay As String = "公测版"
     Public Const ChannelVersionCodeOffset As Integer = 60
-    Public Const ChannelAllowTelemetry As Boolean = True
     Public Const ChannelHighestVersionKey As String = "SystemHighestBetaVersionReg"
 #ElseIf PCL_CHANNEL_RC Then
     '正式发布线（rc 分支）——《分支与发布规范》§1.5
@@ -63,7 +61,6 @@ Public Module ModBuildChannel
     Public Const ChannelCode As String = "rc"
     Public Const ChannelDisplay As String = "正式版"
     Public Const ChannelVersionCodeOffset As Integer = 90
-    Public Const ChannelAllowTelemetry As Boolean = True
     Public Const ChannelHighestVersionKey As String = "SystemHighestRcVersionReg"
 #ElseIf PCL_CHANNEL_SNAPSHOT Then
     '正式版的 SP 维护线（snapshot 分支）——《分支与发布规范》§1.6、§4
@@ -71,7 +68,6 @@ Public Module ModBuildChannel
     Public Const ChannelCode As String = "snapshot"
     Public Const ChannelDisplay As String = "正式版"
     Public Const ChannelVersionCodeOffset As Integer = 95
-    Public Const ChannelAllowTelemetry As Boolean = True
     Public Const ChannelHighestVersionKey As String = "SystemHighestRcVersionReg"
 #ElseIf PCL_CHANNEL_SLUSH Then
     '收敛 / 冻结线（slush 分支）——《分支与发布规范》§1.2
@@ -79,7 +75,6 @@ Public Module ModBuildChannel
     Public Const ChannelCode As String = "slush"
     Public Const ChannelDisplay As String = "收敛版"
     Public Const ChannelVersionCodeOffset As Integer = 10
-    Public Const ChannelAllowTelemetry As Boolean = False
     Public Const ChannelHighestVersionKey As String = "SystemHighestSlushVersionReg"
 #Else
     '功能集成主线（dev 分支）——《分支与发布规范》§1.1
@@ -87,7 +82,6 @@ Public Module ModBuildChannel
     Public Const ChannelCode As String = "dev"
     Public Const ChannelDisplay As String = "开发版"
     Public Const ChannelVersionCodeOffset As Integer = 0
-    Public Const ChannelAllowTelemetry As Boolean = False
     Public Const ChannelHighestVersionKey As String = "SystemHighestDevVersionReg"
 #End If
 

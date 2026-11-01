@@ -491,8 +491,6 @@ Public Class FormMain
             Catch ex As Exception
                 Logger.Warn(ex, "清理自动更新文件失败")
             End Try
-            '上报
-            Telemetry("启动")
             '开发阶段提示与开发日志改由 RunCountSub（首次启动）与 UpgradeSub（版本升级）统一触发，见 ShowDevNotes。
         End Sub, "初始化", ThreadPriority.Lowest)
 

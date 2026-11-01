@@ -982,26 +982,6 @@ NextFile:
             "文件位置：" & Paths.Base)
     End Sub
 
-    '遥测
-    Public Sub Telemetry([Event] As String, ParamArray Datas As String())
-        If Not ModBuildChannel.ChannelAllowTelemetry Then Return '按渠道决定是否上传遥测（见《分支与发布规范》§9 决策点 C：alpha 关闭、beta 开启）
-        If Not Settings.Get(Of Boolean)("SystemSystemTelemetry") Then Return '用户关闭了遥测
-        If Not ClsBaseUrl.StartsWithF("http") Then Return '开源版没有设置遥测地址
-        RunInNewThread(
-        Sub()
-            Try
-                Logger.Info($"匿名数据上报：{[Event]}")
-                Dim Url As String = $"{ClsBaseUrl}&Event={StringUtils.UrlEscape([Event])}"
-                For i = 0 To Datas.Length - 1 Step 2
-                    Url &= "&" & StringUtils.UrlEscape(Datas(i)) & "=" & StringUtils.UrlEscape(Datas(i + 1).ReplaceLineEndings(vbLf, mergeMultiple:=True))
-                Next
-                NetRequestByClient(Url, MakeLog:=False)
-            Catch ex As Exception
-                Logger.Warn(ex, "匿名数据上报失败")
-            End Try
-        End Sub, "Telemetry", ThreadPriority.Lowest)
-    End Sub
-
 #End Region
 
     Public DragControl = Nothing
