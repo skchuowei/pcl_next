@@ -79,6 +79,18 @@ public static class ResourceConfig
     /// 未注入时视为无百科数据（TranslatedName 等同 RawName）。对应 VB 的 WikiEntry.All 按 Slug 检索。
     /// </summary>
     public static Func<string, ResourcePlatforms, WikiInfo?>? WikiLookup;
+
+    /// <summary>
+    /// MC 百科全量条目（用于中文搜索反查英文名）。由宿主注入（对应 VB 的 WikiEntry.All.Value）。
+    /// 未注入时视为无百科数据，中文搜索分支将退化为直接以原文搜索。
+    /// </summary>
+    public static IEnumerable<WikiEntry>? WikiEntries;
+
+    /// <summary>
+    /// 繁体→简体中文转换钩子（对应 VB 的 Strings.StrConv(s, VbStrConv.SimplifiedChinese)）。
+    /// 未注入时退化为恒等（不转换），由宿主在 net10 上经 Microsoft.VisualBasic 提供真实实现。
+    /// </summary>
+    public static Func<string, string>? ToSimplifiedChinese;
 }
 
 /// <summary>
@@ -153,13 +165,42 @@ internal static class VbCompat
         return pos < 0 ? str : str[(pos + text.Length)..];
     }
 
+    /// <summary>获取在子字符串第一次出现之后的部分，未找到则返回原串（MeloongCore AfterFirst）。</summary>
+    public static string AfterFirst(this string str, string text)
+    {
+        int pos = string.IsNullOrEmpty(text) ? -1 : str.IndexOf(text, StringComparison.Ordinal);
+        return pos < 0 ? str : str[(pos + text.Length)..];
+    }
+
     /// <summary>忽略大小写的 Contains（MeloongCore ContainsIgnoreCase）。</summary>
     public static bool ContainsIgnoreCase(this string value, string subString)
         => value.IndexOf(subString, StringComparison.OrdinalIgnoreCase) >= 0;
 
+    /// <summary>是否全部为 ASCII 字符（VB 的 IsAsciiOnly）。</summary>
+    public static bool IsAsciiOnly(this string value)
+    {
+        foreach (var c in value)
+            if (c > 127) return false;
+        return true;
+    }
+
     /// <summary>升序排序（MeloongCore Ordered）。</summary>
     public static IEnumerable<T> Ordered<T>(this IEnumerable<T> source) where T : IComparable<T>
         => source.OrderBy(x => x);
+
+    /// <summary>
+    /// 按自定义两两相等性去重（对应 VB 的 Distinct(comparison)）。保留每个等价类中的首个出现，保持顺序。
+    /// <paramref name="equals"/> 返回 true 表示两项视为相同。
+    /// </summary>
+    public static IEnumerable<T> Distinct<T>(this IEnumerable<T> source, Func<T, T, bool> equals)
+    {
+        var kept = new List<T>();
+        foreach (var item in source)
+        {
+            if (!kept.Any(k => equals(k, item))) kept.Add(item);
+        }
+        return kept;
+    }
 
     /// <summary>将第一个字符转换为大写，其余字符转换为小写（MeloongCore Capitalize）。</summary>
     public static string Capitalize(this string word)
