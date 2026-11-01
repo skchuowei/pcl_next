@@ -15,13 +15,20 @@ public sealed class ResourceProviderRegistry
         "CurseForge 源未启用（未配置环境变量 PCL_CURSEFORGE_API_KEY），已自动改用 Modrinth 源";
 
     private readonly Dictionary<ResourcePlatforms, IResourceProvider> _providers = [];
+    private readonly IResourceApi? _api;
 
     /// <summary>用给定 Provider 列表构造注册表（同平台后者覆盖前者）。</summary>
-    public ResourceProviderRegistry(IEnumerable<IResourceProvider> providers)
+    /// <param name="providers">Provider 列表。</param>
+    /// <param name="api">融合搜索使用的请求器；null 时取全局默认。</param>
+    public ResourceProviderRegistry(IEnumerable<IResourceProvider> providers, IResourceApi? api = null)
     {
         ArgumentNullException.ThrowIfNull(providers);
+        _api = api;
         foreach (var provider in providers) _providers[provider.Platform] = provider;
     }
+
+    /// <summary>融合搜索使用的请求器：构造时注入优先，其次全局默认。</summary>
+    private IResourceApi Api => ResourceApi.Resolve(_api);
 
     /// <summary>
     /// 按默认配置构造：Modrinth + CurseForge（Key 取自环境变量）。
@@ -35,7 +42,7 @@ public sealed class ResourceProviderRegistry
         [
             new ModrinthProvider(api),
             new CurseForgeProvider(api, options),
-        ]);
+        ], api);
     }
 
     /// <summary>取指定平台的 Provider（未注册或非单一平台时返回 null）。</summary>
@@ -96,4 +103,53 @@ public sealed class ResourceProviderRegistry
 
     /// <summary>当前是否存在需要提示用户的降级（CurseForge 未启用时为 true）。</summary>
     public bool HasDegradation => Get(ResourcePlatforms.CurseForge) is { IsAvailable: false };
+
+    /// <summary>
+    /// 融合搜索（dev.4 §2.1 C）：按注册表的可用性收敛源后推进一页，返回本次新增的工程。
+    /// <para/>
+    /// 双站融合、<c>IsLike</c> 跨站去重与评分排序仍由 <see cref="ResourceSearcher"/> 完成——
+    /// 这里只做「源收敛 + 入口收敛」，不复制融合逻辑。
+    /// </para>
+    /// </summary>
+    /// <param name="request">搜索请求；翻页时把上次返回的 <see cref="ResourceSearchPage.Storage"/> 传回。</param>
+    /// <param name="notice">因降级产生的提示文案；无降级时为 null。</param>
+    /// <exception cref="ResourceProviderUnavailableException">所有源都不可用时抛出。</exception>
+    public ResourceSearchPage Search(ResourceProviderSearchRequest request, out string? notice)
+        => Search(request, ResourcePlatforms.Any, out notice);
+
+    /// <inheritdoc cref="Search(ResourceProviderSearchRequest, out string?)"/>
+    /// <param name="request">搜索请求。</param>
+    /// <param name="requestedSources">调用方期望的源（用户在下拉框选的），会先经 <see cref="ResolveSources"/> 收敛。</param>
+    /// <param name="notice">因降级产生的提示文案；无降级时为 null。</param>
+    public ResourceSearchPage Search(ResourceProviderSearchRequest request, ResourcePlatforms requestedSources, out string? notice)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        var sources = ResolveSources(requestedSources, out notice);
+        if (sources == 0)
+            throw new ResourceProviderUnavailableException(ResourcePlatforms.Any, "没有可用的资源源");
+
+        var storage = request.Storage ?? new ResourceSearcher.SearchResult();
+        var before = storage.Results.Count;
+        var target = before + Math.Max(1, request.PageSize);
+        ResourceSearcher.Search(new ResourceSearcher.SearchRequest(request.Type, storage, target)
+        {
+            Tag = request.Tag,
+            ModLoaders = request.ModLoaders,
+            GameVersion = request.GameVersion,
+            SearchText = request.SearchText,
+            Sources = sources,
+        }, Api);
+
+        return new ResourceSearchPage
+        {
+            Items = storage.Results.Skip(before).ToList(),
+            //融合场景下两站各自推进，聚合值只用于「是否还有下一页」的判断
+            Offset = storage.CurseForgeOffset + storage.ModrinthOffset,
+            Total = storage.CurseForgeTotal < 0 || storage.ModrinthTotal < 0
+                ? -1
+                : storage.CurseForgeTotal + storage.ModrinthTotal,
+            Storage = storage,
+        };
+    }
 }

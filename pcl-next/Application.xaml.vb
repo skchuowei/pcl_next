@@ -20,6 +20,12 @@ Public Class Application
             End If
             '提升主线程优先级
             Thread.CurrentThread.Priority = ThreadPriority.Highest
+            '注入 C# 侧资源站客户端（Phase 3/4）：资源搜索、指纹反查、版本枚举都经 ResourceApi.Default 联网
+            Try
+                ResourceSourceGate.EnsureInitialized()
+            Catch ex As Exception
+                Logger.Warn(ex, "初始化 C# 资源站客户端失败，资源联网将回退 VB 实现")
+            End Try
             '执行开发版测试
             If BuildType = BuildTypes.Debug Then
                 Try

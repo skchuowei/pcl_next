@@ -118,6 +118,29 @@ Public Class ResourceProject
     '实例化
 
     ''' <summary>
+    ''' 从 C# 侧的 <see cref="PCL.Download.ResourceProject"/> 直接构造（Phase 4 首步：列表数据源改由 Provider 提供）。
+    ''' 逐字段映射而不经 JSON 中转，避免 UnsafeGameVersions 这类只在内存中使用的字段丢失。
+    ''' </summary>
+    Friend Sub New(Source As PCL.Download.ResourceProject)
+        If Source Is Nothing Then Throw New ArgumentNullException(NameOf(Source))
+        Platform = CType(CInt(Source.Platform), ResourcePlatforms)
+        Types = CType(CInt(Source.Types), ResourceTypes)
+        Slug = Source.Slug
+        Id = Source.Id
+        If Source.CurseForgeFileIds IsNot Nothing Then CurseForgeFileIds = New List(Of Integer)(Source.CurseForgeFileIds)
+        RawName = Source.RawName
+        Description = Source.Description
+        Website = Source.Website
+        LastUpdate = Source.LastUpdate
+        DownloadCount = Source.DownloadCount
+        ModLoaders = CType(CInt(Source.ModLoaders), PCLCS.ModLoaders)
+        Tags = New List(Of String)(Source.Tags)
+        LogoUrl = Source.LogoUrl
+        Drops = New List(Of Integer)(Source.Drops)
+        If Source.UnsafeGameVersions IsNot Nothing Then UnsafeGameVersions = New List(Of String)(Source.UnsafeGameVersions)
+    End Sub
+
+    ''' <summary>
     ''' 从工程 Json 中初始化实例。若出错会抛出异常。
     ''' </summary>
     Public Sub New(Data As JObject)

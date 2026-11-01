@@ -153,6 +153,12 @@ Public Class ResourceSearcher
         ''' </summary>
         Public ErrorMessage As String = Nothing
 
+        ''' <summary>
+        ''' C# 侧搜索状态（Phase 4 首步：数据源改由 Provider 提供）。
+        ''' 翻页偏移与总量由 C# 侧维护；重建 Storage 时一并清空，从而使下一次搜索从头开始。
+        ''' </summary>
+        Friend CSharpStorage As PCL.Download.ResourceSearcher.SearchResult
+
     End Class
 
     ''' <summary>

@@ -179,7 +179,116 @@ public class ResourceProviderTests
         Assert.DoesNotContain(api.Requests, r => r.Url.Contains("curseforge"));
     }
 
+    // ---- 融合搜索（Phase 4 首步） ----
+
+    [Fact]
+    public void RegistrySearch_DegradesToModrinthAndAccumulatesAcrossPages()
+    {
+        const int pageSize = 40;
+        var api = new FakeResourceApi();
+        api.Map(u => u.Contains("api.modrinth.com/v2/search"),
+            u => ModrinthSearchPageJson(u, pageSize, totalHits: pageSize * 3));
+
+        var registry = new ResourceProviderRegistry(
+        [
+            new ModrinthProvider(api),
+            new CurseForgeProvider(api, new ResourceSigningOptions { CurseForgeApiKey = null }),
+        ], api);
+
+        var storage = new ResourceSearcher.SearchResult();
+        var first = registry.Search(new ResourceProviderSearchRequest
+        {
+            Type = ResourceTypes.Mod,
+            SearchText = "xmod",
+            PageSize = pageSize,
+            Storage = storage,
+        }, out var notice);
+
+        Assert.Equal(ResourceProviderRegistry.CurseForgeDisabledNotice, notice);
+        Assert.Equal(pageSize, first.Items.Count);
+        Assert.Equal(pageSize, storage.Results.Count);
+        Assert.All(api.Requests, r => Assert.Contains("api.modrinth.com", r.Url));
+        Assert.DoesNotContain(api.Requests, r => r.Url.Contains("curseforge"));
+
+        //第二页：偏移继续推进，结果累积而不是被替换
+        var second = registry.Search(new ResourceProviderSearchRequest
+        {
+            Type = ResourceTypes.Mod,
+            SearchText = "xmod",
+            PageSize = pageSize,
+            Storage = storage,
+        }, out _);
+
+        Assert.Equal(pageSize, second.Items.Count);
+        Assert.Equal(pageSize * 2, storage.Results.Count);
+        Assert.Equal(pageSize * 2, storage.Results.Select(p => p.Id).Distinct().Count());
+        Assert.Equal(pageSize * 3, second.Total);
+        Assert.True(second.HasMore);
+    }
+
+    [Fact]
+    public void RegistrySearch_HonorsCallerSourceSelection()
+    {
+        var api = new FakeResourceApi();
+        api.Map(u => u.Contains("api.modrinth.com/v2/search"),
+            u => ModrinthSearchPageJson(u, 1, totalHits: 1));
+
+        var registry = new ResourceProviderRegistry(
+        [
+            new ModrinthProvider(api),
+            new CurseForgeProvider(api, new ResourceSigningOptions { CurseForgeApiKey = "test-key" }),
+        ], api);
+
+        registry.Search(new ResourceProviderSearchRequest
+        {
+            Type = ResourceTypes.Mod,
+            SearchText = "xmod",
+            PageSize = 1,
+        }, ResourcePlatforms.Modrinth, out var notice);
+
+        Assert.Null(notice); //用户本来就只选 Modrinth，不算降级
+        Assert.DoesNotContain(api.Requests, r => r.Url.Contains("curseforge"));
+    }
+
+    [Fact]
+    public void RegistrySearch_ThrowsWhenNoSourceAvailable()
+    {
+        var api = new FakeResourceApi();
+        var registry = new ResourceProviderRegistry(
+        [
+            new CurseForgeProvider(api, new ResourceSigningOptions { CurseForgeApiKey = null }),
+        ], api);
+
+        var ex = Assert.Throws<ResourceProviderUnavailableException>(() =>
+            registry.Search(new ResourceProviderSearchRequest { Type = ResourceTypes.Mod }, out _));
+        Assert.Contains("没有可用的资源源", ex.Message);
+        Assert.Empty(api.Requests);
+    }
+
     // ---- 夹具 ----
+
+    /// <summary>构造一页 Modrinth 搜索结果；按 URL 里的 offset 生成互不相同的工程，便于验证翻页累积。</summary>
+    private static JsonObject ModrinthSearchPageJson(string url, int pageSize, int totalHits)
+    {
+        var offset = 0;
+        var marker = url.IndexOf("offset=", StringComparison.Ordinal);
+        if (marker >= 0)
+        {
+            var start = marker + "offset=".Length;
+            var end = url.IndexOf('&', start);
+            int.TryParse(url[start..(end < 0 ? url.Length : end)], out offset);
+        }
+
+        var hits = new JsonArray();
+        for (var i = 0; i < pageSize; i++)
+            hits.Add(ModrinthHitJson($"P{offset + i}", $"xmod-{offset + i}", 100_000 - offset - i));
+
+        return new JsonObject
+        {
+            ["hits"] = hits,
+            ["total_hits"] = totalHits,
+        };
+    }
 
     private static JsonObject ModrinthHitJson(string id, string slug, int downloads) => new()
     {

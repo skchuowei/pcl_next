@@ -74,7 +74,8 @@ Public Class PageResource
     Public Shared TargetName As String = Nothing
 
     '在点击 MyResourceItem 时会获取 Loader 的输入，以使资源详情页面可以应用相同的筛选项
-    Public Loader As LoaderTask(Of ResourceSearcher.SearchRequest, Integer) = ResourceSearcher.GetLoader(AddressOf LoaderInput)
+    '数据源已改由 C# 侧 Provider 提供（Phase 4 首步）；接口与原先的 ResourceSearcher.GetLoader 一致
+    Public Loader As LoaderTask(Of ResourceSearcher.SearchRequest, Integer) = ResourceProviderSearch.GetLoader(AddressOf LoaderInput)
 
     Private Sub PageResource_Loaded(sender As Object, e As EventArgs) Handles Me.Loaded
         Static IsFirstLoaded As Boolean = False
@@ -109,6 +110,7 @@ Public Class PageResource
         '加载器初始化
         If IsFirstLoaded Then Return
         IsFirstLoaded = True
+        ApplySourceAvailability()
         CType(Parent, MyPageRight).PageLoaderInit(Load, PanLoad, PanContent, PanAlways, Loader, AddressOf Load_OnFinish, AddressOf LoaderInput)
         '将最高 Drop 加入筛选
         If AllDrops IsNot Nothing AndAlso AllDrops.First > 250 Then
@@ -122,15 +124,44 @@ Public Class PageResource
         Dim Request As New ResourceSearcher.SearchRequest(PageType, Storage, (Page + 1) * PAGE_SIZE)
         Dim GameVersion As String = If(TextSearchVersion.Text = "全部 (也可自行输入)", Nothing,
             If(TextSearchVersion.Text.Contains(".") OrElse TextSearchVersion.Text.Contains("w"), TextSearchVersion.Text, Nothing))
+        Dim Notice As String = Nothing
         With Request
             .SearchText = TextSearchName.Text
             .GameVersion = GameVersion
             .Tag = ComboSearchTag.SelectedItem.Tag
             .ModLoaders = If(PageType = ResourceTypes.Mod, Val(ComboSearchLoader.SelectedItem.Tag), ModLoaders.None)
-            .Sources = CType(Val(ComboSearchSource.SelectedItem.Tag), ResourcePlatforms)
+            '未配置 CurseForge Key 时裁掉该源，避免向 CurseForge 发必然 403 的请求
+            .Sources = ResourceSourceGate.ResolveSources(CType(Val(ComboSearchSource.SelectedItem.Tag), ResourcePlatforms), Notice)
         End With
         Return Request
     End Function
+
+    ''' <summary>
+    ''' 未配置 CurseForge API Key 时，在页面上明示降级：显示提示条并禁用源选择器中的 CurseForge 项。
+    ''' 源可用性在进程内不会变化，首次加载时处理一次即可。
+    ''' </summary>
+    Private Sub ApplySourceAvailability()
+        Try
+            If ResourceSourceGate.CurseForgeAvailable Then Return
+            HintSource.Text = ResourceSourceGate.DegradationNotice & vbCrLf &
+                "如需启用，请设置环境变量 PCL_CURSEFORGE_API_KEY 后重启启动器。"
+            HintSource.Visibility = Visibility.Visible
+            Dim CurseForgeSelected As Boolean = False
+            For Each Item As MyComboBoxItem In ComboSearchSource.Items
+                If Item.Content?.ToString = "CurseForge" Then
+                    '必须在改文案前判断选中态：Content 一旦改掉，后续再也匹配不上
+                    CurseForgeSelected = ComboSearchSource.SelectedItem Is Item
+                    Item.Content = "CurseForge（未启用）"
+                    Item.IsEnabled = False
+                End If
+            Next
+            '原本选中的是 CurseForge，回退到「全部」（实际只会走 Modrinth）
+            If CurseForgeSelected Then ComboSearchSource.SelectedIndex = 0
+            Logger.Info("未检测到 CurseForge API Key，资源搜索已降级为仅 Modrinth 源")
+        Catch ex As Exception
+            Logger.Warn(ex, "应用资源源可用性提示失败")
+        End Try
+    End Sub
 
 #End Region
 
