@@ -1,4 +1,4 @@
-Public Module ModWatcher
+﻿Public Module ModWatcher
 
     '对全体的监视
     Public McWatcherList As New List(Of Watcher)
@@ -270,7 +270,7 @@ Public Module ModWatcher
                     MinecraftWindow = TryGetMinecraftWindow()
                 Catch ex As ComponentModel.Win32Exception
                     '拒绝访问（#1062）
-                    Logger.Error(ex, "由于反作弊或安全软件拦截，PCL 无法操作游戏窗口", LogBehavior.Toast)
+                    Logger.Error(ex, "由于反作弊或安全软件拦截，PCL Next 无法操作游戏窗口", LogBehavior.Toast)
                     IsWindowFinished = True
                 End Try
                 If MinecraftWindow Is Nothing Then Return

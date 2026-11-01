@@ -6,10 +6,10 @@
     PanScroll="PanBack" RenderOptions.BitmapScalingMode="LowQuality">
     <local:MyScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" x:Name="PanBack">
         <StackPanel x:Name="PanMain" Margin="25,10" Grid.IsSharedSizeScope="True">
-            <local:MyCard Margin="0,15" Title="关于 pcl-next">
+            <local:MyCard Margin="0,15" Title="关于 PCL Next">
                 <StackPanel Margin="25,39,23,20">
                     <TextBlock TextWrapping="Wrap" LineHeight="18" Margin="0,0,0,4"
-                               Text="pcl-next 是基于 Plain Craft Launcher 2 的第三方修改版，目标是用 C# 完整重写 PCL，并迁移到 .NET 10。本项目与 PCL 官方无隶属关系，非 Minecraft 官方产品。" />
+                               Text="PCL Next 是基于 Plain Craft Launcher 2 的第三方修改版，目标是用 C# 完整重写 PCL，并迁移到 .NET 10。本项目与 PCL 官方无隶属关系，非 Minecraft 官方产品。" />
                     <TextBlock TextWrapping="Wrap" LineHeight="18" Margin="0,10,0,4"
                                Text="当前状态：项目处于开发阶段（代号 dev），尚未完成 C# 重写，主程序仍有较多部分沿用 PCL2 的 VB 实现，功能与行为都可能发生较大变化。详见下方「项目进度」与各版本发布说明。" />
                     <StackPanel Orientation="Horizontal" Height="35" HorizontalAlignment="Left" Margin="0,12,0,0">
@@ -25,14 +25,16 @@
                     <Grid.RowDefinitions>
                         <RowDefinition Height="45" />
                         <RowDefinition Height="45" />
+                        <RowDefinition Height="45" />
                     </Grid.RowDefinitions>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="40" />
                         <ColumnDefinition />
                         <ColumnDefinition Width="150" />
                     </Grid.ColumnDefinitions>
-                    <local:MyListItem IsHitTestVisible="False" Title="pcl-next" Margin="-5,0,15,0" Info="当前版本：%VERSION%（%VERSIONCODE%.%BRANCH%）" Grid.Row="0" Grid.Column="1" x:Name="ItemAboutPcl" />
+                    <local:MyListItem IsHitTestVisible="False" Title="PCL Next" Margin="-5,0,15,0" Info="当前版本：%VERSION%（%VERSIONCODE%.%BRANCH%）" Grid.Row="0" Grid.Column="1" x:Name="ItemAboutPcl" />
                     <local:MyListItem IsHitTestVisible="False" Title="项目状态" Margin="-5,0,15,0" Info="开发阶段（代号 dev），C# 重写进行中，尚未达到 alpha 标准" Grid.Row="1" Grid.Column="1" />
+                    <local:MyListItem IsHitTestVisible="False" Title="构建版本" Margin="-5,0,15,0" Info="%BUILD%" Grid.Row="2" Grid.Column="1" x:Name="ItemAboutBuild" />
                     <Image Source="/pcl-next;component/Images/Heads/Logo.png" Grid.Row="0" Margin="3">
                         <Image.Clip>
                             <EllipseGeometry Center="17 17" RadiusX="17" RadiusY="17" />
@@ -56,12 +58,12 @@
             </local:MyCard>
             <local:MyCard Margin="0,0,0,15" Title="作者与贡献">
                 <StackPanel Margin="25,39,23,20">
-                    <TextBlock Text="pcl-next 项目" TextWrapping="Wrap" Margin="0,0,0,4" FontWeight="Bold" />
+                    <TextBlock Text="PCL Next 项目" TextWrapping="Wrap" Margin="0,0,0,4" FontWeight="Bold" />
                     <TextBlock TextWrapping="Wrap" LineHeight="18" Margin="0,0,0,2"
-                               Text="pcl-next 是由社区开发者发起的第三方重写项目，源码以公开仓库形式维护，欢迎所有人参与。" />
+                               Text="PCL Next 是由社区开发者发起的第三方重写项目，源码以公开仓库形式维护，欢迎所有人参与。" />
                     <TextBlock Text="上游 PCL 作者" TextWrapping="Wrap" Margin="0,12,0,4" FontWeight="Bold" />
                     <TextBlock TextWrapping="Wrap" LineHeight="18" Margin="0,0,0,2"
-                               Text="以下为上游 Plain Craft Launcher 2 的作者与贡献者，pcl-next 基于其源码重写，特此致谢并保留署名（依 PCL 分发有限许可）：" />
+                               Text="以下为上游 Plain Craft Launcher 2 的作者与贡献者，PCL Next 基于其源码重写，特此致谢并保留署名（依 PCL 分发有限许可）：" />
                     <Grid Margin="0,8,0,0">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="45" />
@@ -89,7 +91,7 @@
                     </Grid>
                     <TextBlock Text="如何参与贡献" TextWrapping="Wrap" Margin="0,12,0,4" FontWeight="Bold" />
                     <TextBlock TextWrapping="Wrap" LineHeight="18" Margin="0,0,0,2"
-                               Text="pcl-next 采用公开仓库协作，功能改动请提交到 dev 分支的 feat/* 分支（从 dev 拉出、合回 dev），缺陷修复提交到对应代号分支的 fix/* 分支。提交前请确保工程可编译并完成基本冒烟（启动、下载、启动游戏、整合包四条主链路）。&#xa;发现问题或有改进建议，欢迎在项目仓库提交 issue 或发起讨论。" />
+                               Text="PCL Next 采用公开仓库协作，功能改动请提交到 dev 分支的 feat/* 分支（从 dev 拉出、合回 dev），缺陷修复提交到对应代号分支的 fix/* 分支。提交前请确保工程可编译并完成基本冒烟（启动、下载、启动游戏、整合包四条主链路）。&#xa;发现问题或有改进建议，欢迎在项目仓库提交 issue 或发起讨论。" />
                 </StackPanel>
             </local:MyCard>
             <local:MyCard Margin="0,0,0,15" Title="特别鸣谢（上游 PCL）">
@@ -197,14 +199,14 @@
             </local:MyCard>
             <local:MyCard Margin="0,0,0,15" Title="法律信息" IsSwapped="True" CanSwap="True">
                 <StackPanel Margin="25,39,23,20">
-                    <TextBlock Text="本项目（pcl-next）" TextWrapping="Wrap" Margin="0,6,0,4" FontWeight="Bold" />
-                    <TextBlock Margin="0,0,0,2" LineHeight="17" Text="pcl-next 是 Plain Craft Launcher 2 的社区重写版（目标框架 .NET 10），与原版 PCL 及成都瓜皮龙科技有限公司无从属或代理关系。项目介绍与源码见上方「关于 pcl-next」卡片。" TextWrapping="Wrap" />
+                    <TextBlock Text="本项目（PCL Next）" TextWrapping="Wrap" Margin="0,6,0,4" FontWeight="Bold" />
+                    <TextBlock Margin="0,0,0,2" LineHeight="17" Text="PCL Next 是 Plain Craft Launcher 2 的社区重写版（目标框架 .NET 10），与原版 PCL 及成都瓜皮龙科技有限公司无从属或代理关系。项目介绍与源码见上方「关于 PCL Next」卡片。" TextWrapping="Wrap" />
                     <TextBlock Text="隐私说明" TextWrapping="Wrap" Margin="0,10,0,4" FontWeight="Bold" />
-                    <TextBlock Margin="0,0,0,2" LineHeight="17" Text="pcl-next 不包含任何遥测或日志上传代码：不会向任何服务器上传日志、错误信息或使用数据，也不会收集个人信息。" TextWrapping="Wrap" />
+                    <TextBlock Margin="0,0,0,2" LineHeight="17" Text="PCL Next 不包含任何遥测或日志上传代码：不会向任何服务器上传日志、错误信息或使用数据，也不会收集个人信息。" TextWrapping="Wrap" />
                     <TextBlock Text="上游版权信息（依《PCL 分发有限许可》保留）" TextWrapping="Wrap" Margin="0,10,0,4" FontWeight="Bold" />
                     <TextBlock Margin="0,0,0,2" LineHeight="17" Text="上游 Plain Craft Launcher 2：Copyright © 成都瓜皮龙科技有限公司&#13;计算机软件著作权登记号：2020SR0875133&#13;违法违规行为举报投诉邮箱：admin@meloong.com&#13;非 MINECRAFT 官方产品。未经 MOJANG 或 MICROSOFT 批准，也不与 MOJANG 或 MICROSOFT 关联。" TextWrapping="Wrap" />
                     <StackPanel Orientation="Horizontal" Height="35" HorizontalAlignment="Left" Margin="0,12,0,0">
-                        <local:MyButton Text="pcl-next 源码" Width="170" Padding="13,0" Margin="0,0,20,0" ColorType="Highlight"
+                        <local:MyButton Text="PCL Next 源码" Width="170" Padding="13,0" Margin="0,0,20,0" ColorType="Highlight"
                                         local:CustomEventService.EventType="打开网页" local:CustomEventService.EventData="https://github.com/skchuowei/pcl_next" />
                         <local:MyButton Text="PCL 分发有限许可" Width="170" Padding="13,0" Margin="0,0,20,0"
                                         local:CustomEventService.EventType="打开网页" local:CustomEventService.EventData="https://shimo.im/docs/rGrd8pY8xWkt6ryW#anchor-X0bo" />

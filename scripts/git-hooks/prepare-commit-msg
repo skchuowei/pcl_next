@@ -1,7 +1,9 @@
 #!/bin/sh
 # 提交前自动追加「构建小版本」到提交信息末尾（《分支与发布规范》§5.2.1）。
 #
-# 值 = 本周期起点（最近一个 v* 发布标签）以来的提交数 × 0.01，写成 M.mm。
+# 值 = 自固定锚点以来的提交数 × 0.01，写成 M.mm（与 scripts/Get-BuildSmallVersion.ps1 同源）。
+# 锚点是 v2.100.0.1-dev.1 的提交，硬编码且永不移动——用「最近发布标签」会让编号在打新标签后归零，
+# 后提交的版本反而比先提交的小。
 # 本次提交是第 N+1 个，因此追加的是它自己对应的编号——
 # 与编译期脚本在提交后算出的值一致。
 #
@@ -10,21 +12,28 @@
 MSGFILE="$1"
 SOURCE="$2"
 
-# merge / squash / commit --amend 的场景不追加：信息由 git 生成或已带编号
+# merge / squash 的场景不追加：信息由 git 生成
 case "$SOURCE" in
     merge|squash) exit 0 ;;
 esac
 
-# 已经带 Build 行就不再重复追加（--amend 重跑时）
+# amend 场景不追加：$3 是原提交的 SHA，此时编号已经定下，
+# 再按 HEAD 算会多加 1（HEAD 仍是那个提交），导致信息里的编号与产物对不上。
+if [ -n "$3" ]; then
+    exit 0
+fi
+
+# 已经带 Build 行就不再重复追加
 if grep -q '^Build: ' "$MSGFILE" 2>/dev/null; then
     exit 0
 fi
 
-BASE=$(git describe --tags --abbrev=0 --match 'v*' 2>/dev/null)
-if [ -z "$BASE" ]; then
-    COUNT=$(git rev-list --count HEAD 2>/dev/null || echo 0)
+ANCHOR=85c17f13003322a4025e09379bb1ed2d852ea63c
+if git rev-parse --verify --quiet "$ANCHOR^{commit}" > /dev/null 2>&1; then
+    COUNT=$(git rev-list --count "$ANCHOR..HEAD" 2>/dev/null || echo 0)
 else
-    COUNT=$(git rev-list --count "$BASE..HEAD" 2>/dev/null || echo 0)
+    # 浅克隆取不到锚点时退化，与脚本保持同一行为
+    COUNT=$(git rev-list --count HEAD 2>/dev/null || echo 0)
 fi
 
 # 本次提交自身的序号

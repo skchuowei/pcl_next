@@ -1,4 +1,4 @@
-Imports System.Collections.ObjectModel
+﻿Imports System.Collections.ObjectModel
 Imports System.Text.RegularExpressions
 
 Public Module ModModpack
@@ -9,7 +9,7 @@ Public Module ModModpack
     ''' </summary>
     Public Sub ModpackInstall()
         If RestrictMcDownload Then
-            Hint("为遵守相关法律法规，PCL 不再提供 MC 下载功能，非常抱歉 qwq……", HintType.Red)
+            Hint("为遵守相关法律法规，PCL Next 不再提供 MC 下载功能，非常抱歉 qwq……", HintType.Red)
             Return
         End If
         Dim File As String = Dialogs.SelectFile("选择整合包压缩文件", False, filter:={({"rar", "zip", "mrpack"}, "整合包文件")}).FirstOrDefault() '选择整合包文件
@@ -79,13 +79,13 @@ Public Module ModModpack
                 If ex.GetDisplay(True).Contains("Error.WinIOError") Then
                     Throw New Exception("打开整合包文件失败", ex)
                 ElseIf PathUtils.GetExtension(File) = "rar" Then
-                    Throw New Exception("PCL 无法处理 rar 格式的压缩包，请在解压后重新压缩为 zip 格式再试", ex)
+                    Throw New Exception("PCL Next 无法处理 rar 格式的压缩包，请在解压后重新压缩为 zip 格式再试", ex)
                 Else
                     Throw New Exception("打开整合包文件失败，文件可能损坏或为不支持的压缩包格式", ex)
                 End If
             End Try
             '执行对应的安装方法
-            If RestrictMcDownload Then Throw New Exception("为遵守相关法律法规，PCL 不再提供 MC 下载功能，非常抱歉 qwq……")
+            If RestrictMcDownload Then Throw New Exception("为遵守相关法律法规，PCL Next 不再提供 MC 下载功能，非常抱歉 qwq……")
             Select Case PackType
                 Case 0
                     Logger.Info("整合包种类：CurseForge")
@@ -716,7 +716,7 @@ Public Module ModModpack
         Next
         If Not Addons.ContainsKey("game") Then Throw New Exception("该 MCBBS 整合包未提供游戏版本信息，无法安装！")
         If Addons.ContainsKey("quilt") Then
-            Hint("PCL 不支持安装 Quilt 整合包！", HintType.Red)
+            Hint("PCL Next 不支持安装 Quilt 整合包！", HintType.Red)
             Throw New OperationCanceledException
         End If
         Dim ModLoaderVersions As New Dictionary(Of ModLoaders, String)
@@ -781,7 +781,7 @@ Public Module ModModpack
                     Logger.Info($"文件 {ExeFile} 的产品名标识为 {Info.ProductName}")
                     If Info.ProductName = "Plain Craft Launcher" Then
                         Launcher = ExeFile
-                        Logger.Info($"发现整合包附带的 PCL 启动器：{ExeFile}")
+                        Logger.Info($"发现整合包附带的 PCL Next 启动器：{ExeFile}")
                     ElseIf (Info.ProductName.ContainsIgnoreCase("Launcher") OrElse Info.ProductName.Contains("启动")) AndAlso
                         Not Info.ProductName = "Plain Craft Launcher Admin Manager" Then
                         If Launcher Is Nothing Then

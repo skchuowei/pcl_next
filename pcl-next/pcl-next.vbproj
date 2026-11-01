@@ -242,4 +242,24 @@
     </ItemGroup>
   </Target>
 
+  <!--
+    产物命名：在 pcl-next.exe 旁边另存一份 PCL-Next-<版本名>-<代号>-<构建号>[-dirty].exe，
+    原始文件名保持不变——XAML 里大量 `/pcl-next;component/...` 的资源 URI 依赖 AssemblyName，
+    改它会导致图片等资源全部加载失败。版本名读产物自身的 FileVersion，构建号读 git，
+    两者都不需要额外维护。规则见《分支与发布规范》§5.2.1 / §5.3。
+  -->
+  <Target Name="PclVersionedArtifact" AfterTargets="Build">
+    <Exec Command="powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\scripts\Copy-VersionedArtifact.ps1&quot; -ExePath &quot;$(TargetPath)&quot; -Channel &quot;$(PclChannel)&quot;&#xD;&#xA;"
+          IgnoreExitCode="true"
+          StandardOutputImportance="low"
+          StandardErrorImportance="low" />
+  </Target>
+
+  <Target Name="PclVersionedArtifactPublish" AfterTargets="Publish" Condition="'$(PublishDir)' != ''">
+    <Exec Command="powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\scripts\Copy-VersionedArtifact.ps1&quot; -ExePath &quot;$(PublishDir)$(TargetFileName)&quot; -Channel &quot;$(PclChannel)&quot;&#xD;&#xA;"
+          IgnoreExitCode="true"
+          StandardOutputImportance="low"
+          StandardErrorImportance="low" />
+  </Target>
+
 </Project>

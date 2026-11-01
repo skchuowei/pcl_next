@@ -1,4 +1,4 @@
-Imports System.Collections.ObjectModel
+﻿Imports System.Collections.ObjectModel
 Imports System.Globalization
 Imports System.Net.Sockets
 Imports System.Reflection
@@ -159,16 +159,16 @@ Public Class PageLinkMain
         '判断类型
         If Not (Code.Length >= 14 AndAlso Code(0) = "P"c AndAlso Code(5) = "-"c AndAlso Code(11) = "-"c) Then
             If Code.StartsWithF("U/") Then 'HMCL
-                Return "请让房主使用 PCL 创建房间！"
+                Return "请让房主使用 PCL Next 创建房间！"
             ElseIf Code.Length = 10 Then 'PCL CE
-                Return "请让房主使用非社区版的 PCL 创建房间！"
+                Return "请让房主使用非社区版的 PCL Next 创建房间！"
             Else
-                Return "邀请码有误，请让房主使用 PCL 创建房间！"
+                Return "邀请码有误，请让房主使用 PCL Next 创建房间！"
             End If
         End If
         '校验版本
         If Code.Length >= 23 AndAlso Code(17) = "-"c AndAlso
-            Val(Code.Substring(18, 2)) > INVITE_CODE_VERSION Then Return "你的 PCL 版本太老了，请在更新 PCL 之后再联机！"
+            Val(Code.Substring(18, 2)) > INVITE_CODE_VERSION Then Return "你的 PCL Next 版本太老了，请在更新 PCL Next 之后再联机！"
         Return Nothing
     End Function
     Private Shared Function FixCodeFormat(Code As String) As String
@@ -356,7 +356,7 @@ Public Class PageLinkMain
 
     '复制邀请码
     Private Sub Copy() Handles BtnFinishCopy.Click
-        Dim CodeText As String = $"在 PCL 启动器中输入邀请码【{GetInviteCode()}】，即可加入联机房间！"
+        Dim CodeText As String = $"在 PCL Next 启动器中输入邀请码【{GetInviteCode()}】，即可加入联机房间！"
         ClipboardSet(CodeText, False)
         Settings.Set("LinkLastAutoJoinInviteCode", CodeText)
         Hint("已复制邀请码！", HintType.Green)
@@ -435,7 +435,7 @@ Public Class PageLinkMain
         If Not String.IsNullOrEmpty(DisableReason) Then Throw New Exception("$" & DisableReason) 'TODO: 可能不会显示错误原因？
         If CType(ServerConfig("Link"), JObject).ContainsKey("MinVersionCode") AndAlso
            VersionCode < ServerConfig("Link")("MinVersionCode").ToObject(Of Integer) Then
-            Throw New Exception("$你的 PCL 版本太老了，请在更新 PCL 之后再联机！")
+            Throw New Exception("$你的 PCL Next 版本太老了，请在更新 PCL Next 之后再联机！")
         End If
     End Sub
 
@@ -1091,7 +1091,7 @@ ForcedPass:
             Try
                 Static BroadcastSocket As New Socket(SocketType.Dgram, ProtocolType.Udp)
                 BroadcastSocket.SendTo(
-                    Encoding.UTF8.GetBytes($"[MOTD]PCL 联机房间[/MOTD][AD]{ClientPort}[/AD]"),
+                    Encoding.UTF8.GetBytes($"[MOTD]PCL Next 联机房间[/MOTD][AD]{ClientPort}[/AD]"),
                     SocketFlags.None,
                     New IPEndPoint(IPAddress.Loopback, 4445))
             Catch ex As Exception

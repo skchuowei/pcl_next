@@ -19,7 +19,7 @@ Public Class FormMain
                 FeatureList.Add(New KeyValuePair(Of Integer, String)(1, "优化：为设置更新添加部分黑名单"))
             End If
             If LastVersion < 413 Then 'Release 2.99.0.0
-                FeatureList.Add(New KeyValuePair(Of Integer, String)(5, "删除：为遵守相关法律法规，PCL 不再提供 MC 下载功能，非常抱歉 qwq……"))
+                FeatureList.Add(New KeyValuePair(Of Integer, String)(5, "删除：为遵守相关法律法规，PCL Next 不再提供 MC 下载功能，非常抱歉 qwq……"))
             End If
             If LastVersion < 411 Then 'Release 2.14.0.0
                 FeatureList.Add(New KeyValuePair(Of Integer, String)(4, "新增：允许修改、添加、移除、更新已安装版本的各个组件，可从版本设置中进入"))
@@ -145,7 +145,7 @@ Public Class FormMain
                 FeatureList.Add(New KeyValuePair(Of Integer, String)(1, "优化：为设置更新添加部分黑名单"))
             End If
             If LastVersion < 414 Then 'Snapshot 2.99.0.0
-                FeatureList.Add(New KeyValuePair(Of Integer, String)(5, "删除：为遵守相关法律法规，PCL 不再提供 MC 下载功能，非常抱歉 qwq……"))
+                FeatureList.Add(New KeyValuePair(Of Integer, String)(5, "删除：为遵守相关法律法规，PCL Next 不再提供 MC 下载功能，非常抱歉 qwq……"))
             End If
             If LastVersion < 412 Then 'Snapshot 2.14.0.0
                 FeatureList.Add(New KeyValuePair(Of Integer, String)(4, "新增：允许修改、添加、移除、更新已安装版本的各个组件，可从版本设置中进入"))
@@ -284,7 +284,7 @@ Public Class FormMain
                 '    FeatureList.Add(New KeyValuePair(Of Integer, String)(3, "优化：使用离线登录也可以直接加入联机房间了"))
                 '    FeatureList.Add(New KeyValuePair(Of Integer, String)(3, "优化：会从所有共享节点中自动选择负载最低的进行中继连接"))
                 '    FeatureList.Add(New KeyValuePair(Of Integer, String)(2, "优化：若复制了邀请码，则可以直接快速加入房间"))
-                '    FeatureList.Add(New KeyValuePair(Of Integer, String)(2, "优化：关闭 PCL 时总是会提示是否退出联机，防止在关闭 PCL 时无意地关闭或退出了房间"))
+                '    FeatureList.Add(New KeyValuePair(Of Integer, String)(2, "优化：关闭 PCL Next 时总是会提示是否退出联机，防止在关闭 PCL Next 时无意地关闭或退出了房间"))
                 '    FeatureList.Add(New KeyValuePair(Of Integer, String)(2, "新增：允许自定义要连接的节点"))
                 'End If
                 FeatureCount += 9
@@ -314,7 +314,7 @@ Public Class FormMain
         '输出更新日志
         RunInNewThread(
         Sub()
-            If MyMsgBox(Content, "PCL 已更新至" & VersionDisplay, "确定", "完整更新日志") = 2 Then
+            If MyMsgBox(Content, "PCL Next 已更新至" & VersionDisplay, "确定", "完整更新日志") = 2 Then
                 OpenWebsite("https://meloong.com/afd/a/LTCat?tab=feed")
             End If
         End Sub, "UpdateLog Output")
@@ -350,7 +350,7 @@ Public Class FormMain
                 Logger.Info("从老 PCL 升级，但此前未调整版本隔离，使用老的版本隔离默认值")
                 Settings.Set("LaunchArgumentIndieV2", Settings.GetDefault("LaunchArgumentIndie"))
             Else
-                Logger.Info("全新的 PCL，使用新的版本隔离默认值")
+                Logger.Info("全新的 PCL Next，使用新的版本隔离默认值")
                 Settings.Set("LaunchArgumentIndieV2", Settings.GetDefault("LaunchArgumentIndieV2"))
             End If
         End If
@@ -384,8 +384,8 @@ Public Class FormMain
         PageRight = FrmLaunchRight
         FrmLaunchRight.PageState = MyPageRight.PageStates.ContentStay
         '模式提醒
-        If BuildType = BuildTypes.Debug Then Hint("[开发者模式] PCL 正以开发者模式运行，这可能会造成严重的性能下降，请务必立即向开发者反馈此问题！", HintType.Red)
-        If ModeDebug Then Hint("[调试模式] PCL 正以调试模式运行，这可能会导致性能下降，若无必要请不要开启！")
+        If BuildType = BuildTypes.Debug Then Hint("[开发者模式] PCL Next 正以开发者模式运行，这可能会造成严重的性能下降，请务必立即向开发者反馈此问题！", HintType.Red)
+        If ModeDebug Then Hint("[调试模式] PCL Next 正以调试模式运行，这可能会导致性能下降，若无必要请不要开启！")
         '尽早执行的加载池
         McFolderListLoader.Start(0) '为了让下载已存在文件检测可以正常运行，必须跑一次；为了让启动按钮尽快可用，需要尽早执行；为了与 PageLaunchLeft 联动，需要为 0 而不是 GetUuid
 
@@ -449,7 +449,7 @@ Public Class FormMain
             Sub()
                 PanBack.RenderTransform = Nothing
                 IsWindowLoadFinished = True
-                Logger.Info($"DPI：{DPI}，系统版本：{Environment.OSVersion.VersionString}，PCL 位置：{PathExe}")
+                Logger.Info($"DPI：{DPI}，系统版本：{Environment.OSVersion.VersionString}，PCL Next 位置：{PathExe}")
             End Sub, , True)
         }, "Form Show")
         'Timer 启动
@@ -463,8 +463,8 @@ Public Class FormMain
             If Settings.Get(Of Integer)("SystemEulaVersion") < EulaVersion Then
                 Select Case MyMsgBox(
                     If(Settings.Get(Of Integer)("SystemEulaVersion") = 0,
-                        "在使用 PCL 前，请先阅读用户协议与免责声明。",
-                        $"PCL 的用户协议与免责声明已更新。{vbCrLf}请阅读更新后的用户协议与免责声明。"),
+                        "在使用 PCL Next 前，请先阅读用户协议与免责声明。",
+                        $"PCL Next 的用户协议与免责声明已更新。{vbCrLf}请阅读更新后的用户协议与免责声明。"),
                         "协议授权", "同意", "拒绝", "查看用户协议与免责声明",
                         Button3Action:=Sub() OpenWebsite("https://shimo.im/docs/rGrd8pY8xWkt6ryW"))
                     Case 1
@@ -503,15 +503,15 @@ Public Class FormMain
         If Settings.Get(Of Integer)("SystemCount") = 1 Then
             Select Case ModBuildChannel.Channel
                 Case ModBuildChannel.Channels.Alpha
-                    MyMsgBox("欢迎使用 PCL 内测版！" & vbCrLf & vbCrLf &
+                    MyMsgBox("欢迎使用 PCL Next 内测版！" & vbCrLf & vbCrLf &
                              "内测版仅面向少量受邀用户，可能存在已知缺陷，甚至会导致配置丢失或游戏崩溃。" & vbCrLf &
-                             "请务必先备份好 PCL 的配置与整合包，遇到无法接受的问题请及时反馈。", "内测版使用说明")
+                             "请务必先备份好 PCL Next 的配置与整合包，遇到无法接受的问题请及时反馈。", "内测版使用说明")
                 Case ModBuildChannel.Channels.Beta
-                    MyMsgBox("欢迎使用 PCL 公测版！" & vbCrLf & vbCrLf &
+                    MyMsgBox("欢迎使用 PCL Next 公测版！" & vbCrLf & vbCrLf &
                              "公测版面向所有用户开放试跑，只修复阻塞使用的问题，仍可能存在少量已知缺陷。" & vbCrLf &
                              "请不要将公测版用于正式生产环境，遇到无法接受的崩溃请反馈。", "公测版使用说明")
                 Case ModBuildChannel.Channels.Slush
-                    MyMsgBox("欢迎使用 PCL 收敛版！" & vbCrLf & vbCrLf &
+                    MyMsgBox("欢迎使用 PCL Next 收敛版！" & vbCrLf & vbCrLf &
                              "这是功能冻结后的内部候选构建，仅供内部测试使用，请不要对外分发。", "收敛版使用说明")
             End Select
             ShowDevNotes()
@@ -519,7 +519,7 @@ Public Class FormMain
         If ModBuildChannel.ChannelIsInternal Then
             If Settings.Get(Of Integer)("SystemCount") >= 99 Then
                 If ThemeUnlock(6, False) Then
-                    MyMsgBox("你已经使用了 99 次 PCL 啦，感谢你长期以来的支持！" & vbCrLf &
+                    MyMsgBox("你已经使用了 99 次 PCL Next 啦，感谢你长期以来的支持！" & vbCrLf &
                              "隐藏主题 铁杆粉 已解锁！", "提示")
                 End If
             End If
@@ -562,7 +562,7 @@ Public Class FormMain
             Dim UnlockedTheme As New List(Of String)(Settings.Get(Of String)("UiLauncherThemeHide2").ToString.Split("|"))
             UnlockedTheme.Remove("13")
             Settings.Set("UiLauncherThemeHide2", UnlockedTheme.Join("|"c))
-            MyMsgBox("由于新版 PCL 修改了欧皇彩的解锁方式，你需要重新解锁欧皇彩。" & vbCrLf &
+            MyMsgBox("由于新版 PCL Next 修改了欧皇彩的解锁方式，你需要重新解锁欧皇彩。" & vbCrLf &
                      "多谢各位的理解啦！", "重新解锁提醒")
         End If
         '重置滑稽彩
@@ -570,7 +570,7 @@ Public Class FormMain
             Dim UnlockedTheme As New List(Of String)(Settings.Get(Of String)("UiLauncherThemeHide2").ToString.Split("|"))
             UnlockedTheme.Remove("12")
             Settings.Set("UiLauncherThemeHide2", UnlockedTheme.Join("|"c))
-            MyMsgBox("由于新版 PCL 修改了滑稽彩的解锁方式，你需要重新解锁滑稽彩。" & vbCrLf &
+            MyMsgBox("由于新版 PCL Next 修改了滑稽彩的解锁方式，你需要重新解锁滑稽彩。" & vbCrLf &
                      "多谢各位的理解啦！", "重新解锁提醒")
         End If
         '移动自定义皮肤
@@ -815,9 +815,9 @@ Public Class FormMain
                     FrmSetupUI.PanLogoText.Visibility = Visibility.Collapsed
                     FrmSetupUI.PanLogoChange.Visibility = Visibility.Collapsed
                 End If
-            Case 1 '默认
-                ShapeTitleLogo.Visibility = Visibility.Visible
-                LabTitleLogo.Visibility = Visibility.Collapsed
+            Case 1 '默认（PCL Next 品牌文字；上游那个「PCL」图形标志不再作为默认外观）
+                ShapeTitleLogo.Visibility = Visibility.Collapsed
+                LabTitleLogo.Visibility = Visibility.Visible
                 ImageTitleLogo.Visibility = Visibility.Collapsed
                 If Not IsNothing(FrmSetupUI) Then
                     FrmSetupUI.CheckLogoLeft.Visibility = Visibility.Collapsed
@@ -850,8 +850,13 @@ Public Class FormMain
                 End Try
         End Select
         FrmSetupUI?.CardLogo.TriggerForceResize()
-        '标题栏文本
-        LabTitleLogo.Text = Settings.Get(Of String)("UiLogoText")
+        '标题栏文本：默认档固定显示品牌名，文本档用用户自定义内容（留空时回落到品牌名）
+        If Settings.Get(Of Integer)("UiLogoType") = 1 Then
+            LabTitleLogo.Text = "PCL Next"
+        Else
+            LabTitleLogo.Text = Settings.Get(Of String)("UiLogoText")
+            If String.IsNullOrWhiteSpace(LabTitleLogo.Text) Then LabTitleLogo.Text = "PCL Next"
+        End If
         '标题栏文本是否居左
         PanTitleMain.ColumnDefinitions(0).Width = New GridLength(If(Settings.Get(Of Boolean)("UiLogoLeft") AndAlso Settings.Get(Of Integer)("UiLogoType") = 0, 0, 1), GridUnitType.Star)
     End Sub
@@ -1139,7 +1144,7 @@ Public Class FormMain
                     RunInUi(Sub() FrmMain.PageChange(FormMain.PageType.TaskManager))
                     Return
                 Catch ex As Exception
-                    If RestrictMcDownload AndAlso ex.Message = "为遵守相关法律法规，PCL 不再提供 MC 下载功能，非常抱歉 qwq……" Then
+                    If RestrictMcDownload AndAlso ex.Message = "为遵守相关法律法规，PCL Next 不再提供 MC 下载功能，非常抱歉 qwq……" Then
                         Hint(ex.Message, HintType.Red)
                         Return
                     End If
@@ -1149,7 +1154,7 @@ Public Class FormMain
             End If
             'RAR 处理
             If Extension = "rar" Then
-                Hint("PCL 无法处理 rar 格式的压缩包，请在解压后重新压缩为 zip 格式再试！", HintType.Red)
+                Hint("PCL Next 无法处理 rar 格式的压缩包，请在解压后重新压缩为 zip 格式再试！", HintType.Red)
                 Return
             End If
             '错误报告分析
@@ -1165,7 +1170,7 @@ Public Class FormMain
                 Logger.Error(ex, "自主错误报告分析失败")
             End Try
             '未知操作
-            Hint("PCL 无法确定适合的操作……", HintType.Red)
+            Hint("PCL Next 无法确定适合的操作……", HintType.Red)
         End Sub, "文件拖拽")
     End Sub
 

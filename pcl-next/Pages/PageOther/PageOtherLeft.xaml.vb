@@ -1,4 +1,4 @@
-Public Class PageOtherLeft
+﻿Public Class PageOtherLeft
 
     Private IsLoad As Boolean = False
     Private IsPageSwitched As Boolean = False '如果在 Loaded 前切换到其他页面，会导致触发 Loaded 时再次切换一次
@@ -132,7 +132,7 @@ Public Class PageOtherLeft
     End Sub
     Public Shared Sub TryFeedback()
         If False.Equals(PageSetupSystem.IsLauncherNewest) Then
-            If MyMsgBox($"你的 PCL 不是最新版，因此无法提交反馈。{vbCrLf}请在更新后，确认该问题在最新版中依然存在，然后再提交反馈。", "无法提交反馈", "更新", "取消") = 1 Then
+            If MyMsgBox($"你的 PCL Next 不是最新版，因此无法提交反馈。{vbCrLf}请在更新后，确认该问题在最新版中依然存在，然后再提交反馈。", "无法提交反馈", "更新", "取消") = 1 Then
                 UpdateCheckByButton()
             End If
             Return

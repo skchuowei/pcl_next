@@ -97,7 +97,7 @@ Public Class Settings
         New Setting("LaunchFolderSelect", ""),
         New Setting("LaunchFolders", "", Source:=Sources.Registry),
         New Setting("LaunchArgumentTitle", ""),
-        New Setting("LaunchArgumentInfo", "PCL"),
+        New Setting("LaunchArgumentInfo", "PCL Next"),
         New Setting("LaunchArgumentJavaSelect", "", Source:=Sources.Registry),
         New Setting("LaunchArgumentJavaAll", "[]", Source:=Sources.Registry),
         New Setting("LaunchArgumentIndie", 0),

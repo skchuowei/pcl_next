@@ -1,4 +1,4 @@
-''' <summary>
+﻿''' <summary>
 ''' 开发阶段提示与开发日志（内置，每版本硬编码）。
 '''
 ''' 与《分支与发布规范》§5.4 的 GitHub ReleaseNotes 互补，二者来源一致、侧重不同：
@@ -32,7 +32,7 @@ Public Module ModDevNotes
         Get
             Select Case VersionCode
                 Case 5003 ' dev 2.100.0.4
-                    Return "你正在使用 PCL 的开发版（dev）。本版补齐了资源子系统的联网半边（平台接口、密钥降级、" &
+                    Return "你正在使用 PCL Next 的开发版（dev）。本版补齐了资源子系统的联网半边（平台接口、密钥降级、" &
                            "在线反查），并把下载页的搜索与列表切到了 C# 实现；dev.2 起欠下的四项真机验证已清偿。" & vbCrLf & vbCrLf &
                            "本版本已知限制：" & vbCrLf &
                            "- 未配置环境变量 PCL_CURSEFORGE_API_KEY 时只有 Modrinth 源，资源页会给出提示；" & vbCrLf &
