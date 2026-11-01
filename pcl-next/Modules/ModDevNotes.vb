@@ -51,6 +51,12 @@ Public Module ModDevNotes
     Public ReadOnly Property DevChangelog As String
         Get
             Select Case VersionCode
+                Case 5001 ' dev 2.100.0.2
+                    Return "· 修复：渠道条件编译常量不一致——PclChannelConstant 与代码判断的" &
+                           " PCL_CHANNEL_* 不匹配，除 dev 外的所有渠道都会被编成 dev。" &
+                           "已对齐并新增 PclChannelGuard 强制重编校验（渠道变更时自动清理旧程序集）。" & vbCrLf &
+                           "· 修复：代号改名收尾（pc→rc），发布输出目录按渠道隔离到 bin-net10/<渠道>。" & vbCrLf &
+                           "· 本构建起包含 v2.100.0.1-dev.1 标签之后的全源连接挂起静默卡死修复（真机 NeoForge 复现）。"
                 Case 5000 ' dev 2.100.0.1
                     Return "· 重写：主程序运行时由 .NET Framework 迁移到 .NET 10，启用新的应用模型与异步调用栈。" & vbCrLf &
                            "· 优化：下载服务完成 C# 化并接入主程序，采用多源并发、分片续传、断点续传与一致性校验。" & vbCrLf &
