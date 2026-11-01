@@ -1,0 +1,170 @@
+namespace PCL.Download;
+
+/// <summary>
+/// 社区资源的类型。
+/// 数值与 PCLCS.Constants.ResourceTypes 保持一致，桥接层按数值互转（迁移计划 §3.3 DTO 化方案）。
+/// </summary>
+[Flags]
+public enum ResourceTypes
+{
+    /// <summary>Mod。</summary>
+    Mod = 1,
+    /// <summary>整合包。</summary>
+    ModPack = 2,
+    /// <summary>资源包。</summary>
+    ResourcePack = 4,
+    /// <summary>光影包。</summary>
+    Shader = 8,
+    /// <summary>数据包。</summary>
+    DataPack = 16,
+    /// <summary>服务端插件。</summary>
+    Plugin = 32,
+    /// <summary>地图。</summary>
+    Map = 64,
+    /// <summary>同时包含数据包以及 Mod。</summary>
+    ModOrDataPack = Mod | DataPack,
+    /// <summary>允许任意种类，或种类未知。</summary>
+    Any = Mod | ModPack | ResourcePack | Shader | DataPack | Plugin | Map,
+}
+
+/// <summary>
+/// 社区资源的来源平台。数值与 PCLCS.Constants.ResourcePlatforms 保持一致。
+/// </summary>
+[Flags]
+public enum ResourcePlatforms
+{
+    CurseForge = 1,
+    Modrinth = 2,
+    Any = CurseForge | Modrinth,
+}
+
+/// <summary>
+/// Mod 加载器的类型。数值与 PCLCS.Constants.ModLoaders 保持一致。
+/// </summary>
+[Flags]
+public enum ModLoaders
+{
+    None = 0,
+    Forge = 1,
+    LiteLoader = 2,
+    Fabric = 4,
+    NeoForge = 16,
+    All = Forge | LiteLoader | Fabric | NeoForge,
+}
+
+/// <summary>
+/// MC 百科数据库条目的精简信息（供 <see cref="ResourceProject"/> 的翻译名查询使用）。
+/// </summary>
+public sealed class WikiInfo
+{
+    /// <summary>MC 百科的页面 ID。若为 0 则没有。</summary>
+    public int Id { get; init; }
+
+    /// <summary>翻译后的中文名。可能为 null。</summary>
+    public string? ChineseName { get; init; }
+}
+
+/// <summary>
+/// 资源模型层的宿主注入点（对应 VB 侧的全局状态：ModeDebug、WikiEntry.All）。
+/// </summary>
+public static class ResourceConfig
+{
+    /// <summary>
+    /// 是否为调试模式。影响 <see cref="ResourceVersion.ReleaseTypeDisplay"/> 的文案（对应 VB 全局 ModeDebug）。
+    /// </summary>
+    public static bool DebugMode;
+
+    /// <summary>
+    /// MC 百科数据库查询钩子：输入 (slug, platform)，返回百科条目，无则返回 null。
+    /// 未注入时视为无百科数据（TranslatedName 等同 RawName）。对应 VB 的 WikiEntry.All 按 Slug 检索。
+    /// </summary>
+    public static Func<string, ResourcePlatforms, WikiInfo?>? WikiLookup;
+}
+
+/// <summary>
+/// VB / MeloongCore 语义的等价小工具（平移用，仅供本程序集内部使用）。
+/// </summary>
+internal static class VbCompat
+{
+    /// <summary>VB 的 IsSingle：集合恰有 1 个元素。</summary>
+    public static bool IsSingle<T>(this IReadOnlyCollection<T>? source) => source is { Count: 1 };
+
+    /// <summary>
+    /// 对于具有 <see cref="FlagsAttribute"/> 的枚举，返回其所有单一 Flag 值（跳过 0、非 2 的幂、组合值、别名）。
+    /// 与 MeloongCore EnumUtils.GetAllFlags 语义一致；按枚举数值升序（Enum.GetValues 顺序）。
+    /// </summary>
+    public static List<TEnum> GetAllFlags<TEnum>() where TEnum : struct, Enum
+    {
+        var flags = new List<TEnum>();
+        foreach (var element in Enum.GetValues<TEnum>())
+        {
+            long number = Convert.ToInt64(element);
+            if (number == 0 || (number & (number - 1)) != 0) continue;
+            if (!flags.Contains(element)) flags.Add(element);
+        }
+        return flags;
+    }
+
+    /// <summary>将 Flags 枚举值解包为它包含的单一 Flag 成员集合。与 MeloongCore 的 Flags() 扩展语义一致。</summary>
+    public static IEnumerable<TEnum> FlagsOf<TEnum>(this TEnum value) where TEnum : struct, Enum
+        => GetAllFlags<TEnum>().Where(element => value.HasFlag(element));
+
+    /// <summary>非零标志位的 <see cref="Enum.HasFlag"/>。与 MeloongCore 的 HasFlagF 语义一致。</summary>
+    public static bool HasFlagF<TEnum>(this TEnum value, TEnum flag) where TEnum : struct, Enum
+        => value.HasFlag(flag) && !EqualityComparer<TEnum>.Default.Equals(flag, default);
+
+    /// <summary>
+    /// 按既定规则进行选择排序（与 ModBase.SortByComparison 相同的算法）。
+    /// <paramref name="sortRule"/> 返回 true 表示第一个对象应排在前面（a &gt; b）。
+    /// </summary>
+    public static List<T> SortByComparison<T>(IEnumerable<T> source, Func<T, T, bool> sortRule)
+    {
+        var list = source.ToList();
+        var result = new List<T>(list.Count);
+        while (list.Count > 0)
+        {
+            var highest = list[0];
+            for (int i = 1; i < list.Count; i++)
+                if (sortRule(list[i], highest)) highest = list[i];
+            list.Remove(highest);
+            result.Add(highest);
+        }
+        return result;
+    }
+
+    /// <summary>获取在子字符串第一次出现之前的部分，未找到则返回原串（MeloongCore BeforeFirst）。</summary>
+    public static string BeforeFirst(this string str, string text)
+    {
+        int pos = string.IsNullOrEmpty(text) ? -1 : str.IndexOf(text, StringComparison.Ordinal);
+        return pos < 0 ? str : str[..pos];
+    }
+
+    /// <summary>获取在子字符串最后一次出现之前的部分，未找到则返回原串（MeloongCore BeforeLast）。</summary>
+    public static string BeforeLast(this string str, string text)
+    {
+        int pos = string.IsNullOrEmpty(text) ? -1 : str.LastIndexOf(text, StringComparison.Ordinal);
+        return pos < 0 ? str : str[..pos];
+    }
+
+    /// <summary>获取在子字符串最后一次出现之后的部分，未找到则返回原串（MeloongCore AfterLast）。</summary>
+    public static string AfterLast(this string str, string text)
+    {
+        int pos = string.IsNullOrEmpty(text) ? -1 : str.LastIndexOf(text, StringComparison.Ordinal);
+        return pos < 0 ? str : str[(pos + text.Length)..];
+    }
+
+    /// <summary>忽略大小写的 Contains（MeloongCore ContainsIgnoreCase）。</summary>
+    public static bool ContainsIgnoreCase(this string value, string subString)
+        => value.IndexOf(subString, StringComparison.OrdinalIgnoreCase) >= 0;
+
+    /// <summary>升序排序（MeloongCore Ordered）。</summary>
+    public static IEnumerable<T> Ordered<T>(this IEnumerable<T> source) where T : IComparable<T>
+        => source.OrderBy(x => x);
+
+    /// <summary>将第一个字符转换为大写，其余字符转换为小写（MeloongCore Capitalize）。</summary>
+    public static string Capitalize(this string word)
+    {
+        if (string.IsNullOrEmpty(word)) return word;
+        return $"{char.ToUpperInvariant(word[0])}{word[1..].ToLowerInvariant()}";
+    }
+}
