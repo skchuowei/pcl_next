@@ -61,3 +61,8 @@
 #*.PDF   diff=astextplain
 #*.rtf   diff=astextplain
 #*.RTF   diff=astextplain
+
+###############################################################################
+# Git 钩子必须保持 LF：Windows 检出时被转成 CRLF 会让 #!/bin/sh 解析失败
+###############################################################################
+scripts/git-hooks/* text eol=lf

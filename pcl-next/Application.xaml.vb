@@ -119,7 +119,7 @@ RetryCacheCheck:
                 FrmStart.Show(False, True)
             End If
             '基础信息
-            Logger.Info($"程序版本：{VersionDisplay} ({VersionCode}，渠道 {ModBuildChannel.ChannelCode}{If(CommitHash = "", "", $"，#{CommitHash}")})")
+            Logger.Info($"程序版本：{VersionDisplay} ({VersionCode}，渠道 {ModBuildChannel.ChannelCode}，{ModBuildInfo.Display}{If(CommitHash = "", "", $"，#{CommitHash}")})")
             If ModBuildChannel.ChannelIsInternal Then
                 Logger.Info($"识别码：{Identify}{If(ThemeCheckOne(9), "，已解锁反馈主题", "，未解锁反馈主题")}")
             Else

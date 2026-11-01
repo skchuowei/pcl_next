@@ -220,4 +220,26 @@
     <Delete Files="@(_PclPublishLeftover)" ContinueOnError="true" />
   </Target>
 
+  <!--
+    构建小版本（《分支与发布规范》§5.2.1）：
+    编译前根据 git 状态推导「自本周期起点以来的提交数 × 0.01」，生成 obj\PclBuildInfo.g.vb，
+    内含 AssemblyInformationalVersion 与 PclBuildInfoGenerated 数据类，
+    使任何一份产物都能反查到构建时的提交（exe 属性 → 详细信息 → 产品版本）。
+
+    生成的源文件内容未变时不重写，避免每次构建都触发整包重编译。
+    非 git 环境（如源码压缩包）退化为 0.00 / nogit，不阻断构建。
+  -->
+  <Target Name="PclBuildInfo" BeforeTargets="CoreCompile">
+    <PropertyGroup>
+      <_PclBuildInfoFile>$(IntermediateOutputPath)PclBuildInfo.g.vb</_PclBuildInfoFile>
+    </PropertyGroup>
+    <Exec Command="powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\scripts\Get-BuildSmallVersion.ps1&quot; -RepoRoot &quot;$(MSBuildProjectDirectory)\..&quot; -OutFile &quot;$(_PclBuildInfoFile)&quot;"
+          IgnoreExitCode="true"
+          StandardOutputImportance="low"
+          StandardErrorImportance="low" />
+    <ItemGroup>
+      <Compile Include="$(_PclBuildInfoFile)" Condition="Exists('$(_PclBuildInfoFile)')" />
+    </ItemGroup>
+  </Target>
+
 </Project>

@@ -1,0 +1,36 @@
+#!/bin/sh
+# 提交前自动追加「构建小版本」到提交信息末尾（《分支与发布规范》§5.2.1）。
+#
+# 值 = 本周期起点（最近一个 v* 发布标签）以来的提交数 × 0.01，写成 M.mm。
+# 本次提交是第 N+1 个，因此追加的是它自己对应的编号——
+# 与编译期脚本在提交后算出的值一致。
+#
+# 由 scripts/Install-GitHooks.ps1 安装到 .git/hooks/prepare-commit-msg。
+
+MSGFILE="$1"
+SOURCE="$2"
+
+# merge / squash / commit --amend 的场景不追加：信息由 git 生成或已带编号
+case "$SOURCE" in
+    merge|squash) exit 0 ;;
+esac
+
+# 已经带 Build 行就不再重复追加（--amend 重跑时）
+if grep -q '^Build: ' "$MSGFILE" 2>/dev/null; then
+    exit 0
+fi
+
+BASE=$(git describe --tags --abbrev=0 --match 'v*' 2>/dev/null)
+if [ -z "$BASE" ]; then
+    COUNT=$(git rev-list --count HEAD 2>/dev/null || echo 0)
+else
+    COUNT=$(git rev-list --count "$BASE..HEAD" 2>/dev/null || echo 0)
+fi
+
+# 本次提交自身的序号
+COUNT=$((COUNT + 1))
+MAJOR=$((COUNT / 100))
+MINOR=$((COUNT % 100))
+SMALL=$(printf '%d.%02d' "$MAJOR" "$MINOR")
+
+printf '\nBuild: %s\n' "$SMALL" >> "$MSGFILE"
