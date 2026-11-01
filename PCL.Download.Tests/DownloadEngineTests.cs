@@ -231,6 +231,47 @@ public class DownloadEngineTests
     #region 输入校验
 
     [Fact]
+    public async Task AllSourcesHang_TimesOutRotatesSourcesAndFailsVisibly()
+    {
+        // 复现真机 NeoForge 卡死：所有源接受连接但永不响应。
+        // 引擎应在连接超时后换源重试、留下日志，并在源全部达到失败上限后明确失败——而不是无声卡在 Connecting。
+        using var server1 = new FakeFileServer { Data = [1, 2, 3], HangConnections = true };
+        using var server2 = new FakeFileServer { Data = [1, 2, 3], HangConnections = true };
+        var target = TempPath("hang.bin");
+        var engine = new DownloadEngine();
+        var warnings = new List<string>();
+        var options = new DownloadOptions
+        {
+            MaxConcurrentChunks = 4,
+            MinConnectTimeoutMilliseconds = 200, // 加速：连接 200ms 即超时
+            ConnectTimeoutMilliseconds = 200,
+            LogWarn = (_, msg) => lockWarnAdd(warnings, msg),
+        };
+
+        await Assert.ThrowsAnyAsync<Exception>(() => engine.DownloadAsync(
+        [
+            new DownloadFileRequest
+            {
+                Sources = [server1.Url, server2.Url],
+                LocalPath = target,
+                Check = new FileCheckRule { Hash = "deadbeef" }, // 给 Check 以免触发本地复用歧义
+            },
+        ], options));
+
+        // 必须有可见的重试/禁用日志（修复前：全程静默）
+        Assert.Contains(warnings, w => w.Contains("自动换源重试") || w.Contains("已被禁用"));
+        // 必须确实对两个源都发起过连接（调度器在超时后轮转了源）
+        Assert.True(server1.AcceptCount + server2.AcceptCount >= 2,
+            $"连接次数不足：{server1.AcceptCount}+{server2.AcceptCount}");
+    }
+
+    private static readonly object WarnLock = new();
+    private static void lockWarnAdd(List<string> list, string msg)
+    {
+        lock (WarnLock) list.Add(msg);
+    }
+
+    [Fact]
     public async Task InvalidSourceUrl_ThrowsArgumentException()
     {
         var engine = new DownloadEngine();

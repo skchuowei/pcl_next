@@ -278,6 +278,10 @@ internal sealed class FileTask
                     source.SingleChunk = chunk;
                 }
                 Chunks.Add(chunk);
+                // 与 VB 对齐：首分块记 Info，续传/追加分块记日志留痕（此前完全静默，UI 卡死时无从排查）
+                options.Log?.Invoke(start == 0
+                    ? $"{LocalName}：开始下载，起始点 0，{source.Url}"
+                    : $"{LocalName}：开始分块，起始点 {start}，{source.Url}");
                 return chunk;
             }
         }
@@ -297,7 +301,7 @@ internal sealed class FileTask
         var firstThread = chunk.Start == 0 && FileSize == -2;
 
         var connectAverage = ConnectAverage;
-        var timeout = Math.Min(Math.Max(connectAverage < 0 ? 15000 : connectAverage, 15000) * (1 + source.FailCount),
+        var timeout = Math.Min(Math.Max(connectAverage < 0 ? options.MinConnectTimeoutMilliseconds : connectAverage, options.MinConnectTimeoutMilliseconds) * (1 + source.FailCount),
             options.ConnectTimeoutMilliseconds);
         chunk.Phase = ChunkPhase.Connecting;
 
@@ -468,6 +472,9 @@ internal sealed class FileTask
             if (ex is HttpStatusCodeException { StatusCode: 416 })
                 ex = new RangeNotSupportedException(ex.Message);
             if (ex is OperationCanceledException && cancellationToken.IsCancellationRequested) throw;
+            // 连接/响应超时产生的 OCE（主令牌未取消）：转义为明确的超时异常，避免误导性的"操作已取消"
+            if (ex is OperationCanceledException)
+                ex = new TimeoutException($"连接或响应超时（上限 {timeout}ms）：{source.Url}", ex);
             OnChunkFailure(chunk, ex, isMergeFailure: false, options, ctx);
         }
         finally
@@ -563,7 +570,9 @@ internal sealed class FileTask
                 }
                 else if (hasMultiSource && !isMergeFailure)
                 {
-                    // 还有可用源，继续
+                    // 还有可用源，继续（可见性：静默重试也要留痕，否则 UI 上表现为"卡死"）
+                    options.LogWarn?.Invoke(ex,
+                        $"{LocalName}：分块失败，自动换源重试（第 {chunk.Source.FailCount} 次，源 {chunk.Source.Id}）");
                 }
                 else if (inOnceMode && !isMergeFailure)
                 {

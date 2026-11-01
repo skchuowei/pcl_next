@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using System.Threading;
 
 namespace PCL.Download.Tests;
 
@@ -31,7 +32,13 @@ public sealed class FakeFileServer : IDisposable
     /// <summary>是否直接拒绝连接（模拟无法访问的源）。</summary>
     public bool RefuseConnections { get; set; }
 
-    public List<string> Requests { get; } = [];
+    /// <summary>接受连接但永不响应（模拟连接挂起，触发引擎连接超时）。</summary>
+    public bool HangConnections { get; set; }
+
+    public List<string> Requests { get; } = new();
+
+    /// <summary>TCP 连接被接受的次数（含 HangConnections 模式——此时 Requests 不增长）。</summary>
+    public int AcceptCount;
     public int Port { get; }
     public string Url => $"http://127.0.0.1:{Port}/file.bin";
 
@@ -66,6 +73,22 @@ public sealed class FakeFileServer : IDisposable
                 client.Dispose();
                 continue;
             }
+            if (HangConnections)
+            {
+                // 吞掉连接，不读不写，让客户端一直等待直到超时
+                Interlocked.Increment(ref AcceptCount);
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        await Task.Delay(Timeout.Infinite, cancellationToken).ConfigureAwait(false);
+                    }
+                    catch (OperationCanceledException) { }
+                    client.Dispose();
+                }, cancellationToken);
+                continue;
+            }
+            Interlocked.Increment(ref AcceptCount);
             _ = Task.Run(() => HandleAsync(client, cancellationToken), cancellationToken);
         }
     }

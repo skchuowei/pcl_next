@@ -165,8 +165,11 @@ public sealed class DownloadOptions
     /// <summary>测速/调度轮询间隔。</summary>
     public int TickMilliseconds { get; init; } = 100;
 
-    /// <summary>连接超时上限（毫秒）。单个连接建立超时 = min(max(平均首包时间,15s) × (1+源失败数), 该值)。</summary>
+    /// <summary>连接超时上限（毫秒）。单个连接建立超时 = min(max(平均首包时间,下限) × (1+源失败数), 该值)。</summary>
     public int ConnectTimeoutMilliseconds { get; init; } = 30000;
+
+    /// <summary>连接超时下限（毫秒）。默认 15000 与 VB 对齐；单测中可调小以加速失败。</summary>
+    public int MinConnectTimeoutMilliseconds { get; init; } = 15000;
 
     /// <summary>调试用：每个连接随机延迟，模拟不稳定网络。</summary>
     public int DebugMaxDelayMilliseconds { get; init; } = 0;
