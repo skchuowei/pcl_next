@@ -74,6 +74,7 @@ jobs:
       run: dotnet publish "pcl-next\pcl-next.vbproj" -c Release -p:PclChannel=${{ steps.channel.outputs.channel }} -p:PublishProfile=win-x64-single
 
     - name: Pack artifact
+      id: pack
       shell: pwsh
       run: |
         # 制品命名：PCL-<版本名>-<代号>.zip（《分支与发布规范》§5.3）

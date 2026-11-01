@@ -1,3 +1,6 @@
 [submodule "MeloongCore"]
 	path = MeloongCore
-	url = https://github.com/Meloong-Git/MeloongCore.git
+	# 上游 Meloong-Git/MeloongCore 不含 pcl-next 所需的 net10 适配提交（82931b2），
+	# 完整历史由 skchuowei/pcl_next 的 meloongcore 分支承载，CI 从这里取子模块
+	url = https://github.com/skchuowei/pcl_next.git
+	branch = meloongcore
