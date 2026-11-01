@@ -34,6 +34,7 @@ public sealed class DownloadEngine : IDownloadEngine
                 LocalPath = localPath,
                 Check = request.Check,
                 SimulateBrowserHeaders = request.SimulateBrowserHeaders,
+                HeaderProvider = request.HeaderProvider,
             };
             var task = FileTask.Create(normalized, taskByPath.Count);
             foreach (var source in task.Sources)
