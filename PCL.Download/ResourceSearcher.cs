@@ -140,20 +140,20 @@ public static class ResourceSearcher
         //#Region "前置检查"
         if (storage.Results.Count >= request.TargetResultCount)
         {
-            Logger.Info($"已有 {storage.Results.Count} 个结果，多于所需的 {request.TargetResultCount} 个结果，结束处理");
+            DownloadLog.Info($"已有 {storage.Results.Count} 个结果，多于所需的 {request.TargetResultCount} 个结果，结束处理");
             return;
         }
         else if (!request.CanContinue)
         {
             if (storage.Results.Count == 0)
                 throw new Exception("没有符合条件的结果");
-            Logger.Info($"已有 {storage.Results.Count} 个结果，少于所需的 {request.TargetResultCount} 个结果，但无法继续获取，结束处理");
+            DownloadLog.Info($"已有 {storage.Results.Count} 个结果，少于所需的 {request.TargetResultCount} 个结果，但无法继续获取，结束处理");
             return;
         }
 
         //#Region "中文搜索"
         var rawSearchText = (request.SearchText ?? "").Trim().ToLowerInvariant();
-        Logger.Info($"工程列表搜索原始文本：{rawSearchText}");
+        DownloadLog.Info($"工程列表搜索原始文本：{rawSearchText}");
         rawSearchText = ToSimplified(rawSearchText); //繁体转简体
 
         var isChineseSearch = rawSearchText.RegexHasCjk() && !string.IsNullOrEmpty(rawSearchText) &&
@@ -234,7 +234,7 @@ public static class ResourceSearcher
                     var curseForgeTarget = curseForgeCandidates.MaxBy(s => s.Item.Popularity); //然后从中选择最受欢迎的那一个
                     //后处理
                     curseForgeAltSearchText = string.Join(" ", extractWords(curseForgeTarget, ResourcePlatforms.CurseForge));
-                    Logger.Warn($"中文搜索关键词（CurseForge）：{curseForgeAltSearchText}");
+                    DownloadLog.Warn($"中文搜索关键词（CurseForge）：{curseForgeAltSearchText}");
                 }
             }
             //Modrinth
@@ -256,7 +256,7 @@ public static class ResourceSearcher
                         }
                     }
                     modrinthAltSearchText = wordWeights.MaxBy(w => w.Value).Key;
-                    Logger.Warn($"中文搜索关键词（Modrinth）：{modrinthAltSearchText}");
+                    DownloadLog.Warn($"中文搜索关键词（Modrinth）：{modrinthAltSearchText}");
                     //直接请求工程
                     modrinthSlugs = modrinthSearchResults.Take(100).Select(r => r.Item.Slugs[ResourcePlatforms.Modrinth]).ToList();
                 }
@@ -288,7 +288,7 @@ public static class ResourceSearcher
                 try
                 {
                     var curseForgeUrl = request.GetCurseForgeAddress(curseForgeAltSearchText ?? rawSearchText, ignoreModLoaderFilter);
-                    Logger.Info($"开始 CurseForge 搜索：{curseForgeUrl}");
+                    DownloadLog.Info($"开始 CurseForge 搜索：{curseForgeUrl}");
                     var requestResult = api.Request(curseForgeUrl);
                     var projectList = new List<ResourceProject>();
                     foreach (var jsonEntry in requestResult["data"].AsArrayOrEmpty())
@@ -301,11 +301,11 @@ public static class ResourceSearcher
                     lock (lockObj) { foreach (var p in projectList) searchResults.Add(p); }
                     storage.CurseForgeOffset += requestResult["data"].AsArrayOrEmpty().Count();
                     storage.CurseForgeTotal = requestResult["pagination"]["totalCount"].AsInt();
-                    Logger.Info($"从 CurseForge 搜索到了 {projectList.Count} 个工程（总计已获取 {storage.CurseForgeOffset} 个，共 {storage.CurseForgeTotal} 个）");
+                    DownloadLog.Info($"从 CurseForge 搜索到了 {projectList.Count} 个工程（总计已获取 {storage.CurseForgeOffset} 个，共 {storage.CurseForgeTotal} 个）");
                 }
                 catch (Exception ex)
                 {
-                    Logger.Warn(ex, "CurseForge 搜索失败");
+                    DownloadLog.Warn(ex, "CurseForge 搜索失败");
                     storage.CurseForgeTotal = -1;
                     lock (lockObj) errors.Add((ex, ResourcePlatforms.CurseForge));
                 }
@@ -321,7 +321,7 @@ public static class ResourceSearcher
                 try
                 {
                     var modrinthUrl = request.GetModrinthAddress(modrinthAltSearchText ?? rawSearchText, ignoreModLoaderFilter);
-                    Logger.Info($"开始 Modrinth 搜索：{modrinthUrl}");
+                    DownloadLog.Info($"开始 Modrinth 搜索：{modrinthUrl}");
                     var requestResult = api.Request(modrinthUrl);
                     var projectList = new List<ResourceProject>();
                     foreach (var jsonEntry in requestResult["hits"].AsArrayOrEmpty())
@@ -329,11 +329,11 @@ public static class ResourceSearcher
                     lock (lockObj) { foreach (var p in projectList) searchResults.Add(p); }
                     storage.ModrinthOffset += requestResult["hits"].AsArrayOrEmpty().Count();
                     storage.ModrinthTotal = requestResult["total_hits"].AsInt();
-                    Logger.Info($"从 Modrinth 搜索到了 {projectList.Count} 个工程（总计已获取 {storage.ModrinthOffset} 个，共 {storage.ModrinthTotal} 个）");
+                    DownloadLog.Info($"从 Modrinth 搜索到了 {projectList.Count} 个工程（总计已获取 {storage.ModrinthOffset} 个，共 {storage.ModrinthTotal} 个）");
                 }
                 catch (Exception ex)
                 {
-                    Logger.Warn(ex, "Modrinth 搜索失败");
+                    DownloadLog.Warn(ex, "Modrinth 搜索失败");
                     storage.ModrinthTotal = -1;
                     lock (lockObj) errors.Add((ex, ResourcePlatforms.Modrinth));
                 }
@@ -349,7 +349,7 @@ public static class ResourceSearcher
                 try
                 {
                     var modrinthUrl = $"https://api.modrinth.com/v2/projects?ids=[\"{string.Join("\",\"", modrinthSlugs)}\"]";
-                    Logger.Info($"开始 Modrinth 直接获取：{modrinthUrl}");
+                    DownloadLog.Info($"开始 Modrinth 直接获取：{modrinthUrl}");
                     var projectList = new List<ResourceProject>();
                     foreach (var jsonEntry in api.Request(modrinthUrl).AsArrayOrEmpty())
                     {
@@ -375,12 +375,12 @@ public static class ResourceSearcher
                         projectList = projectList.Where(p => matchedIds.Contains(p.Id)).ToList();
                     }
                     lock (lockObj) { foreach (var p in projectList) searchResults.Add(p); }
-                    Logger.Info($"从 Modrinth 直接获取到了 {projectList.Count} 个工程");
+                    DownloadLog.Info($"从 Modrinth 直接获取到了 {projectList.Count} 个工程");
                     modrinthSlugs.Clear(); //防止重试/加载下一页时重复获取
                 }
                 catch (Exception ex)
                 {
-                    Logger.Warn(ex, "Modrinth 直接获取失败");
+                    DownloadLog.Warn(ex, "Modrinth 直接获取失败");
                     lock (lockObj) errors.Add((ex, ResourcePlatforms.Modrinth));
                 }
             }));
@@ -434,21 +434,21 @@ public static class ResourceSearcher
                                           !storage.Results.Any(b => r.IsLike(b))).ToList();
         //加入列表
         realResults.AddRange(rawResults);
-        Logger.Info($"去重、筛选后累计新增结果 {realResults.Count} 个（目前已有结果 {storage.Results.Count} 个）");
+        DownloadLog.Info($"去重、筛选后累计新增结果 {realResults.Count} 个（目前已有结果 {storage.Results.Count} 个）");
 
         //#Region "检查结果数量，如果不足且可继续，会继续加载下一页"
         if (realResults.Count + storage.Results.Count < request.TargetResultCount)
         {
-            Logger.Info($"总结果数需求最少 {request.TargetResultCount} 个，仅获得了 {realResults.Count + storage.Results.Count} 个");
+            DownloadLog.Info($"总结果数需求最少 {request.TargetResultCount} 个，仅获得了 {realResults.Count + storage.Results.Count} 个");
             if (request.CanContinue && errors.Count == 0) //如果有某个源失败则不再重试，这时候重试可能导致无限循环
             {
-                Logger.Info("将继续尝试加载下一页");
+                DownloadLog.Info("将继续尝试加载下一页");
                 Search(request, api, ct, progress); //递归加载下一页
                 return;
             }
             else
             {
-                Logger.Info("无法继续加载，将强制结束");
+                DownloadLog.Info("无法继续加载，将强制结束");
             }
         }
 

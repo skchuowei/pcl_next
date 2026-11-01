@@ -59,14 +59,14 @@ public static class LocalResourceScanner
             if (dump is not null)
             {
                 var disabled = dump.IsEnabled ? entry : dump; // 保留启用的一份
-                Logger.Warn($"重复的 Mod 文件：{dump.File.Name} 与 {entry.File.Name}，已忽略 {disabled.File.Name}");
+                DownloadLog.Warn($"重复的 Mod 文件：{dump.File.Name} 与 {entry.File.Name}，已忽略 {disabled.File.Name}");
                 if (ReferenceEquals(disabled, entry)) continue; // 新的是被忽略的禁用份
                 result.Remove(dump); // 移除已加入的禁用份，稍后加入启用的新份
             }
             result.Add(entry);
         }
 
-        Logger.Info($"共发现 {result.Count} 个 Mod");
+        DownloadLog.Info($"共发现 {result.Count} 个 Mod");
         return result.OrderBy(m => m.File.Name).ToList();
     }
 
