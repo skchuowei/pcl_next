@@ -750,8 +750,17 @@ Retry:
                         Return 0.04
                     Case NetState.Downloading
                         '正在下载中，对应 5% ~ 98%
-                        Dim OriginalProgress As Double = If(IsUnknownSize, 0.5, DownloadDone / Math.Max(FileSize, 1))
-                        OriginalProgress = 1 - (1 - OriginalProgress) ^ 0.9
+                        'FileSize 未知（-2/-1/0）时用 0.5 占位；并把比例夹紧到 [0,1]：
+                        '比例 > 1 会让 1 - 比例 变成负数，Math.Pow 结果为 NaN，界面直接显示「NaN%」
+                        Dim Ratio As Double
+                        If IsUnknownSize OrElse FileSize <= 0 Then
+                            Ratio = 0.5
+                        Else
+                            Ratio = DownloadDone / CDbl(FileSize)
+                        End If
+                        If Double.IsNaN(Ratio) OrElse Double.IsInfinity(Ratio) Then Ratio = 0.5
+                        Ratio = Math.Clamp(Ratio, 0, 1)
+                        Dim OriginalProgress As Double = 1 - Math.Pow(1 - Ratio, 0.9)
                         Return OriginalProgress * 0.93 + 0.05
                     Case NetState.Merging
                         Return 0.99

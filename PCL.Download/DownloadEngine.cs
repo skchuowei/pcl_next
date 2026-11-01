@@ -127,7 +127,10 @@ public sealed class DownloadEngine : IDownloadEngine
                 var final = new DownloadProgress
                 {
                     OverallProgress = succeeded ? 1.0 : 0.0,
-                    TotalBytesDone = Interlocked.Read(ref context.TotalBytesDone),
+                    TotalBytesDone = CurrentDone(tasks),
+                    // 必须带上总大小：留默认 -1 会让上层把它当成「大小未知」，
+                    // 镜像逻辑与进度计算都会走未知分支（曾导致收尾瞬间显示 NaN%）
+                    TotalBytesExpected = tasks.Where(t => t.FileSize >= 0).Sum(t => t.FileSize),
                     Speed = 0,
                     ActiveChunks = 0,
                 };
@@ -170,17 +173,27 @@ public sealed class DownloadEngine : IDownloadEngine
 
     // ===================== 调度循环 =====================
 
+
     private static async Task SchedulerLoopAsync(
         List<FileTask> tasks, DownloadOptions options, EngineContext context, CancellationToken cancellationToken)
     {
         try
         {
+            var firstPass = true;
             while (!cancellationToken.IsCancellationRequested)
             {
-                await Task.Delay(20, cancellationToken).ConfigureAwait(false);
+                // 首轮立即调度（不空等一个周期），后续每 20ms 一轮
+                if (!firstPass) await Task.Delay(20, cancellationToken).ConfigureAwait(false);
+                firstPass = false;
 
-                var speed = Math.Max(Interlocked.Read(ref context.CurrentSpeed), Interlocked.Read(ref context.DynamicSpeedFloor));
-                var needMoreThreads = speed < options.SpeedLimitLow;
+                // 与 VB 对齐（ModNet.vb：If Speed >= NetTaskSpeedLimitLow Then Continue While）：
+                // 用「当前速度」对比「动态抬升后的下限」（初始为 SpeedLimitLow，随历史速度水涨船高），
+                // 当前速度掉到该下限以下即为进行中的文件补分块。
+                // 修复前误写为 max(当前速度, 动态下限) < 静态下限：文件先快后停时动态下限已被抬高，
+                // max 恒取高值导致永远不再补分块，文件冻结在当前进度（真机 NeoForge 安装卡 16%、0 B/s）。
+                var currentSpeed = Interlocked.Read(ref context.CurrentSpeed);
+                var speedFloor = Math.Max(Interlocked.Read(ref context.DynamicSpeedFloor), options.SpeedLimitLow);
+                var needMoreThreads = currentSpeed < speedFloor;
 
                 foreach (var task in tasks)
                 {
@@ -190,9 +203,29 @@ public sealed class DownloadEngine : IDownloadEngine
 
                     var running = Interlocked.Read(ref context.ActiveChunks);
                     var isWaiting = state == DownloadFileState.WaitingToDownload;
-                    if (!isWaiting && !needMoreThreads) continue;
 
-                    if (!isWaiting)
+                    // 兜底看门狗：没有任何活动分块、也还有未下载数据时，静默超过 10 秒就清空重下。
+                    // 正常流程不会走到这里；它只用于兜住「区间无人负责」这类逻辑漏洞，避免永久卡死。
+                    var doneNow = Interlocked.Read(ref task.DownloadDone);
+                    if (running == 0 && state < DownloadFileState.Merging && task.FileSize != -2 &&
+                        task.FileSize >= 0 && doneNow < task.FileSize)
+                    {
+                        if (task.IdleSince == 0) task.IdleSince = Environment.TickCount64;
+                        else if (Environment.TickCount64 - task.IdleSince > 10000)
+                        {
+                            task.IdleSince = 0;
+                            if (task.ForceRestart(options)) continue;
+                        }
+                    }
+                    else
+                    {
+                        task.IdleSince = 0;
+                    }
+                    // 断点续传是恢复被中断的下载，不受速度门限制（速度门只约束追加并发分块）
+                    var isRecovering = task.HasBrokenChunk(options);
+                    if (!isWaiting && !needMoreThreads && !isRecovering) continue;
+
+                    if (!isWaiting && !isRecovering)
                     {
                         // 进行中的文件：准备中的分块已多于下载中的分块时不再新增
                         int preparing = 0, downloading = 0;
@@ -207,11 +240,18 @@ public sealed class DownloadEngine : IDownloadEngine
                         if (preparing > downloading) continue;
                     }
 
+                    // 全局并发预算：跨引擎实例共享名额，占不到则下一轮再试
+                    var budget = options.SharedBudget;
+                    if (budget is not null && !budget.TryAcquire()) continue;
+
                     var chunk = task.TryBeginChunk(options, (int)running);
-                    if (chunk is null) continue;
+                    if (chunk is null)
+                    {
+                        budget?.Release();
+                        continue;
+                    }
                     Interlocked.Increment(ref context.ActiveChunks);
-                    if (chunk.Source.Url.Contains("bmclapi", StringComparison.OrdinalIgnoreCase))
-                        await Task.Delay(100, cancellationToken).ConfigureAwait(false); // 减少 BMCLAPI 请求频率
+                    // 连接发起限频由 HostStartThrottle 在 TryBeginChunk 内非阻塞完成（原 Task.Delay(100) 会拖慢整个调度循环）
                     _ = task.RunChunkAsync(chunk, options, context, cancellationToken)
                         .ContinueWith(
                             t => options.LogWarn?.Invoke(t.Exception!.InnerException ?? t.Exception, "下载分块出现未处理异常"),
@@ -224,6 +264,14 @@ public sealed class DownloadEngine : IDownloadEngine
         {
             options.LogWarn?.Invoke(ex, "下载调度线程出错");
         }
+    }
+
+    /// <summary>所有任务当前已下载量之和（重置/重下会正确回退，不会像累计计数那样虚高）。</summary>
+    private static long CurrentDone(List<FileTask> tasks)
+    {
+        long done = 0;
+        foreach (var task in tasks) done += Interlocked.Read(ref task.DownloadDone);
+        return done;
     }
 
     private static async Task StatLoopAsync(
@@ -249,7 +297,10 @@ public sealed class DownloadEngine : IDownloadEngine
                 var delta = now - lastTick;
                 if (delta > 0)
                 {
-                    var done = Interlocked.Read(ref context.TotalBytesDone);
+                    // 进度必须由各任务「当前已下载量」求和得出，不能用累计传输量：
+                    // 失败重启/Range 重下会让累计量超过文件大小（真机实测 3.7MB 的文件累计到 7.9MB），
+                    // 进度随之 >100% → 前端显示 NaN。
+                    var done = CurrentDone(tasks);
                     var actual = Math.Max(0, (done - lastDone) / (delta / 1000.0));
                     lastDone = done;
                     lastTick += delta;
@@ -296,8 +347,8 @@ public sealed class DownloadEngine : IDownloadEngine
                 if (totalProgress > 0 && !double.IsNaN(totalProgress)) newProgress /= totalProgress;
                 progress.Report(new DownloadProgress
                 {
-                    OverallProgress = newProgress,
-                    TotalBytesDone = Interlocked.Read(ref context.TotalBytesDone),
+                    OverallProgress = Math.Clamp(double.IsNaN(newProgress) ? 0 : newProgress, 0, 1),
+                    TotalBytesDone = CurrentDone(tasks),
                     TotalBytesExpected = allSizesKnown ? totalExpected : -1,
                     Speed = Interlocked.Read(ref context.CurrentSpeed),
                     ActiveChunks = (int)Interlocked.Read(ref context.ActiveChunks),
@@ -462,23 +513,44 @@ public static class LocalFileReuse
 /// </summary>
 internal sealed class EngineContext
 {
-    public EngineContext(DownloadOptions options, string tempFolder)
+    /// <summary>
+    /// 跨引擎实例共享的 HTTP 客户端（连接池复用）。
+    /// <para/>PCL 的一次安装会产生数百个小文件（支持库 / Assets），此前每个文件各建一个 HttpClient，
+    /// 每个文件都要重新 TCP + TLS 握手且无法复用 Keep-Alive 连接，小文件场景吞吐被握手开销严重拖累。
+    /// </summary>
+    private static readonly HttpClient SharedClient = CreateSharedClient();
+
+    private static HttpClient CreateSharedClient()
     {
-        Options = options;
-        TempFolder = tempFolder;
-        Client = new HttpClient(new HttpClientHandler
+        var handler = new SocketsHttpHandler
         {
             AutomaticDecompression = System.Net.DecompressionMethods.Deflate | System.Net.DecompressionMethods.GZip,
             UseCookies = false,
-        })
+            AllowAutoRedirect = true,
+            // 允许并行分块的多连接，真正的并发数由 MaxConcurrentChunks / SharedBudget 控制
+            MaxConnectionsPerServer = 256,
+            // 安装阶段的连续小文件复用空闲连接，免去重复握手（下载提速插件同款：5min）
+            PooledConnectionIdleTimeout = TimeSpan.FromMinutes(5),
+            PooledConnectionLifetime = TimeSpan.FromMinutes(10),
+            // HTTP/2 单流初始窗口默认仅 64KB，高带宽延迟积下吞吐被流控锁死
+            // （下载提速插件 NetworkServiceTuningMixin 同款调优：64KB → 1MB）
+            InitialHttp2StreamWindowSize = 1024 * 1024,
+        };
+        return new HttpClient(handler)
         {
             Timeout = Timeout.InfiniteTimeSpan, // 超时由引擎自行控制（含分块级动态超时）
         };
     }
 
+    public EngineContext(DownloadOptions options, string tempFolder)
+    {
+        Options = options;
+        TempFolder = tempFolder;
+    }
+
     public DownloadOptions Options { get; }
     public string TempFolder { get; }
-    public HttpClient Client { get; }
+    public HttpClient Client => SharedClient;
     public SpeedGate SpeedGate { get; } = new();
     public long TotalBytesDone;
     public long CurrentSpeed;
@@ -488,21 +560,117 @@ internal sealed class EngineContext
     public void OnChunkExited() => Interlocked.Decrement(ref ActiveChunks);
 
     /// <summary>带超时的一次流读取：超时视为无数据。</summary>
+    /// <remarks>
+    /// 不能只给 ReadAsync 传一个 CancelAfter 的令牌：连接经代理/中间设备挂死时，
+    /// 挂起的 socket 读取不会立刻响应取消（实测 10s 的停滞超时 58s 后才浮现，期间进度完全冻结，
+    /// 表现为「卡在某个百分比不动」）。改用 WaitAsync 强制在超时时刻返回，
+    /// 把善后交给调用方 Dispose 连接（那会真正关掉 socket）。
+    /// </remarks>
     public async Task<int> ReadWithTimeout(Stream stream, byte[] buffer, int timeoutMilliseconds, CancellationToken cancellationToken)
     {
-        var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeoutCts.CancelAfter(timeoutMilliseconds);
+        var readTask = stream.ReadAsync(buffer, cancellationToken).AsTask();
         try
         {
-            return await stream.ReadAsync(buffer, timeoutCts.Token).ConfigureAwait(false);
+            return await readTask.WaitAsync(TimeSpan.FromMilliseconds(Math.Max(1, timeoutMilliseconds)), cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (TimeoutException)
+        {
+            // 被放弃的读取稍后会以异常结束，后台吞掉，避免未观察异常
+            _ = readTask.ContinueWith(static t => _ = t.Exception, TaskContinuationOptions.OnlyOnFaulted);
+            throw new TimeoutException("操作超时，无数据。");
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
             throw new TimeoutException("操作超时，无数据。");
         }
-        finally
+    }
+}
+
+/// <summary>
+/// 按主机限制「同时在跑的分块数」。
+/// <para/>BMCLAPI 这类镜像会按请求频率/并发限速：一个 3.7MB 文件被切成 14 个分块同时压过去，
+/// 立刻回 429，随后所有分块一起失败 → 表现为 0 B/s 卡死（真机 NeoForge 安装实测）。
+/// 限并发后仍是多连接并行，但不会触发限速，实际吞吐反而更高。
+/// </summary>
+internal static class HostConcurrency
+{
+    private static readonly ConcurrentDictionary<string, int> Counts = new(StringComparer.OrdinalIgnoreCase);
+
+    public static string? KeyOf(string url)
+    {
+        try { return new Uri(url).Host; } catch { return null; }
+    }
+
+    public static bool TryEnter(string? host, int limit)
+    {
+        if (string.IsNullOrEmpty(host) || limit <= 0) return true;
+        var current = Counts.AddOrUpdate(host, 1, static (_, v) => v + 1);
+        if (current > limit)
         {
-            timeoutCts.Dispose();
+            Counts.AddOrUpdate(host, 0, static (_, v) => Math.Max(0, v - 1));
+            return false;
+        }
+        return true;
+    }
+
+    public static void Exit(string? host)
+    {
+        if (string.IsNullOrEmpty(host)) return;
+        Counts.AddOrUpdate(host, 0, static (_, v) => Math.Max(0, v - 1));
+    }
+}
+
+/// <summary>
+/// 按主机限制「发起新连接」的频率（对应 VB 对 BMCLAPI 的 Thread.Sleep(100)）。
+/// <para/>非阻塞实现：未到间隔时直接放弃本轮调度，避免拖慢整个调度循环；
+/// 跨引擎实例共享同一主机的时间表，防止大量小文件同时爆发请求触发服务器限速。
+/// 另支持「失败惩罚」：连接失败后对该主机冷却一段时间（对所有主机生效，不限关键字），
+/// 防止失败即重拉把服务器打出 429 后陷入请求风暴。
+/// </summary>
+internal static class HostStartThrottle
+{
+    private sealed class Gate
+    {
+        public long NextAllowed;
+    }
+
+    private static readonly ConcurrentDictionary<string, Gate> Gates = new(StringComparer.OrdinalIgnoreCase);
+
+    private static Gate? GetGate(string url)
+    {
+        try { return Gates.GetOrAdd(new Uri(url).Host, static _ => new Gate()); }
+        catch { return null; }
+    }
+
+    /// <summary>
+    /// 失败惩罚：冷却该主机一段时间（与限频取更晚者），期间所有新连接一律拒绝。
+    /// </summary>
+    public static void Penalize(string url, long cooldownMilliseconds)
+    {
+        if (cooldownMilliseconds <= 0) return;
+        var gate = GetGate(url);
+        if (gate is null) return;
+        lock (gate)
+        {
+            var until = Environment.TickCount64 + cooldownMilliseconds;
+            if (until > gate.NextAllowed) gate.NextAllowed = until;
+        }
+    }
+
+    public static bool TryReserve(string url, DownloadOptions options)
+    {
+        var gate = GetGate(url);
+        if (gate is null) return true;
+        lock (gate)
+        {
+            var now = Environment.TickCount64;
+            // 惩罚 / 限频共用时间表：未到允许时刻一律拒绝（惩罚对所有主机生效）
+            if (now < gate.NextAllowed) return false;
+            if (options.HostStartMinIntervalMilliseconds > 0 && options.HostStartThrottleKeywords.Count > 0 &&
+                options.HostStartThrottleKeywords.Any(k => url.Contains(k, StringComparison.OrdinalIgnoreCase)))
+                gate.NextAllowed = now + options.HostStartMinIntervalMilliseconds;
+            return true;
         }
     }
 }

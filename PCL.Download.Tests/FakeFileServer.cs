@@ -35,12 +35,37 @@ public sealed class FakeFileServer : IDisposable
     /// <summary>接受连接但永不响应（模拟连接挂起，触发引擎连接超时）。</summary>
     public bool HangConnections { get; set; }
 
+    /// <summary>每条连接写入指定字节数后停滞（保持连接打开但不再发送数据），模拟"突发后停滞"的下载源。</summary>
+    public int StallAfterBytes { get; set; }
+
+    /// <summary>响应前延迟指定毫秒（连得上但迟迟不给首包），模拟"能建连却不发数据"的源。</summary>
+    public int FirstByteDelayMs { get; set; }
+
+    /// <summary>大于 0 时无视一切请求，直接返回该 HTTP 状态码（如 429/500），模拟限速或故障源。</summary>
+    public int FailStatus { get; set; }
+
+    /// <summary>
+    /// 配合 <see cref="FailStatus"/>：只让前 N 个请求失败，之后的请求正常响应。
+    /// 用于模拟「限速几秒后恢复」的镜像，验证断点续传不会把区间丢成孤儿（真机卡在 66% 的场景）。
+    /// </summary>
+    public int FailFirstRequests { get; set; }
+
     public List<string> Requests { get; } = new();
+
+    /// <summary>已处理到第几个请求（含失败请求）。</summary>
+    private int _requestCount;
+
+    /// <summary>每次请求到达的时刻（TickCount64），与 <see cref="Requests"/> 对齐，用于断言请求节奏。</summary>
+    public List<long> RequestTimes { get; } = new();
 
     /// <summary>TCP 连接被接受的次数（含 HangConnections 模式——此时 Requests 不增长）。</summary>
     public int AcceptCount;
     public int Port { get; }
-    public string Url => $"http://127.0.0.1:{Port}/file.bin";
+
+    /// <summary>URL 路径。测试可改为含 "bmclapi" 等关键字的路径以命中引擎的主机关键字规则。</summary>
+    public string UrlPath { get; set; } = "/file.bin";
+
+    public string Url => $"http://127.0.0.1:{Port}{UrlPath}";
 
     public FakeFileServer()
     {
@@ -115,8 +140,24 @@ public sealed class FakeFileServer : IDisposable
             var raw = await ReadHeadersAsync(stream, ct).ConfigureAwait(false);
             var headerPart = raw.Split("\r\n\r\n")[0];
             var lines = headerPart.Split("\r\n");
-            lock (Requests) Requests.Add(lines[0] + " | " +
-                lines.FirstOrDefault(l => l.StartsWith("Range:", StringComparison.OrdinalIgnoreCase)) ?? "");
+            lock (Requests)
+            {
+                Requests.Add(lines[0] + " | " +
+                    lines.FirstOrDefault(l => l.StartsWith("Range:", StringComparison.OrdinalIgnoreCase)) ?? "");
+                RequestTimes.Add(Environment.TickCount64);
+                _requestCount++;
+            }
+
+            var failThisRequest = FailStatus > 0 && (FailFirstRequests <= 0 || _requestCount <= FailFirstRequests);
+            if (failThisRequest)
+            {
+                var failHeaders =
+                    $"HTTP/1.1 {FailStatus} Fail\r\n" +
+                    "Content-Length: 0\r\n" +
+                    "Connection: close\r\n\r\n";
+                await WriteAllAsync(stream, failHeaders, [], 0, 0, ct).ConfigureAwait(false);
+                return;
+            }
 
             long rangeStart = -1;
             var rangeLine = lines.FirstOrDefault(l => l.StartsWith("Range:", StringComparison.OrdinalIgnoreCase));
@@ -133,6 +174,8 @@ public sealed class FakeFileServer : IDisposable
             var body = Data;
             if (Mutate is not null) body = Mutate(body);
 
+            if (FirstByteDelayMs > 0) await Task.Delay(FirstByteDelayMs, ct).ConfigureAwait(false);
+
             string status;
             byte[] payload;
             if (rangeStart > 0 && SupportRange && RangeViolationMode == 0)
@@ -146,7 +189,7 @@ public sealed class FakeFileServer : IDisposable
                     $"Content-Range: bytes {rangeStart}-{body.Length - 1}/{body.Length}\r\n" +
                     "Accept-Ranges: bytes\r\n" +
                     "Connection: close\r\n\r\n";
-                await WriteAllAsync(stream, headers, payload, DelayMsPerChunk, ct).ConfigureAwait(false);
+                await WriteAllAsync(stream, headers, payload, DelayMsPerChunk, StallAfterBytes, ct).ConfigureAwait(false);
                 return;
             }
             if (rangeStart > 0 && RangeViolationMode == 2)
@@ -165,7 +208,7 @@ public sealed class FakeFileServer : IDisposable
                 $"Content-Length: {payload.Length}\r\n" +
                 "Accept-Ranges: bytes\r\n" +
                 "Connection: close\r\n\r\n";
-            await WriteAllAsync(stream, plainHeaders, payload, DelayMsPerChunk, ct).ConfigureAwait(false);
+            await WriteAllAsync(stream, plainHeaders, payload, DelayMsPerChunk, StallAfterBytes, ct).ConfigureAwait(false);
         }
         catch
         {
@@ -173,16 +216,25 @@ public sealed class FakeFileServer : IDisposable
         }
     }
 
-    private static async Task WriteAllAsync(NetworkStream stream, string headers, byte[] payload, int delayMsPerChunk, CancellationToken ct)
+    private static async Task WriteAllAsync(NetworkStream stream, string headers, byte[] payload, int delayMsPerChunk, int stallAfterBytes, CancellationToken ct)
     {
         var head = Encoding.ASCII.GetBytes(headers);
         await stream.WriteAsync(head, ct).ConfigureAwait(false);
         const int chunkSize = 64 * 1024;
+        var written = 0;
         for (var offset = 0; offset < payload.Length; offset += chunkSize)
         {
+            if (stallAfterBytes > 0 && written >= stallAfterBytes)
+            {
+                // 保持连接打开但不再发送数据，客户端读取超时后自行断开
+                await Task.Delay(Timeout.Infinite, ct).ConfigureAwait(false);
+                return;
+            }
             var count = Math.Min(chunkSize, payload.Length - offset);
+            if (stallAfterBytes > 0) count = Math.Min(count, stallAfterBytes - written);
             await stream.WriteAsync(payload.AsMemory(offset, count), ct).ConfigureAwait(false);
             await stream.FlushAsync(ct).ConfigureAwait(false);
+            written += count;
             if (delayMsPerChunk > 0) await Task.Delay(delayMsPerChunk, ct).ConfigureAwait(false);
         }
     }

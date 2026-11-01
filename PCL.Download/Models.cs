@@ -38,6 +38,18 @@ public sealed class DownloadSource
     public string Url { get; }
     /// <summary>连续失败计数；一旦有成功的数据包即清零。</summary>
     public int FailCount;
+    /// <summary>
+    /// 连续「零进展」失败次数：分块失败时一个字节都没收到。
+    /// 曾经送达过数据的源不会命中「从未送达」的死源规则，靠这个计数快速降级
+    /// （官方源能建连却不发数据时，原实现要攒满 MaxConcurrentChunks+2 次 ≈ 十几分钟才禁用）。
+    /// </summary>
+    public int ZeroProgressFails;
+    /// <summary>首包对冲胜出次数（用于后续优先选用更快的源）。</summary>
+    public int HedgeWins;
+    /// <summary>首包对冲落败次数。</summary>
+    public int HedgeLosses;
+    /// <summary>该源累计成功接收的字节数；始终为 0 表示从未送达过任何数据（用于死源快速禁用）。</summary>
+    public long DeliveredBytes;
     /// <summary>该源是否已被禁用。</summary>
     public bool IsFailed;
     /// <summary>导致该源被禁用的异常。</summary>
@@ -128,6 +140,44 @@ public sealed class DownloadFileRequest
 }
 
 /// <summary>
+/// 跨下载引擎实例共享的并发分块预算（对应 VB 的 NetTaskThreadCount 全局上限）。
+/// <para/>VB 侧为每个文件单独调用一次引擎时，各引擎自带的 MaxConcurrentChunks 只能约束单文件；
+/// 通过共享同一预算实例，可把「全局同时进行的下载分块数」压回 NetTaskThreadLimit，
+/// 避免大量小文件同时发起连接触发服务器限速。
+/// </summary>
+public sealed class ConcurrencyBudget
+{
+    private int _active;
+    private int _limit;
+
+    public ConcurrencyBudget(int limit) => _limit = Math.Max(1, limit);
+
+    /// <summary>全局并发上限。可在运行期按设置刷新。</summary>
+    public int Limit
+    {
+        get => Volatile.Read(ref _limit);
+        set => Volatile.Write(ref _limit, Math.Max(1, value));
+    }
+
+    /// <summary>当前占用的分块数。</summary>
+    public int Active => Volatile.Read(ref _active);
+
+    /// <summary>尝试占用一个并发名额；预算耗尽时立即返回 false。</summary>
+    public bool TryAcquire()
+    {
+        while (true)
+        {
+            var current = Volatile.Read(ref _active);
+            if (current >= Volatile.Read(ref _limit)) return false;
+            if (Interlocked.CompareExchange(ref _active, current + 1, current) == current) return true;
+        }
+    }
+
+    /// <summary>归还一个并发名额。</summary>
+    public void Release() => Interlocked.Decrement(ref _active);
+}
+
+/// <summary>
 /// 下载引擎选项（与 VB 侧 NetManager 的设置项对齐）。
 /// </summary>
 public sealed class DownloadOptions
@@ -135,7 +185,17 @@ public sealed class DownloadOptions
     /// <summary>全局最大并发下载数。对应 VB 的 NetTaskThreadLimit（ToolDownloadThread + 1）。</summary>
     public int MaxConcurrentChunks { get; init; } = 33;
 
-    /// <summary>速度下限（Byte/s）：低于该值时为进行中的文件追加下载分块。默认 256K/s。</summary>
+    /// <summary>
+    /// 跨引擎实例共享的并发预算；为 null 时仅受 <see cref="MaxConcurrentChunks"/> 约束。
+    /// VB 侧为每个文件各起一个引擎时必须传入同一实例，否则全局并发不受控。
+    /// </summary>
+    public ConcurrencyBudget? SharedBudget { get; init; }
+
+    /// <summary>
+    /// 速度下限（Byte/s）：当前速度低于该值时为进行中的文件追加下载分块。默认 256K/s。
+    /// 该值会随历史速度以 85% 比例自适应抬升（对应 VB 的 NetTaskSpeedLimitLow），
+    /// 调度时以「当前速度 &lt; max(该值, 动态下限)」判定是否补分块。
+    /// </summary>
     public long SpeedLimitLow { get; init; } = 256 * 1024;
 
     /// <summary>速度上限（Byte/s）；小于等于 0 表示不限速。</summary>
@@ -162,14 +222,70 @@ public sealed class DownloadOptions
     public IReadOnlyList<string> NoSplitHostKeywords { get; init; } =
         ["pcl2-server", "meloong.com", "bmclapi", "github.com", "optifine.net", "momot.rs"];
 
+    /// <summary>
+    /// 首包对冲延迟（毫秒）：文件首块开始下载后，若主下载源在该时间内仍未返回任何数据，
+    /// 立即同时向另一个可用源发起同一区间请求。谁先吐出首包谁继续下载，另一个连接立刻断开。
+    /// <para/>真机场景：maven.fabricmc.net 能建立连接却始终不发数据，原实现要干等 30 秒超时才换源；
+    /// 对冲后约 1 秒即可切到 BMCLAPI。仅作用于文件首块，整体请求量不放大。
+    /// 0 表示关闭对冲（退回纯顺序换源）。
+    /// </summary>
+    public int HedgeDelayMilliseconds { get; init; } = 1000;
+
     /// <summary>测速/调度轮询间隔。</summary>
     public int TickMilliseconds { get; init; } = 100;
 
+    /// <summary>
+    /// 需要限制「发起新连接」频率的主机关键字（防止请求过密触发服务器限速）。
+    /// 与 VB 对齐默认仅限 BMCLAPI；空列表表示不限频。
+    /// </summary>
+    public IReadOnlyList<string> HostStartThrottleKeywords { get; init; } = ["bmclapi"];
+
+    /// <summary>
+    /// 受限主机两次发起连接间的最小间隔（毫秒），非阻塞式（未到间隔则本调度轮跳过）。
+    /// 0 或负数表示不限频。默认 50ms ≈ 20 次/秒，与 VB 的 Sleep(100) × 双调度线程相当。
+    /// </summary>
+    public int HostStartMinIntervalMilliseconds { get; init; } = 50;
+
+    /// <summary>
+    /// 慢速下载源判定阈值（Byte/s）：分块持续传输超过 <see cref="SlowSourceRotateAfterMilliseconds"/>
+    /// 且平均速度低于该值时，保留断点自动换其他下载源续传。小于等于 0 关闭该特性。
+    /// </summary>
+    public long SlowSourceRotateSpeedBytesPerSecond { get; init; } = 64 * 1024;
+
+    /// <summary>慢速下载源判定所需的最短持续传输时间（毫秒）。默认 5000。</summary>
+    public int SlowSourceRotateAfterMilliseconds { get; init; } = 5000;
+
+    /// <summary>
+    /// 同一主机允许同时进行的分块数上限。BMCLAPI 等镜像会按并发/频率限速，
+    /// 单文件被切成十几个分块同时压过去会立刻回 429（随后全线失败 → 0 B/s 卡死）。
+    /// 默认 4，0 或负数表示不限制。
+    /// </summary>
+    public int MaxChunksPerHost { get; init; } = 4;
+
     /// <summary>连接超时上限（毫秒）。单个连接建立超时 = min(max(平均首包时间,下限) × (1+源失败数), 该值)。</summary>
     public int ConnectTimeoutMilliseconds { get; init; } = 30000;
-
     /// <summary>连接超时下限（毫秒）。默认 15000 与 VB 对齐；单测中可调小以加速失败。</summary>
     public int MinConnectTimeoutMilliseconds { get; init; } = 15000;
+
+    /// <summary>
+    /// 读取停滞判定（毫秒）：连接已建立但超过该时长未收到任何数据即断开重试。
+    /// 对应下载提速插件的 BlockTimeoutMs（balanced 10s / aggressive 8s / conservative 20s）。
+    /// 此前复用连接超时（15~30s），真机上表现为死连接要挂半分钟才动，UI 长时间 0 B/s。
+    /// </summary>
+    public int ReadStallTimeoutMilliseconds { get; init; } = 10000;
+
+    /// <summary>
+    /// 分块失败后的基础重试冷却（毫秒），按失败次数指数退避（×1/×2/×4/×8 封顶）。
+    /// 修复「失败分块立即重新拉起 → 每 20ms 一次请求打爆服务器触发 429 → 全线 0 B/s」的重试风暴
+    /// （真机 NeoForge 安装卡 2% 的根因）。0 表示关闭退避（仅保留主机惩罚）。
+    /// </summary>
+    public int RetryBackoffMilliseconds { get; init; } = 1500;
+
+    /// <summary>
+    /// 收到 429/503（服务器限速）后的主机冷却时长（毫秒），期间不再对该主机发起任何新连接。
+    /// 对应下载提速插件「限速时宁可慢不可打爆」的原则。
+    /// </summary>
+    public int RateLimitCooldownMilliseconds { get; init; } = 5000;
 
     /// <summary>调试用：每个连接随机延迟，模拟不稳定网络。</summary>
     public int DebugMaxDelayMilliseconds { get; init; } = 0;
