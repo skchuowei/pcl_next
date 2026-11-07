@@ -32,6 +32,59 @@ internal static class McSource
         _ => throw new CliUsageException($"--mirror 只能是 auto / official / mirror，实际为「{raw}」"),
     };
 
+    /// <summary>加载器第三方 maven 根（Fabric / Forge / NeoForge）的镜像替换前缀。</summary>
+    private static readonly (string Original, string Mirror)[] ThirdPartyMavenRoots =
+    [
+        ("https://maven.fabricmc.net", Bmclapi + "/maven"),
+        ("https://maven.minecraftforge.net", Bmclapi + "/maven"),
+        ("https://maven.neoforged.net/releases", Bmclapi + "/maven"),
+        ("https://maven.neoforged.net", Bmclapi + "/maven"),
+        ("https://repo.spongepowered.org/repository/maven-public", Bmclapi + "/maven"),
+    ];
+
+    /// <summary>
+    /// 加载器依赖库（第三方 maven 坐标）。Fabric/Forge/Neo 官方 maven 在受限网络下不可达，
+    /// 镜像优先（/maven 与 /libraries 双前缀），官方直链仅在 Auto 模式兜底。
+    /// </summary>
+    public static IReadOnlyList<string> ForLoaderLibrary(MavenCoord coord, string repositoryRoot, string? sourceUrl, McMirrorPreference preference)
+    {
+        var original = string.IsNullOrWhiteSpace(sourceUrl) ? coord.ToUrl(repositoryRoot) : sourceUrl!;
+        var mirrorMaven = Bmclapi + "/maven/" + coord.RelativePath;
+        var mirrorLibs = Bmclapi + "/libraries/" + coord.RelativePath;
+
+        return preference switch
+        {
+            McMirrorPreference.Official => [original],
+            McMirrorPreference.Mirror => [mirrorMaven, mirrorLibs],
+            _ => new[] { mirrorMaven, mirrorLibs, original }.Distinct(StringComparer.OrdinalIgnoreCase).ToList(),
+        };
+    }
+
+    /// <summary>加载器 installer jar 候选：镜像优先（/maven、/libraries 双前缀），官方 maven 直链兜底。</summary>
+    public static IReadOnlyList<string> ForLoaderInstaller(string installerUrl, McMirrorPreference preference)
+    {
+        var rel = new Uri(installerUrl).AbsolutePath.TrimStart('/');
+        var mirrorMaven = Bmclapi + "/maven/" + rel;
+        var mirrorLibs = Bmclapi + "/libraries/" + rel;
+
+        return preference switch
+        {
+            McMirrorPreference.Official => [installerUrl],
+            McMirrorPreference.Mirror => [mirrorMaven, mirrorLibs],
+            _ => new[] { mirrorMaven, mirrorLibs, installerUrl }.Distinct(StringComparer.OrdinalIgnoreCase).ToList(),
+        };
+    }
+
+    /// <summary>Fabric meta 接口候选（官方 meta.fabricmc.net / BMCLAPI fabric-meta 镜像）。</summary>
+    public static IReadOnlyList<string> ForFabricMeta(string path, McMirrorPreference preference)
+    {
+        path = path.StartsWith('/') ? path : "/" + path;
+        return Order(
+            "https://meta.fabricmc.net" + path,
+            Bmclapi + "/fabric-meta" + path,
+            preference);
+    }
+
     /// <summary>资源对象（assets/objects）地址。</summary>
     public static IReadOnlyList<string> ForAsset(string original, McMirrorPreference preference)
     {

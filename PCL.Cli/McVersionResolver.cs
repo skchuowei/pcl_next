@@ -95,4 +95,37 @@ internal static class McVersionResolver
         var dir = Path.GetDirectoryName(localPath);
         if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
     }
+
+    /// <summary>按 assets 索引展开全部对象（<c>--objects</c>）。索引文件此时已在本地；缺失时先单独拉取。</summary>
+    public static async Task<List<DownloadFileRequest>> BuildObjectRequestsAsync(
+        CliSession session, IDownloadEngine engine, DownloadFileRequest indexRequest, string instanceDir)
+    {
+        if (!File.Exists(indexRequest.LocalPath))
+        {
+            await engine.DownloadAsync([indexRequest], session.CreateOptions(), null, session.Token).ConfigureAwait(false);
+        }
+
+        var result = new List<DownloadFileRequest>();
+        var root = JsonNode.Parse(File.ReadAllText(indexRequest.LocalPath));
+        if (root?["objects"] is not JsonObject objects) return result;
+
+        var objectsDir = Path.Combine(instanceDir, "assets", "objects");
+        foreach (var (_, node) in objects)
+        {
+            var hash = node?["hash"]?.GetValue<string>();
+            if (string.IsNullOrEmpty(hash) || hash.Length < 2) continue;
+            var size = node?["size"] is JsonValue sizeNode && sizeNode.TryGetValue<long>(out var parsed) ? parsed : -1;
+
+            var url = $"https://resources.download.minecraft.net/{hash[..2]}/{hash}";
+            result.Add(new DownloadFileRequest
+            {
+                Sources = McSource.ForAsset(url, session.Mirror),
+                LocalPath = Path.Combine(objectsDir, hash[..2], hash),
+                Check = new FileCheckRule { Hash = hash, ActualSize = size },
+            });
+        }
+
+        session.Output.Say($"assets 索引含 {result.Count} 个对象");
+        return result;
+    }
 }

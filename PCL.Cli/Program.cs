@@ -43,14 +43,15 @@ internal static class Program
                 return (int)CliExitCode.Argument;
             }
 
-            if (command is not ("download" or "install" or "resource" or "selftest"))
-                throw new CliUsageException($"未知命令「{command}」，可选 download / install / resource / selftest");
+            if (command is not ("download" or "install" or "loader" or "resource" or "selftest"))
+                throw new CliUsageException($"未知命令「{command}」，可选 download / install / loader / resource / selftest");
 
             using var session = CliSession.Create(command, args);
             return command switch
             {
                 "download" => await DownloadCommand.RunAsync(session).ConfigureAwait(false),
                 "install" => await InstallCommand.RunAsync(session).ConfigureAwait(false),
+                "loader" => await InstallLoaderCommand.RunAsync(session).ConfigureAwait(false),
                 "resource" => await ResourceCommand.RunAsync(session).ConfigureAwait(false),
                 "selftest" => await SelfTestCommand.RunAsync(session).ConfigureAwait(false),
                 _ => throw new CliUsageException("未知命令：" + command),
@@ -106,6 +107,7 @@ internal static class Program
         命令：
           download    下载文件（支持多源、分片、续传、校验）
           install     按版本 JSON 拉取 client / libraries / assets 的下载段
+          loader      拼装原版 + Fabric/Forge/NeoForge 完整实例（下载依赖并合并版本 JSON）
           resource    资源站联网查询（search / versions / fingerprint）
           selftest    自检套件（offline / b1 / b2 / b5 / all，默认 offline）
           help        显示本帮助
@@ -114,6 +116,8 @@ internal static class Program
         {{DownloadCommand.Usage.Replace("pclcli", ToolName)}}
 
         {{InstallCommand.Usage.Replace("pclcli", ToolName)}}
+
+        {{InstallLoaderCommand.Usage.Replace("pclcli", ToolName)}}
 
         {{ResourceCommand.Usage.Replace("pclcli", ToolName)}}
 

@@ -52,7 +52,7 @@ internal static class InstallCommand
             var indexRequest = requests.FirstOrDefault(r => r.LocalPath.EndsWith(".json", StringComparison.OrdinalIgnoreCase));
             if (args.GetBool("objects") && indexRequest is not null)
             {
-                var extra = await BuildObjectRequestsAsync(session, engine.Engine, indexRequest, instanceDir).ConfigureAwait(false);
+                var extra = await McVersionResolver.BuildObjectRequestsAsync(session, engine.Engine, indexRequest, instanceDir).ConfigureAwait(false);
                 requests.AddRange(extra);
             }
 
@@ -223,40 +223,6 @@ internal static class InstallCommand
         Hash = string.IsNullOrWhiteSpace(download.Sha1) ? null : download.Sha1,
         ActualSize = download.Size,
     };
-
-    /// <summary>按 assets 索引展开全部对象（<c>--objects</c>）。索引文件此时已在本地。</summary>
-    private static async Task<List<DownloadFileRequest>> BuildObjectRequestsAsync(
-        CliSession session, IDownloadEngine engine, DownloadFileRequest indexRequest, string instanceDir)
-    {
-        // 索引可能还没下载（只在 requests 里），先单独把它拉下来再解析
-        if (!File.Exists(indexRequest.LocalPath))
-        {
-            await engine.DownloadAsync([indexRequest], session.CreateOptions(), null, session.Token).ConfigureAwait(false);
-        }
-
-        var result = new List<DownloadFileRequest>();
-        var root = JsonNode.Parse(File.ReadAllText(indexRequest.LocalPath));
-        if (root?["objects"] is not JsonObject objects) return result;
-
-        var objectsDir = Path.Combine(instanceDir, "assets", "objects");
-        foreach (var (_, node) in objects)
-        {
-            var hash = node?["hash"]?.GetValue<string>();
-            if (string.IsNullOrEmpty(hash) || hash.Length < 2) continue;
-            var size = node?["size"] is JsonValue sizeNode && sizeNode.TryGetValue<long>(out var parsed) ? parsed : -1;
-
-            var url = $"https://resources.download.minecraft.net/{hash[..2]}/{hash}";
-            result.Add(new DownloadFileRequest
-            {
-                Sources = McSource.ForAsset(url, session.Mirror),
-                LocalPath = Path.Combine(objectsDir, hash[..2], hash),
-                Check = new FileCheckRule { Hash = hash, ActualSize = size },
-            });
-        }
-
-        session.Output.Say($"assets 索引含 {result.Count} 个对象");
-        return result;
-    }
 
     /// <summary>把 <see cref="DownloadEngine"/> 的释放交给 using（引擎当前无资源，留扩展位）。</summary>
     private sealed class EngineHolder : IDisposable
