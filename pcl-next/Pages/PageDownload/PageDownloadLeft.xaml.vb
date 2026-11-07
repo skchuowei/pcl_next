@@ -100,7 +100,7 @@ Public Class PageDownloadLeft
     End Sub
     Public Sub Refresh(SubType As FormMain.PageSubType)
         ResourceProject.Cache.Clear()
-        ResourceVersion.ProjectFilesCache.Clear()
+        ResourceVersion.ClearCaches()
         Select Case SubType
             Case FormMain.PageSubType.DownloadInstall
                 DlClientListLoader.Start(IsForceRestart:=True)

@@ -101,6 +101,15 @@ public class ResourceVersion
     /// 它们可能没有加载，在加载后会添加到 Dependencies 中（主要是因为 Modrinth 返回的是字符串 ID 而非 Slug，导致 Project.Id 查询不到）。
     /// </summary>
     private List<string> RawDependencies { get; set; } = [];
+
+    /// <summary>
+    /// 依赖项的原始项目 ID（未解析成项目对象之前的值）。
+    /// <para>
+    /// 仅供宿主做「版本对象 → 缓存 JSON」的序列化（VB 侧 <c>ResourceVersion.ToCacheJson</c> 需要它）；
+    /// 业务代码请读 <see cref="Dependencies"/>，那里是已解析的结果。
+    /// </para>
+    /// </summary>
+    public List<string> DependencyIds => RawDependencies;
     /// <summary>
     /// 作为该版本依赖项的项目 ID。
     /// </summary>
@@ -263,6 +272,7 @@ public class ResourceVersion
         //获取项目对象的文件列表
         if (!ProjectFilesCache.ContainsKey(projectId))
         {
+            DownloadLog.Info($"开始获取项目版本列表：{projectId}");
             JsonArray resultJsonArray;
             if (platform == ResourcePlatforms.CurseForge)
             {
@@ -282,9 +292,12 @@ public class ResourceVersion
                     if (retryCount < 2)
                     {
                         //CurseForge 返回的资源版本列表存在缺失，即将重试（#6224）
+                        DownloadLog.Warn($"CurseForge 返回的资源版本列表存在缺失（{resultCount}/{totalCount}），"
+                            + $"即将进行第 {retryCount + 1} 次重试");
                     }
                     else
                     {
+                        DownloadLog.Warn($"CurseForge 返回的资源版本列表存在缺失（{resultCount}/{totalCount}），已重试 2 次");
                         throw new Exception("CurseForge 返回的资源版本列表存在缺失");
                     }
                 }

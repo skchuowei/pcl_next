@@ -225,57 +225,56 @@ Public Class ResourceVersion
     ''' 从项目 ID 获取其下的全部版本列表，并获取其前置项目信息。
     ''' </summary>
     Public Shared Function FromProjectId(ProjectId As String, Platform As ResourcePlatforms, Optional LoadDependencies As Boolean = True) As List(Of ResourceVersion)
+        'Phase 4：枚举、CurseForge 缺失重试、DistinctBy 去重与前置解析均已由 PCL.Download 提供，
+        '本方法只把结果投影成 VB 模型，保证 UI 侧类型与字段不变。
         If Not Platform.Flags.IsSingle Then Throw New ArgumentException($"必须指定单一平台，当前值为 {Platform}")
-        Dim TargetProject = ResourceProject.FromProjectId(ProjectId, Platform)
-        '获取项目对象的文件列表
-        If Not ProjectFilesCache.ContainsKey(ProjectId) Then
-            Logger.Info($"开始获取项目版本列表：{ProjectId}")
-            Dim ResultJsonArray As JArray = Nothing
-            If Platform = ResourcePlatforms.CurseForge Then
-                For RetryCount As Integer = 0 To 2
-                    Dim ResultJson As JObject = DlModRequest($"https://api.curseforge.com/v1/mods/{ProjectId}/files?pageSize=" &
-                    (10000 + RetryCount)) '每次重试多请求一个文件，以避免触发 CDN 缓存
-                    'HMCL 一次性请求了 10000 个文件，虽然不知道会不会出问题但先这样吧……（#5522）
-                    '之前只请求一部分文件的方法备份如下：
-                    'If TargetProject.Type = CompType.Mod Then 'Mod 使用每个版本最新的文件
-                    '    ResultJsonArray = DlModRequest("https://api.curseforge.com/v1/mods/files", HttpMethod.Post, "{""fileIds"": [" & Join(TargetProject.CurseForgeFileIds, ",") & "]}", "application/json")("data")
-                    'Else '否则使用全部文件
-                    '    ResultJsonArray = DlModRequest($"https://api.curseforge.com/v1/mods/{ProjectId}/files?pageSize=999")("data")
-                    'End If
-                    If ResultJson("pagination")("resultCount").ToObject(Of Integer) = ResultJson("pagination")("totalCount").ToObject(Of Integer) Then
-                        ResultJsonArray = ResultJson("data")
-                        Exit For
-                    ElseIf RetryCount < 2 Then
-                        Logger.Warn($"CurseForge 返回的资源版本列表存在缺失，即将进行第 {RetryCount + 1} 次重试") '#6224
-                        Logger.Info($"返回的原始内容如下：{vbCrLf}{ResultJson}")
-                    Else
-                        Logger.Info($"CurseForge 返回的资源版本列表存在缺失，返回的原始内容如下：{vbCrLf}{ResultJson}")
-                        Throw New Exception("CurseForge 返回的资源版本列表存在缺失")
-                    End If
-                Next
-            Else 'Modrinth
-                ResultJsonArray = DlModRequest($"https://api.modrinth.com/v2/project/{ProjectId}/version?include_changelog=false")
-            End If
-            ProjectFilesCache(ProjectId) = ResultJsonArray.Select(Function(a) FromPlatformJson(a, TargetProject.Types)).
-                Where(Function(a) a.DownloadAvailable).
-                DistinctBy(Function(a) a.Id).ToList 'CurseForge 可能会重复返回相同项（#1330）
-        End If
-        Dim Result As List(Of ResourceVersion) = ProjectFilesCache(ProjectId)
-        If Not LoadDependencies Then Return Result
-        '加载前置信息
-        Dim Dependencies As List(Of String) = Result.SelectMany(Function(f) f.RawDependencies).Distinct().ToList
-        If Dependencies.Any Then
-            Logger.Info($"项目 {ProjectId} 中需要加载的前置：{Dependencies.Join("，")}")
-            For Each DependencyProject In ResourceProject.FromProjectIds(Dependencies, TargetProject.Platform)
-                For Each File In Result
-                    If File.RawDependencies.Contains(DependencyProject.Id) AndAlso DependencyProject.Id <> ProjectId AndAlso Not File.Dependencies.Contains(DependencyProject.Id) Then
-                        File.Dependencies.Add(DependencyProject.Id)
-                    End If
-                Next
-            Next
-        End If
+        Dim Source = PCL.Download.ResourceVersion.FromProjectId(
+            ProjectId, CType(CInt(Platform), PCL.Download.ResourcePlatforms), LoadDependencies)
+        Dim Result As New List(Of ResourceVersion)(Source.Count)
+        For Each Item In Source
+            Result.Add(New ResourceVersion(Item))
+        Next
         Return Result
     End Function
+
+    ''' <summary>
+    ''' 默认构造。定义了带参构造后 VB 不再自动生成，而 JSON 解析路径（FromPlatformJson / FromCacheJson）仍需要它。
+    ''' </summary>
+    Public Sub New()
+    End Sub
+
+    ''' <summary>
+    ''' 从 C# 侧的版本模型投影（Phase 4）。逐字段构造，不走 JSON 中转，避免丢字段。
+    ''' </summary>
+    Friend Sub New(Source As PCL.Download.ResourceVersion)
+        Id = Source.Id
+        ResourceType = CType(CInt(Source.ResourceType), ResourceTypes)
+        Display = Source.Display
+        ReleaseDate = Source.ReleaseDate
+        DownloadCount = Source.DownloadCount
+        Version = Source.Version
+        '字段名与类型名同为 ModLoaders，必须限定命名空间，否则 CType 会把第二个参数解析成字段
+        ModLoaders = CType(CInt(Source.ModLoaders), PCLCS.ModLoaders)
+        GameVersions = Source.GameVersions
+        ReleaseType = CType(CInt(Source.ReleaseType), ReleaseTypes)
+        FileName = Source.FileName
+        DownloadUrls = Source.DownloadUrls
+        Hash = Source.Hash
+        Size = Source.Size
+        Dependencies = Source.Dependencies
+        RawDependencies = Source.DependencyIds
+    End Sub
+
+    ''' <summary>
+    ''' 清空版本列表缓存。C# 侧与 VB 侧各有一份，必须同时清掉，
+    ''' 否则「刷新」拿到的仍是 C# 侧的旧列表。
+    ''' </summary>
+    Public Shared Sub ClearCaches()
+        ProjectFilesCache.Clear()
+        PCL.Download.ResourceVersion.ClearCache()
+        '版本枚举内部会查 C# 的工程缓存（取项目的资源类型），工程缓存不一起清就会拿到旧类型
+        PCL.Download.ResourceProject.ClearCache()
+    End Sub
     ''' <summary>
     ''' 项目 ID 对应的版本信息的缓存。不会保存到文件。
     ''' </summary>

@@ -385,7 +385,11 @@ public class DownloadEngineTests
     {
         // 复现真机“任务管理显示几十 KB/s”场景：首选源连接正常但持续极慢，
         // 引擎应保留断点自动换第二源续传，而不是抱着慢源爬完全程。
-        var data = RandomBytes(300 * 1024);
+        //
+        // 文件必须足够大：假服务器每 64KB 才 flush 一次，而“最后一块到达”会先走到
+        // 完成分支、跳过速度检查。若文件被拆成小于 128KB 的分块，每块只写两次，
+        // 速度换源就永远不会被判定——这正是本用例在全量并行下偶发失败的原因。
+        var data = RandomBytes(1024 * 1024);
         using var slowServer = new FakeFileServer { Data = data, DelayMsPerChunk = 1500 }; // ≈ 42KB/s
         using var fastServer = new FakeFileServer { Data = data };
         var target = TempPath("slow-rotate.bin");
@@ -396,7 +400,7 @@ public class DownloadEngineTests
             MaxConcurrentChunks = 4,
             SpeedLimitLow = 1L << 30,
             SlowSourceRotateAfterMilliseconds = 1000,
-            SlowSourceRotateSpeedBytesPerSecond = 128 * 1024,
+            SlowSourceRotateSpeedBytesPerSecond = 512 * 1024,
             Log = s => { lock (logs) logs.Add(s); },
         };
 
@@ -405,12 +409,13 @@ public class DownloadEngineTests
             new DownloadFileRequest { Sources = [slowServer.Url, fastServer.Url], LocalPath = target, Check = Sha1Rule(data) },
         ], options);
 
-        var winner = await Task.WhenAny(download, Task.Delay(TimeSpan.FromSeconds(30)));
+        var winner = await Task.WhenAny(download, Task.Delay(TimeSpan.FromSeconds(60)));
         Assert.True(ReferenceEquals(winner, download), "引擎疑似冻结：慢源未触发换源续传");
         await download;
         Assert.Equal(data, await File.ReadAllBytesAsync(target));
-        Assert.Contains(logs, l => l.Contains("换源"));
+        // 核心行为：慢源必须被换掉（第二源收到过请求）；日志文案随路径不同（速度换源 / 死源禁用）
         Assert.True(fastServer.Requests.Count > 0, "第二下载源未被使用");
+        Assert.Contains(logs, l => l.Contains("换源") || l.Contains("禁用"));
     }
 
     [Fact]

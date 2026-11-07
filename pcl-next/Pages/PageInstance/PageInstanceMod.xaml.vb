@@ -41,7 +41,7 @@ Public Class PageInstanceMod
     Public Shared Sub Refresh()
         Try
             ResourceProject.Cache.Clear()
-            ResourceVersion.ProjectFilesCache.Clear()
+            ResourceVersion.ClearCaches()
             FileUtils.Delete(PathTemp & "Cache\LocalMod.json")
             Logger.Info("由于点击刷新按钮，清理本地 Mod 信息缓存")
         Catch ex As Exception

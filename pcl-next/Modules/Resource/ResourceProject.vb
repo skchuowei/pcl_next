@@ -413,13 +413,14 @@ Public Class ResourceProject
     ''' </summary>
     Public Shared Function FromProjectId(ProjectId As String, Platform As ResourcePlatforms) As ResourceProject
         If Not Platform.Flags.IsSingle Then Throw New ArgumentException($"必须指定单一平台，当前值为 {Platform}")
-        If Cache.ContainsKey(ProjectId) Then '存在缓存
+        If Cache.ContainsKey(ProjectId) Then '存在本地快查缓存
             Return Cache(ProjectId)
-        ElseIf Platform = ResourcePlatforms.CurseForge Then 'CurseForge
-            Return New ResourceProject(DlModRequest("https://api.curseforge.com/v1/mods/" & ProjectId)("data"))
-        Else 'Modrinth
-            Return New ResourceProject(DlModRequest("https://api.modrinth.com/v2/project/" & ProjectId))
         End If
+        'Phase 4：联网查询、平台判别与 C# 侧缓存统一由 PCL.Download 提供，这里只做投影与本地快查缓存
+        Dim Result As New ResourceProject(
+            PCL.Download.ResourceProject.FromProjectId(ProjectId, CType(CInt(Platform), PCL.Download.ResourcePlatforms)))
+        Cache(Result.Id) = Result
+        Return Result
     End Function
     ''' <summary>
     ''' 从工程 ID 列表联网获取工程信息，结果不按原顺序排列。
