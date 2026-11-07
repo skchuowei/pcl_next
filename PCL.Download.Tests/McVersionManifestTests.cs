@@ -135,7 +135,7 @@ public class McVersionManifestTests
         var ex = Assert.Throws<ResourceRequestException>(() => new McVersionManifestClient(api)
             .Fetch([McVersionSources.Mojang(0), McVersionSources.Bmclapi(0)]));
 
-        Assert.Contains("所有版本列表源均获取失败", ex.Message);
+        Assert.Contains("所有候选源均获取失败", ex.Message);
         Assert.Contains("官方不可达", ex.Message);
         Assert.Contains("镜像不可达", ex.Message);
     }

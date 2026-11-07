@@ -125,9 +125,6 @@ public sealed class McVersionManifestClient
     /// 该值只用于保证任务最终会结束，避免慢连接永久占住轮询。</summary>
     private const int SingleSourceTimeoutSeconds = 45;
 
-    /// <summary>轮询间隔（毫秒）。</summary>
-    private const int PollMilliseconds = 50;
-
     private readonly IResourceApi _api;
 
     /// <summary>
@@ -148,8 +145,8 @@ public sealed class McVersionManifestClient
         => Fetch(McVersionSources.Build(mode), requiredVersion, extraVersionsJsonPath);
 
     /// <summary>
-    /// 按给定的候选源获取版本清单：按 <see cref="McVersionSource.StartAtSeconds"/> 依次启动，
-    /// 先成功者胜出，全部失败则抛出聚合异常。
+    /// 按给定候选源获取版本清单：按 <see cref="McVersionSource.StartAtSeconds"/> 依次启动，
+    /// 先成功者胜出，全部失败则抛出聚合异常。调度与加速规则见 <see cref="SourceRace"/>。
     /// </summary>
     public McVersionManifest Fetch(IReadOnlyList<McVersionSource> sources, string? requiredVersion = null,
         string? extraVersionsJsonPath = null)
@@ -157,58 +154,18 @@ public sealed class McVersionManifestClient
         ArgumentNullException.ThrowIfNull(sources);
         if (sources.Count == 0) throw new ArgumentException("至少需要一个版本列表源", nameof(sources));
 
-        var clock = Stopwatch.StartNew();
-        var pending = new List<Task<McVersionManifest>>(sources.Count);
-        var errors = new List<Exception>(sources.Count);
-        var next = 0;
-        var deadline = TimeSpan.FromSeconds(sources[^1].StartAtSeconds + SingleSourceTimeoutSeconds);
-
-        while (true)
+        var candidates = new List<SourceRaceCandidate<McVersionManifest>>(sources.Count);
+        foreach (var source in sources)
         {
-            // 到点启动候选：先启动第一个，其余按排期在切换时刻启动
-            while (next < sources.Count && TimeSpan.FromSeconds(sources[next].StartAtSeconds) <= clock.Elapsed)
-            {
-                var source = sources[next];
-                next++;
-                if (next > 1)
-                    DownloadLog.Info($"版本列表切换候选源：{source.SourceName}（{clock.ElapsedMilliseconds}ms）");
-                pending.Add(Task.Run(() => FetchOne(source, requiredVersion, extraVersionsJsonPath)));
-            }
-
-            // 先完成者优先；同一轮有多个完成时按候选顺序取靠前的那个
-            for (var i = 0; i < pending.Count; i++)
-            {
-                var task = pending[i];
-                if (!task.IsCompleted) continue;
-                pending.RemoveAt(i);
-                if (task.IsCompletedSuccessfully)
-                {
-                    var manifest = task.Result;
-                    DownloadLog.Info($"版本列表获取成功：{manifest.SourceName}，{manifest.Versions.Count} 个版本，"
-                        + $"{manifest.Drops.Count} 个 Drop，耗时 {manifest.ElapsedMilliseconds}ms");
-                    return manifest;
-                }
-                var error = task.Exception?.GetBaseException() ?? new Exception("版本列表源获取失败");
-                errors.Add(error);
-                DownloadLog.Warn(error, $"版本列表源失败");
-                i--;
-            }
-
-            if (next >= sources.Count && pending.Count == 0) break;
-            if (clock.Elapsed >= deadline)
-            {
-                DownloadLog.Warn($"版本列表获取超过兜底时限 {deadline.TotalSeconds:0}s，放弃剩余候选");
-                break;
-            }
-            Thread.Sleep(PollMilliseconds);
+            candidates.Add(new SourceRaceCandidate<McVersionManifest>(source.SourceName, source.Url,
+                source.IsOfficial, source.StartAtSeconds,
+                () => FetchOne(source, requiredVersion, extraVersionsJsonPath)));
         }
 
-        var detail = errors.Count == 0
-            ? "没有源在时限内返回结果"
-            : string.Join("；", errors.Select(e => e.Message));
-        var kind = errors.Count == 0 ? ResourceRequestErrorKind.Timeout : ResourceRequestErrorKind.Network;
-        throw new ResourceRequestException(kind, sources[0].Url,
-            $"所有版本列表源均获取失败（尝试 {sources.Count} 个源）：{detail}", null, new AggregateException(errors));
+        var result = SourceRace.Run(candidates, "版本列表")
+                     ?? throw new OperationCanceledException("版本列表获取已取消");
+        DownloadLog.Info($"版本列表：{result.Value.Versions.Count} 个版本，{result.Value.Drops.Count} 个 Drop");
+        return result.Value;
     }
 
     private McVersionManifest FetchOne(McVersionSource source, string? requiredVersion, string? extraVersionsJsonPath)
