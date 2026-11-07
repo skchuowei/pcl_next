@@ -893,22 +893,18 @@ Retry:
                 Return
             Next
 
-            '获取下载地址
+            '获取下载地址（镜像在前、官方在后）
             Dim Files As New List(Of NetFile)
             If Info.IsNeoForge Then
-                'NeoForge
                 Dim NeoForge As DlNeoForgeListEntry = Info
-                Dim Url As String = NeoForge.UrlBase & "-installer.jar"
-                Files.Add(New NetFile({
-                    Url.Replace("maven.neoforged.net/releases", "bmclapi2.bangbang93.com/maven"), Url
-                }, Target, New FileChecker With {.MinSize = 64 * 1024}))
+                Dim Installer = PCL.Download.ForgelikeInstaller.BuildNeoForgeInstaller(NeoForge.Inherit, NeoForge.ApiName)
+                Files.Add(New NetFile(Installer.Urls, Target, New FileChecker With {.MinSize = CInt(Installer.MinSize)}))
             Else
-                'Forge
                 Dim Forge As DlForgeVersionEntry = Info
-                Files.Add(New NetFile({
-                    $"https://bmclapi2.bangbang93.com/maven/net/minecraftforge/forge/{Forge.Inherit}-{Forge.FileVersion}/forge-{Forge.Inherit}-{Forge.FileVersion}-{Forge.Category}.{Forge.FileExtension}",
-                    $"https://files.minecraftforge.net/maven/net/minecraftforge/forge/{Forge.Inherit}-{Forge.FileVersion}/forge-{Forge.Inherit}-{Forge.FileVersion}-{Forge.Category}.{Forge.FileExtension}"
-                }, Target, New FileChecker With {.MinSize = 64 * 1024, .Hash = Forge.Hash}))
+                Dim Installer = PCL.Download.ForgelikeInstaller.BuildForgeInstaller(
+                    Forge.Inherit, Forge.FileVersion, Forge.Category, Forge.FileExtension, Forge.Hash)
+                Files.Add(New NetFile(Installer.Urls, Target,
+                                      New FileChecker With {.MinSize = CInt(Installer.MinSize), .Hash = Installer.Hash}))
             End If
 
             '构造加载器
@@ -933,13 +929,11 @@ Retry:
         If Task.IsCanceled Then Return
         If Java Is Nothing Then Throw New OperationCanceledException
         '添加 Java Wrapper 作为主 Jar
-        Dim Arguments As String
-        If UseJavaWrapper AndAlso Not Settings.Get(Of Boolean)("LaunchAdvanceDisableJLW") Then
-            Arguments = $"-Doolloo.jlw.tmpdir=""{PathUtils.RemoveSlashSuffix(PathPure.Value)}"" -cp ""{PathTemp}Cache\forge_installer.jar;{Target}"" -jar ""{LaunchUtils.ExtractPatch("Launch\JavaWrapper.jar", PathPure.Value)}"" com.bangbang93.ForgeInstaller ""{McFolder}"
-        Else
-            Arguments = $"-cp ""{PathTemp}Cache\forge_installer.jar;{Target}"" com.bangbang93.ForgeInstaller ""{McFolder}"
-        End If
-        If Java.Version.Major >= 9 Then Arguments = "--add-exports cpw.mods.bootstraplauncher/cpw.mods.bootstraplauncher=ALL-UNNAMED " & Arguments
+        Dim UseWrapper As Boolean = UseJavaWrapper AndAlso Not Settings.Get(Of Boolean)("LaunchAdvanceDisableJLW")
+        Dim WrapperPath As String = If(UseWrapper, LaunchUtils.ExtractPatch("Launch\JavaWrapper.jar", PathPure.Value), Nothing)
+        Dim Arguments As String = PCL.Download.ForgelikeInstaller.BuildArguments(
+            Java.Version.Major, PathTemp & "Cache\forge_installer.jar", Target, McFolder,
+            WrapperPath, PathUtils.RemoveSlashSuffix(PathPure.Value), UseWrapper)
         '开始启动
         SyncLock InstallSyncLock
             Dim Info = New ProcessStartInfo With {
@@ -1025,42 +1019,24 @@ Retry:
             End Using
         End SyncLock
     End Sub
+    ''' <summary>
+    ''' 把 Forge / NeoForge 安装器的一行输出翻译成进度动作。
+    ''' </summary>
+    ''' <remarks>
+    ''' 识别表在 <c>PCL.Download.ForgelikeInstaller.ReadProgress</c>；不认识的行只进 trace，不上抛进度。
+    ''' </remarks>
     Private Sub ForgelikeInjectorLine(Content As String, Task As LoaderTask(Of Boolean, Boolean))
-        Select Case Content
-            Case "Extracting json"
-                Task.Progress = 0.27
-            Case "Downloading libraries"
-                Task.Progress = 0.28
-            Case "  File exists: Checksum validated."
-                Task.Progress += 0.003
-            Case "Building Processors"
-                Task.Progress = 0.38
-            Case "Task: DOWNLOAD_MOJMAPS" 'B
-                Task.Progress = 0.4
-            Case "Task: MERGE_MAPPING" 'B
-                Task.Progress = 0.5
-            Case "Splitting: "
-                Task.Progress = 0.55
-            Case "Parameter Annotations" 'B
-                Task.Progress = 0.6
-            Case "Processing Complete" 'B
-                Task.Progress = 0.67
-            Case "log: null" 'new
-                Task.Progress = 0.67
-            Case "Sorting" 'new
-                Task.Progress = 0.8
-            Case "Remapping final jar" 'A
-                Task.Progress = 0.85
-            Case "Remapping jar... 50%" 'A
-                Task.Progress = 0.9
-            Case "Remapping jar... 100%" 'A
-                Task.Progress = 0.95
-            Case "Injecting profile"
-                Task.Progress = 0.98
-            Case Else
-                Logger.Trace(Content)
-                Return
-        End Select
+        Dim ProgressStep = PCL.Download.ForgelikeInstaller.ReadProgress(Content)
+        If Not ProgressStep.HasValue Then
+            Logger.Trace(Content)
+            Return
+        End If
+        '校验命中这类行是累加的，别写成赋值，否则进度条会来回跳
+        If ProgressStep.Value.IsIncrement Then
+            Task.Progress += ProgressStep.Value.Progress
+        Else
+            Task.Progress = ProgressStep.Value.Progress
+        End If
         Logger.Info(Content)
     End Sub
 
@@ -1068,20 +1044,11 @@ Retry:
     ''' 获取下载某个 Forgelike 版本的加载器列表。
     ''' </summary>
     Private Function McDownloadForgelikeLoader(IsNeoForge As Boolean, LoaderVersion As String, NewInstanceName As String, Inherit As String, Info As DlForgelikeEntry, McFolder As String, ClientDownloadLoader As LoaderCombo(Of String), ClientFolder As String) As List(Of LoaderBase)
-        '参数初始化
-        If IsNeoForge AndAlso Info Is Nothing Then
-            '需要传入 API Name，但整合包版本可能不以 1.20.1- 开头，所以需要进行特别处理
-            If Inherit = "1.20.1" AndAlso Not LoaderVersion.StartsWithF("1.20.1-") Then
-                Info = New DlNeoForgeListEntry("1.20.1-" & LoaderVersion)
-            Else
-                Info = New DlNeoForgeListEntry(LoaderVersion)
-            End If
-        End If
-        If Not IsNeoForge AndAlso LoaderVersion.StartsWithF("1.") AndAlso LoaderVersion.Contains("-") Then
-            '类似 1.19.3-41.2.8 格式，优先使用 Version 中要求的版本而非 Inherit（例如 1.19.3 却使用了 1.19 的 Forge）
-            Inherit = LoaderVersion.BeforeFirst("-")
-            LoaderVersion = LoaderVersion.AfterLast("-")
-        End If
+        '参数初始化：整合包/实例给出的版本串可能自带 MC 版本，或缺少 NeoForge 的包名前缀
+        Dim VersionTarget = PCL.Download.ForgelikeInstaller.Normalize(IsNeoForge, LoaderVersion, Inherit)
+        Inherit = VersionTarget.Inherit
+        LoaderVersion = VersionTarget.LoaderVersion
+        If IsNeoForge AndAlso Info Is Nothing Then Info = New DlNeoForgeListEntry(LoaderVersion)
         Dim LoaderName As String = If(IsNeoForge, "NeoForge", "Forge")
         Dim InstallerAddress As String = RequestTaskTempFolder(True) & "forge_installer.jar"
         Dim VersionFolder As String = $"{McFolder}versions\{NewInstanceName}\"
@@ -1108,24 +1075,19 @@ Retry:
         '下载 Forgelike 主文件
         Loaders.Add(New LoaderTask(Of String, List(Of NetFile))($"准备下载 {LoaderName}",
         Sub(Task As LoaderTask(Of String, List(Of NetFile)))
-            '添加主文件下载
+            '添加主文件下载（镜像在前、官方在后）
             Dim Files As New List(Of NetFile)
             If Info.IsNeoForge Then
-                'NeoForge
                 Dim Neo As DlNeoForgeListEntry = Info
-                Dim Url As String = Neo.UrlBase & "-installer.jar"
-                Files.Add(New NetFile({
-                    Url.Replace("maven.neoforged.net/releases", "bmclapi2.bangbang93.com/maven"), Url
-                }, InstallerAddress, New FileChecker With {.MinSize = 64 * 1024}))
+                Dim Installer = PCL.Download.ForgelikeInstaller.BuildNeoForgeInstaller(Neo.Inherit, Neo.ApiName)
+                Files.Add(New NetFile(Installer.Urls, InstallerAddress,
+                                      New FileChecker With {.MinSize = CInt(Installer.MinSize)}))
             Else
-                'Forge
                 Dim Forge As DlForgeVersionEntry = Info
-                Dim FileName As String =
-                    $"{Forge.Inherit.Replace("-", "_")}-{Forge.FileVersion}/forge-{Forge.Inherit.Replace("-", "_")}-{Forge.FileVersion}-{Forge.Category}.{Forge.FileExtension}"
-                Files.Add(New NetFile({
-                    $"https://bmclapi2.bangbang93.com/maven/net/minecraftforge/forge/{FileName}",
-                    $"https://files.minecraftforge.net/maven/net/minecraftforge/forge/{FileName}"
-                }, InstallerAddress, New FileChecker With {.MinSize = 64 * 1024, .Hash = Forge.Hash}))
+                Dim Installer = PCL.Download.ForgelikeInstaller.BuildForgeInstaller(
+                    Forge.Inherit, Forge.FileVersion, Forge.Category, Forge.FileExtension, Forge.Hash)
+                Files.Add(New NetFile(Installer.Urls, InstallerAddress,
+                                      New FileChecker With {.MinSize = CInt(Installer.MinSize), .Hash = Installer.Hash}))
             End If
             Task.Output = Files
         End Sub) With {.ProgressWeight = 0.5, .Show = False})
@@ -1874,54 +1836,34 @@ Retry:
         '总加载器
         Return LoaderList
     End Function
+    ''' <summary>
+    ''' 合并原版与各加载器的 json，输出为一份独立版本 json。
+    ''' </summary>
+    ''' <param name="VersionFolder">输出目录，同时也是原版 profile 的所在目录。</param>
+    ''' <param name="OptiFineFolder">OptiFine 目录。作为 Mod 安装时传 Nothing。</param>
+    ''' <param name="OptiFineAsMod">OptiFine 是否以 Mod 形式安装。为真时不参与合并。</param>
+    ''' <param name="ForgeFolder">Forge 目录，未安装传 Nothing。</param>
+    ''' <param name="NeoForgeFolder">NeoForge 目录，未安装传 Nothing。</param>
+    ''' <param name="FabricFolder">Fabric 目录，未安装传 Nothing。</param>
+    ''' <param name="LiteLoaderFolder">LiteLoader 目录，未安装传 Nothing。</param>
+    ''' <remarks>
+    ''' 合并顺序即叠加顺序，决定同名标量（如 mainClass）最终归属。具体合并规则见
+    ''' <c>PCL.Download.VersionMerger</c>；此处只负责按安装形态挑选参与合并的目录。
+    ''' </remarks>
     Private Sub MergeJson(VersionFolder As String, OptiFineFolder As String, OptiFineAsMod As Boolean,
                           ForgeFolder As String, NeoForgeFolder As String, FabricFolder As String, LiteLoaderFolder As String)
-        Dim ProfileSources As New List(Of (Name As String, Folder As String)) From {("Minecraft", VersionFolder)}
-        If OptiFineFolder IsNot Nothing AndAlso Not OptiFineAsMod Then ProfileSources.Add(("OptiFine", OptiFineFolder))
-        If ForgeFolder IsNot Nothing Then ProfileSources.Add(("Forge", ForgeFolder))
-        If NeoForgeFolder IsNot Nothing Then ProfileSources.Add(("NeoForge", NeoForgeFolder))
-        If LiteLoaderFolder IsNot Nothing Then ProfileSources.Add(("LiteLoader", LiteLoaderFolder))
-        If FabricFolder IsNot Nothing Then ProfileSources.Add(("Fabric", FabricFolder))
-        Logger.Info($"开始进行版本合并，输出：{VersionFolder}，" & String.Join("，", ProfileSources.Select(Function(Source) $"{Source.Name}：{Source.Folder}")))
-        '读取文件并检查文件是否合规
-        Dim LoadedProfiles As New List(Of (Name As String, Json As JObject))
-        For Each Source In ProfileSources
-            Dim ProfilePath = Path.Combine(Source.Folder, PathUtils.GetLastPart(Source.Folder) & ".json")
-            Dim ProfileText = If(FileUtils.TryReadAsString(ProfilePath), "")
-            If Not ProfileText.StartsWithF("{") Then Throw New Exception($"{Source.Name} json 有误，地址：{ProfilePath}，前段内容：{ProfileText.Substring(0, Math.Min(ProfileText.Length, 1000))}")
-            LoadedProfiles.Add((Source.Name, ProfileText.DeserializeJson(Of JObject)()))
-        Next
-        '先获取 minecraftArguments，避免合并时原版参数被覆盖
-        Dim AllArguments = LoadedProfiles.Select(Function(Profile) If(Profile.Json("minecraftArguments")?.ToString(), " ")).Join(" ")
-        '合并（相关讨论见 #2801）
-        Dim MergedJson = LoadedProfiles(0).Json 'Minecraft 原版 JSON
-        For Each Loaded In LoadedProfiles.Skip(1)
-            Loaded.Json.Remove("releaseTime")
-            Loaded.Json.Remove("time")
-            MergedJson.Merge(Loaded.Json)
-        Next
-        '填入 minecraftArguments
-        Dim SplitArguments As New List(Of String)
-        For Each Argument In AllArguments.Split(" ", True).Select(Function(Value) Value.Trim())
-            If Not Argument.StartsWithF("-") AndAlso SplitArguments.Any Then
-                Dim LastArgument = SplitArguments.Last
-                If LastArgument.StartsWithF("-") AndAlso Not LastArgument.Contains(" ") Then
-                    SplitArguments(SplitArguments.Count - 1) = LastArgument & " " & Argument
-                    Continue For
-                End If
-            End If
-            SplitArguments.Add(Argument)
-        Next
-        If SplitArguments.Any() Then MergedJson("minecraftArguments") = SplitArguments.Distinct().Join(" ")
-        '修改
-        MergedJson.Remove("_comment_")
-        MergedJson.Remove("inheritsFrom")
-        MergedJson.Remove("jar")
-        Dim VersionName = PathUtils.GetLastPart(VersionFolder)
-        MergedJson("id") = VersionName
-        '保存
-        FileUtils.Write(Path.Combine(VersionFolder, VersionName & ".json"), MergedJson.ToString())
-        Logger.Info($"版本合并 {VersionName} 完成")
+        Dim Sources As New List(Of PCL.Download.VersionMergeSource) From {
+            New PCL.Download.VersionMergeSource("Minecraft", VersionFolder)}
+        If OptiFineFolder IsNot Nothing AndAlso Not OptiFineAsMod Then
+            Sources.Add(New PCL.Download.VersionMergeSource("OptiFine", OptiFineFolder))
+        End If
+        If ForgeFolder IsNot Nothing Then Sources.Add(New PCL.Download.VersionMergeSource("Forge", ForgeFolder))
+        If NeoForgeFolder IsNot Nothing Then Sources.Add(New PCL.Download.VersionMergeSource("NeoForge", NeoForgeFolder))
+        If LiteLoaderFolder IsNot Nothing Then
+            Sources.Add(New PCL.Download.VersionMergeSource("LiteLoader", LiteLoaderFolder))
+        End If
+        If FabricFolder IsNot Nothing Then Sources.Add(New PCL.Download.VersionMergeSource("Fabric", FabricFolder))
+        PCL.Download.VersionMerger.MergeToDirectory(Sources, VersionFolder)
     End Sub
     ''' <summary>
     ''' 进行合并安装。返回是否已经开始安装。
