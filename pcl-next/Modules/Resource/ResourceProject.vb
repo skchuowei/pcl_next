@@ -427,26 +427,17 @@ Public Class ResourceProject
     ''' </summary>
     Public Shared Iterator Function FromProjectIds(ProjectIds As IEnumerable(Of String), Platform As ResourcePlatforms) As IEnumerable(Of ResourceProject)
         If Not Platform.Flags.IsSingle Then Throw New ArgumentException($"必须指定单一平台，当前值为 {Platform}")
-        '获取缓存
-        Dim MissingProjectIds As New List(Of String)
-        For Each ProjectId In ProjectIds
-            If Cache.ContainsKey(ProjectId) Then
-                Yield Cache(ProjectId)
+        'Phase 4：批量查询、平台判别与 C# 侧缓存统一由 PCL.Download 提供，这里只做投影与本地快查缓存
+        For Each Source In PCL.Download.ResourceProject.FromProjectIds(
+                ProjectIds, CType(CInt(Platform), PCL.Download.ResourcePlatforms))
+            Dim Existing As ResourceProject = Nothing
+            If Cache.TryGetValue(Source.Id, Existing) Then
+                Yield Existing
             Else
-                MissingProjectIds.Add(ProjectId)
+                Dim Projected As New ResourceProject(Source)
+                Cache(Projected.Id) = Projected
+                Yield Projected
             End If
-        Next
-        If Not MissingProjectIds.Any() Then Return
-        '联网获取剩余的工程对象
-        Dim Projects As JArray
-        If Platform.HasFlagF(ResourcePlatforms.CurseForge) Then
-            Projects = DlModRequest("https://api.curseforge.com/v1/mods",
-                HttpMethod.Post, "{""modIds"": [" & MissingProjectIds.Join(","c) & "]}", "application/json")("data")
-        Else
-            Projects = DlModRequest($"https://api.modrinth.com/v2/projects?ids=[""{MissingProjectIds.Join(""",""")}""]")
-        End If
-        For Each Project In Projects
-            Yield New ResourceProject(Project)
         Next
     End Function
 
