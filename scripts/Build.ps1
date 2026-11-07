@@ -101,8 +101,12 @@ if ([string]::IsNullOrWhiteSpace($OutPath)) {
 $OutPath = $OutPath.TrimEnd('\', '/')
 
 # 防漂移断言：查询结果必须以 <开发代号>\<版本名>-<构建号>\<运行环境> 收尾
+# Directory.Build.props 的三段树统一改用正斜杠（跨平台护栏：反斜杠在 Linux 上只是普通字符，
+# 会让 Exists() 判定失败）。因此比较前把实际路径的分隔符规范化，
+# 避免 Windows 端仅因 / 与 \ 的差异就误判「产物落错目录」。
 $ExpectedTail = "$Channel\$Version-$BuildSmall\$Rid"
-if (-not $OutPath.EndsWith($ExpectedTail, [System.StringComparison]::OrdinalIgnoreCase)) {
+$OutPathForCheck = $OutPath.Replace('/', '\')
+if (-not $OutPathForCheck.EndsWith($ExpectedTail, [System.StringComparison]::OrdinalIgnoreCase)) {
     throw "产物路径不符合三段树规范（AGENTS §0.1）：`n  实际：$OutPath`n  期望以：\$ExpectedTail 结尾`n请勿在工程体内手写 OutputPath，改用 `$(PclGuiTreeRoot)。"
 }
 Write-Host "==> 渠道 $Channel | 版本 $Version-$BuildSmall | RID $Rid | 配置 $Configuration" -ForegroundColor Cyan

@@ -31,7 +31,10 @@
       版本名直接取自 ModBase.vb 的 VersionBaseName，避免各处手抄版本导致漂移。
       求值期用属性函数读取并正则抽取。
     -->
-    <PclModBaseFile>$(MSBuildThisFileDirectory)pcl-next\Modules\Base\ModBase.vb</PclModBaseFile>
+    <!-- 路径片段一律用正斜杠：MSBuild 在 Windows / Linux 都接受 / 作为分隔符，
+         而反斜杠在 Linux 上只是普通字符，会让 Exists() 判定为 false，进而 PclVersion 为空。
+         （2026-11-07 跨平台护栏实测发现，见 .workbuddy/memory/2026-11-07.md） -->
+    <PclModBaseFile>$(MSBuildThisFileDirectory)pcl-next/Modules/Base/ModBase.vb</PclModBaseFile>
     <PclVersion Condition="'$(PclVersion)' == '' AND Exists('$(PclModBaseFile)')">$([System.Text.RegularExpressions.Regex]::Match($([System.IO.File]::ReadAllText('$(PclModBaseFile)')), 'VersionBaseName[^&quot;]*&quot;([0-9][0-9.]*)&quot;').Groups[1].Value)</PclVersion>
 
     <!--
@@ -47,7 +50,7 @@
       缓存缺失（如新克隆仓库）时 PclBuildSmall 为空，目录名退化为纯版本名；
       下一次任一路径刷新后自动补上，不会长期缺段。
     -->
-    <PclBuildCacheFile>$(MSBuildThisFileDirectory)pcl-next\obj\pcl-build.small</PclBuildCacheFile>
+    <PclBuildCacheFile>$(MSBuildThisFileDirectory)pcl-next/obj/pcl-build.small</PclBuildCacheFile>
     <PclBuildSmall Condition="'$(PclBuildSmall)' == '' AND Exists('$(PclBuildCacheFile)')">$([System.IO.File]::ReadAllText('$(PclBuildCacheFile)').Trim())</PclBuildSmall>
 
     <!--
@@ -77,8 +80,13 @@
         PclGuiTreeRoot → pcl-next\bin-net10\<代号>\<版本>-<构建号>\<RID>\   供 GUI 主工程（位于 pcl-next 项目树下）
       各工程只允许引用这两个变量，**禁止**再手写 bin-net10\... 字面量。
     -->
-    <PclTreeRoot>$(MSBuildThisFileDirectory)bin-net10\$(PclChannel)\$(PclVersionDir)\$(PclRidSegment)\</PclTreeRoot>
-    <PclGuiTreeRoot>$(MSBuildThisFileDirectory)pcl-next\bin-net10\$(PclChannel)\$(PclVersionDir)\$(PclRidSegment)\</PclGuiTreeRoot>
+    <!--
+      分隔符统一用正斜杠：MSBuild 在 Windows / Linux 都能正确解析 /，
+      反斜杠在 Linux 上则只是普通字符，会生成名字里含字面 \ 的目录。
+      配套：scripts\Build.ps1 的防漂移断言在比较前把 / 规范化成 \（见该脚本第 3 步）。
+    -->
+    <PclTreeRoot>$(MSBuildThisFileDirectory)bin-net10/$(PclChannel)/$(PclVersionDir)/$(PclRidSegment)/</PclTreeRoot>
+    <PclGuiTreeRoot>$(MSBuildThisFileDirectory)pcl-next/bin-net10/$(PclChannel)/$(PclVersionDir)/$(PclRidSegment)/</PclGuiTreeRoot>
   </PropertyGroup>
 
   <!-- ── 2.5 路径护栏：声明 PclUseTreePath 的工程，OutputPath 必须落三段树 ── -->

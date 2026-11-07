@@ -1,7 +1,10 @@
 name: Build
 on:
   push:
-    # 仅六条长期分支触发（见《分支与发布规范》§1）；短期分支（feat/*、fix/*）走 PR
+    # 六条代号长期分支 + 两条平台长期线（§0A android / §0B linux）触发；
+    # 短期分支（feat/*、fix/*）走 PR。
+    # 两条平台线都从 dev 吸收内核，必须同时过 Windows 主线编译门禁与 Linux 内核跨平台门禁，
+    # 否则「并行不中断 Phase 4」就没有机械保障。
     branches:
       - dev
       - slush
@@ -9,6 +12,8 @@ on:
       - beta
       - pc
       - snapshot
+      - android
+      - linux
     paths:
       - 'pcl-next/**'
       - 'PCLCS/**'
@@ -75,6 +80,9 @@ jobs:
             '^beta$'     { 'Beta' }
             '^rc$'       { 'Rc' }
             '^snapshot$' { 'Snapshot' }
+            # android / linux 都不占代号（§0A / §0B）：共享 dev 内核版本，渠道常量按 Dev 处理
+            '^android$'  { 'Dev' }
+            '^linux$'    { 'Dev' }
             default      { 'Dev' }
           }
         }
@@ -144,3 +152,57 @@ jobs:
       with:
         name: ${{ matrix.configuration }} ${{ steps.channel.outputs.channel }} ${{ env.describe }}
         path: pcl-next\publish\win-x64\${{ steps.channel.outputs.channel }}\pcl-next.exe
+
+  # ── 跨平台护栏（Linux runner，android / linux 两条平台线共用）──────────
+  # 目的：只验证「无 GUI 内核」在 Linux 上可编译、可测试、可离线自检，
+  # 不产出任何对外制品，也不参与代号发布（《分支与发布规范》§0A.2 / §0B.3）。
+  # 护栏只做一份：两条平台线都从 dev 吸收内核，共用同一套「内核可跨平台」判据，
+  # 各写一份 CI 迟早漂移（AGENTS §0.3.1 的教训）。
+  # 2026-11-07 发现 Directory.Build.props 用反斜杠拼路径会让 Linux 上 Exists() 失效后加的
+  # 机械护栏：若有人把 Windows 专属路径或 WPF 引用重新带进内核，这条 job 会直接失败。
+  # Android APK 构建在 SDK / workload 就绪前**不挂必过门禁**。
+  build-linux:
+    name: Kernel cross-platform guard (Linux)
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v6
+      with:
+        # 构建号按固定锚点以来的提交数推导，浅克隆会让锚点不可达（§5.2.1）
+        fetch-depth: 0
+        submodules: true
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '10.0.x'
+
+    - name: Refresh build number cache
+      shell: bash
+      run: |
+        # 与 Windows job 同源：PclTreePathGuard 要求版本段含构建号，
+        # 而 MSBuild 求值期不能跑 git，故先由脚本落盘。
+        pwsh -File scripts/Get-BuildSmallVersion.ps1 \
+          -RepoRoot "$GITHUB_WORKSPACE" \
+          -CacheFile "$GITHUB_WORKSPACE/pcl-next/obj/pcl-build.small"
+
+    - name: Build download engine
+      run: dotnet build PCL.Download/PCL.Download.csproj -c Release -r linux-x64
+
+    - name: Build CLI (architecture + output path guards)
+      run: dotnet build PCL.Cli/PCL.Cli.csproj -c Release -r linux-x64
+
+    - name: Unit tests
+      run: dotnet test PCL.Download.Tests/PCL.Download.Tests.csproj -c Release
+
+    - name: CLI offline selftest
+      shell: bash
+      run: |
+        dll=$(find bin-net10 -name 'pclcli.dll' -print -quit)
+        if [ -z "$dll" ]; then
+          echo "未找到 pclcli.dll：产物可能未落在 bin-net10 三段树内"
+          exit 1
+        fi
+        echo "CLI 产物：$dll"
+        dotnet "$dll" selftest --suite offline --workdir "$RUNNER_TEMP/pclcli"
