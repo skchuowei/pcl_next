@@ -21,6 +21,7 @@
 | 资源工程 / 版本 / 指纹反查 | 工程查询与版本枚举已由 C# 提供（本轮），UI 侧仍用 VB 模型投影 | ✅ C#（投影保留） |
 | MC 版本清单 | 本轮迁到 `McVersionManifestClient` | ✅ C# |
 | OptiFine / Forge / NeoForge / LiteLoader / Fabric 列表 | 已由 `LoaderListClient` 提供（六类入口全在 C#） | ✅ C#（投影保留） |
+| 本地 Mod 列表扫描 / 在线反查与更新检测 | 本轮改由 `LocalResourceScanner` / `LocalResourceOnlineLoader` 提供 | ✅ C#（投影保留） |
 | 工程批量查询（`FromProjectIds`） | VB 实现，仅整合包安装使用 | ⬜ |
 | 安装编排（`ModDownloadLib`，2176 行） | VB，与 `MyListItem` / `LoaderTask` 深度耦合 | ⬜ |
 | 下载任务列表 / 进度 | VB `LoaderBase`，底层已由 C# 引擎驱动 | ⬜ |
@@ -70,7 +71,22 @@
   推荐版本改由 C# 读同一份 `Cache/ForgeRecommendedList.json`。
 - `PCL.Download.Tests/LoaderListTests.cs`（新增，571 行，20 例）。
 
-### 4.4 后续（未动）
+### 4.4 第四轮：实例 Mod 页（本地列表与在线反查）
+
+- `PCL.Download/LocalResourceFile.cs`：新增 `PrimeHashes(modrinthSha1, curseForge)`。VB 的指纹有跨运行的
+  `Cache\ModHash.ini` 缓存，C# 的缓存只在进程内——不灌入的话每次启动都要把全部 Mod 重读一遍算哈希。
+- `PCL.Download/LocalResourceOnlineLoader.cs`：`Load` 增加 `isCancelled` 谓词，被取消时返回 `null`
+  （与 `LoaderListClient` 的宿主口径一致）；取消判定收敛到内部 `CancelState`（谓词与 `CancellationToken` 取或），
+  `catch` 过滤器一并改用它，避免把谓词取消误判成「站点失败」。
+- `pcl-next/Modules/Resource/LocalResourceLoaders.vb`：`LocalResourceFileLoad` 改调 `LocalResourceScanner.Scan`
+  （Forge 1.13- 的版本号子目录规则以 `Options.IsLegacyForgeSubfolder` 传入），`LocalResourceOnlineLoad`
+  改调 `LocalResourceOnlineLoader.Load` 并做双向 DTO 投影；保留等待更新、UI 文案、缓存版本校验与落盘、边栏刷新。
+  净 −206 行（345 → 139，+63 / −269）。
+- `pcl-next/Application.xaml.vb`：挂接 `PCL.Download.DownloadLog.InfoSink/WarnSink` → `Logger`（见 §5-15）。
+- `PCL.Download.Tests/LocalResourceOnlineLoaderTests.cs`：新增 4 例（加载器集合不一致不算更新、
+  站点失败不写「已加载」标记、取消返回 null、宿主预置指纹生效）。
+
+### 4.5 后续（未动）
 
 - `pcl-next/Pages/PageDownload/ModDownloadLib.vb`：安装编排的 `LoaderBase` 生成改为 C# 输出。
 - `pcl-next/Pages/PageDownload/Resource/PageDownloadCompDetail.xaml.vb`：资源详情版本列表改由 Provider 提供（已通过 `ResourceVersion.FromProjectId` 转发完成）。
@@ -112,6 +128,17 @@
     LiteLoader 的 `1.8` / `1.9` 文件名补 `.0`——都是旧安装器命名遗留，改了会让已装实例反查不到。
 14. **OptiFine 单镜像源入口**：实例重构与整合包安装反查要「全量且稳定」的清单（官方页会删旧预览版），
     故 `FetchOptiFineMirror` 固定走 BMCLAPI，不受「版本列表源」设置影响，缓存后缀 `mirror` 与主入口分开。
+15. **内核日志此前是黑洞**：`DownloadLog` 只在 `PCL.Cli` 里被挂过 sink，GUI 从未挂接，
+    Phase 3/4 迁进 C# 的候选源、资源站请求、加载器列表、本地反查日志全部写进 `Console`（WPF 里等于丢弃）。
+    用户反馈问题时被要求附 `Log1.txt`，但这些记录一行都不会出现。本版在 `Application_Startup` 里挂接。
+16. **指纹必须由宿主灌入**：`Cache\ModHash.ini` 的跨运行缓存是 VB 侧的资产，C# 侧只有进程内缓存。
+    不 `PrimeHashes` 的话，升级后第一次打开 Mod 页会把整个 mods 目录重读一遍算 SHA1 + MurmurHash
+    （200 个 Mod 的整合包约 1~2 GB 读取），表现为「卡在正在加载 Mod 列表」。
+17. **投影而不是 JSON 中转**：VB `LocalResourceFile` 带 `OnUpdate` 事件与跨运行指纹缓存，且
+    `Project` / `UpdateFile` 的 setter 会触发 UI 刷新；双向都用逐字段投影（`New ResourceProject(Core)` /
+    `New ResourceVersion(Core)`），只有缓存 JSON 需要 `Newtonsoft ↔ System.Text.Json` 转一次。
+18. **缓存落盘仍归宿主**：C# `Load` 只就地改传入的 `JsonObject`，写文件、`version` 字段校验与
+    `ModeDebug` 缩进都在 VB——与 `LocalResourceOnlineLoader` 的类注释一致，也避免内核依赖宿主路径约定。
 
 ## 6. 回归面
 
@@ -133,6 +160,13 @@
 - 实例重构 / 整合包安装的 OptiFine 反查：走 `DlOptiFineListBmclapiLoader` 单镜像源，不随设置变化。
 - 强制刷新：`Loader.IsForceRestarting` 为真时必须重新联网（`forceRestart` 绕过缓存）；
   下载页左栏与实例 Mod 页的刷新按钮行为不变。
+- 实例 Mod 页：本地列表条数 / 顺序 / 启用禁用识别、Forge 1.13- 的「版本号子文件夹」收录规则、
+  同名启用+禁用两份只显示一份。
+- 实例 Mod 页的联网反查：工程名、图标、版本号、「可更新」标记、更新日志链接；缓存命中时（6 小时内）
+  不联网但仍显示信息；强制刷新时重新联网。
+- `Cache\LocalMod.json` 的跨版本兼容：本版改由 System.Text.Json 写出，旧缓存（Newtonsoft 写）仍要能读。
+- Mod 页的「切换启用/禁用」重命名后 `NewModEntity.FromJson(ModEntity.ToJson)` 仍要保住网络信息。
+- `Log1.txt` 里能看到 `PCL.Download` 的日志（如「本地资源在线反查：N 个文件需要联网」）。
 
 ## 7. 验证
 
@@ -158,6 +192,20 @@
 - 另一个坑记一笔：用脚本做「改坏 → 还原」时不能只 `copy2` 回原文件——它会带回旧 mtime，
   MSBuild 判定「无需重编」，后续用例实际跑的是**变异后的程序集**，会得出「用例没守住」的假结论。
   还原后必须刷新时间戳。
+- 第四轮（实例 Mod 页）：`PCL.Download.Tests` 新增 4 例（`LocalResourceOnlineLoaderTests` 8 例中新增
+  加载器集合不一致、站点失败不写标记、取消返回 null、宿主预置指纹），全量 300 例。
+- 第四轮反向验证（同一套脚本口径，改坏 → 跑对应用例 → 还原并刷新时间戳）：
+  ① `IsCacheFresh` 恒 false → `Load_FreshCacheSkipsNetwork` 失败；
+  ② 去掉 `update.Loaders.SequenceEqual(...)` 判定 → `Load_ModrinthUpdateWithDifferentLoaders_IsIgnored` 失败；
+  ③ `entry.OnlineDataLoaded = !failed` 改成恒 `true` → `Load_RequestFailed_DoesNotMarkCacheAsLoaded` 失败
+  （这条直接对应「失败后下次启动还会不会重试」）；
+  ④ `CancelState.IsCanceled` 只看 `CancellationToken` → `Load_Canceled_ReturnsNullAndStops` 失败；
+  ⑤ `PrimeHashes` 丢掉宿主预置的 SHA1 → `PrimeHashes_OverridesFileDerivedFingerprints` 失败。
+  5 条全部被抓住，说明这四个用例确实在守逻辑而不是空跑。
+- 全量 300 例中 299 通过，唯一失败是 `SlowSource_IsRotatedToFastSource` 的
+  `Assert.Contains(logs, "换源" | "禁用")`（不是「第二源未被使用」那条）。该例单独运行必过；
+  把并行工作线的 `DownloadFileTask.cs` 改动暂存回基线后，全量跑同样只有这一条失败——
+  属时序敏感用例受同目录并行构建的机器负载影响，与本轮改动无关，留待引擎侧处理。
 - 顺手修了一个长期偶发失败：`DownloadEngineTests.SlowSource_IsRotatedToFastSource`。
   根因不是引擎，而是夹具——假服务器每 64KB 才 flush 一次，而「最后一块到达」会先走完成分支、
   跳过速度检查；300KB 文件一旦被拆成 4 个 75KB 分块，每块只写两次，「速度过慢换源」永远不会被判定。
@@ -179,3 +227,14 @@
 资源详情页同理：`ResourceVersion.FromProjectId` 与 `ResourceProject.FromProjectId` 的 VB 原实现
 （缓存 + `DlModRequest` 两条分支）保留在 git 历史中，回滚只需还原方法体，
 `Friend Sub New(Source ...)` 与 `ClearCaches` 可留着不删（不参与原路径）。
+
+第四轮（实例 Mod 页）同样只删了 VB 的网络实现，入口与数据结构都在：
+
+- 回滚只需把 `LocalResourceLoaders.vb` 还原到上一版（419 行 → git 历史），
+  `LocalResourceScanner` / `LocalResourceOnlineLoader` 留在内核不参与即可。
+- 缓存格式未变：`Cache\LocalMod.json` 的键、`version` 字段与各子字段名都没动，只是写出方
+  从 Newtonsoft 换成 System.Text.Json；日期仍是 ISO 8601，Newtonsoft 能正常解析，
+  所以回滚后旧程序读新缓存、新程序读旧缓存都不会炸。
+- `LocalResourceFile.FromJson` / `ToJson` 仍留在 VB 侧（`PageInstanceMod` 切换启用/禁用时用它复制网络信息），
+  没有被删。
+- 新增的 `PrimeHashes` 与本轮引入的 `isCancelled` 参数都是可选/附加的，回滚后无人调用即可。
