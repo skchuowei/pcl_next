@@ -1462,25 +1462,6 @@ Retry:
     End Sub
     Private IsForgeRecommendedRefreshed As Boolean = False
 
-    ''' <summary>
-    ''' 尝试获取某个 MC 版本对应的 Forge 推荐版本。如果不可用会返回 Nothing。
-    ''' </summary>
-    Public Function McDownloadForgeRecommendedGet(McVersionName As String) As String
-        Try
-            If McVersionName Is Nothing Then Return Nothing
-            Dim List As String = FileUtils.TryReadAsString(PathTemp & "Cache\ForgeRecommendedList.json")
-            If String.IsNullOrEmpty(List) Then
-                Logger.Info("没有 Forge 推荐版本缓存文件")
-                Return Nothing
-            End If
-            Dim Json As JObject = List.DeserializeJson()
-            If Json Is Nothing OrElse (Not If(McVersionName, "").Contains(".")) OrElse Not Json.ContainsKey(McVersionName) Then Return Nothing
-            Return If(Json(McVersionName), "").ToString
-        Catch ex As Exception
-            Logger.Error(ex, $"获取 Forge 推荐版本失败（{If(McVersionName, "null")}）")
-            Return Nothing
-        End Try
-    End Function
 
 #End Region
 

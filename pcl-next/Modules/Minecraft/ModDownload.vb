@@ -312,6 +312,23 @@ Public Module ModDownload
 
 #End Region
 
+#Region "加载器列表 | 取数与解析已迁至 C#"
+
+    ''' <summary>
+    ''' 加载器列表获取器。取数、候选源排期与解析都在 PCL.Download，本模块只做投影与状态管理。
+    ''' </summary>
+    ''' 用模块级单例，是因为 C# 侧的实例内缓存对应原来各子加载器的「已加载结果复用」。
+    Private ReadOnly DlLoaderListClient As New PCL.Download.LoaderListClient()
+
+    ''' <summary>
+    ''' 当前设置的版本列表源偏好（对应 VB 设置项 ToolDownloadVersion）。
+    ''' </summary>
+    Private Function DlLoaderSourceMode() As PCL.Download.McVersionSourceMode
+        Return CType(Settings.Get(Of Integer)("ToolDownloadVersion"), PCL.Download.McVersionSourceMode)
+    End Function
+
+#End Region
+
 #Region "DlOptiFineList | OptiFine 版本列表"
 
     Public Structure DlOptiFineListResult
@@ -374,88 +391,51 @@ Public Module ModDownload
     ''' </summary>
     Public DlOptiFineListLoader As New LoaderTask(Of Integer, DlOptiFineListResult)("DlOptiFineList Main", AddressOf DlOptiFineListMain)
     Private Sub DlOptiFineListMain(Loader As LoaderTask(Of Integer, DlOptiFineListResult))
-        Select Case Settings.Get(Of Integer)("ToolDownloadVersion")
-            Case 0
-                DlSourceLoader(Loader, New List(Of KeyValuePair(Of LoaderTask(Of Integer, DlOptiFineListResult), Integer)) From {
-                    New KeyValuePair(Of LoaderTask(Of Integer, DlOptiFineListResult), Integer)(DlOptiFineListBmclapiLoader, 30),
-                    New KeyValuePair(Of LoaderTask(Of Integer, DlOptiFineListResult), Integer)(DlOptiFineListOfficialLoader, 30 + 60)
-                }, Loader.IsForceRestarting)
-            Case 1
-                DlSourceLoader(Loader, New List(Of KeyValuePair(Of LoaderTask(Of Integer, DlOptiFineListResult), Integer)) From {
-                    New KeyValuePair(Of LoaderTask(Of Integer, DlOptiFineListResult), Integer)(DlOptiFineListOfficialLoader, 5),
-                    New KeyValuePair(Of LoaderTask(Of Integer, DlOptiFineListResult), Integer)(DlOptiFineListBmclapiLoader, 5 + 30)
-                }, Loader.IsForceRestarting)
-            Case Else
-                DlSourceLoader(Loader, New List(Of KeyValuePair(Of LoaderTask(Of Integer, DlOptiFineListResult), Integer)) From {
-                    New KeyValuePair(Of LoaderTask(Of Integer, DlOptiFineListResult), Integer)(DlOptiFineListOfficialLoader, 60),
-                    New KeyValuePair(Of LoaderTask(Of Integer, DlOptiFineListResult), Integer)(DlOptiFineListBmclapiLoader, 60 + 60)
-                }, Loader.IsForceRestarting)
-        End Select
+        Dim Result = DlLoaderListClient.FetchOptiFine(DlLoaderSourceMode(), Loader.IsForceRestarting,
+                                                     Function() Loader.IsCanceled)
+        If Result Is Nothing Then Return '已取消
+        Dim Versions As New List(Of DlOptiFineListEntry)(Result.Items.Count)
+        For Each Item In Result.Items
+            Versions.Add(New DlOptiFineListEntry With {
+                .DisplayName = Item.DisplayName,
+                .FileName = Item.FileName,
+                .InstanceName = Item.InstanceName,
+                .IsPreview = Item.IsPreview,
+                .Inherit = Item.Inherit,
+                .ReleaseTime = Item.ReleaseTime,
+                .RequiredForgeVersion = Item.RequiredForgeVersion
+            })
+        Next
+        Loader.Output = New DlOptiFineListResult With {
+            .IsOfficial = Result.IsOfficial, .SourceName = Result.SourceName, .Value = Versions}
     End Sub
 
     ''' <summary>
-    ''' OptiFine 版本列表，官方源。
+    ''' OptiFine 版本列表，BMCLAPI 单源加载器。
     ''' </summary>
-    Public DlOptiFineListOfficialLoader As New LoaderTask(Of Integer, DlOptiFineListResult)("DlOptiFineList Official", AddressOf DlOptiFineListOfficialMain)
-    Private Sub DlOptiFineListOfficialMain(Loader As LoaderTask(Of Integer, DlOptiFineListResult))
-        Dim Result As String = NetRequestByClientRetry("https://optifine.net/downloads", Encoding:=Encoding.Default)
-        If Result.Length < 200 Then Throw New Exception("获取到的版本列表长度不足（" & Result & "）")
-        Try
-            '获取所有版本信息
-            Dim Forge As List(Of String) = Result.RegexSearch("(?<=colForge'>)[^<]*").ToList
-            Dim ReleaseTime As List(Of String) = Result.RegexSearch("(?<=colDate'>)[^<]+").ToList
-            Dim Name As List(Of String) = Result.RegexSearch("(?<=OptiFine_)[0-9A-Za-z_.]+(?=.jar"")").ToList
-            If Not ReleaseTime.Count = Name.Count Then Throw New Exception("版本与发布时间数据无法对应")
-            If Not Forge.Count = Name.Count Then Throw New Exception("版本与 Forge 兼容数据无法对应")
-            If ReleaseTime.Count < 10 Then Throw New Exception("获取到的版本数量不足（" & Result & "）")
-            '转化为列表输出
-            Dim Versions As New List(Of DlOptiFineListEntry)
-            For i = 0 To ReleaseTime.Count - 1
-                Name(i) = Name(i).Replace("_", " ")
-                Dim Entry As New DlOptiFineListEntry With {
-                    .DisplayName = Name(i).Replace("HD U ", "").Replace(".0 ", " "),
-                    .ReleaseTime = {ReleaseTime(i).Split(".")(2), ReleaseTime(i).Split(".")(1), ReleaseTime(i).Split(".")(0)}.Join("/"c),
-                    .IsPreview = Name(i).ContainsIgnoreCase("pre"),
-                    .Inherit = Name(i).ToString.Split(" ")(0),
-                    .FileName = If(Name(i).ContainsIgnoreCase("pre"), "preview_", "") & "OptiFine_" & Name(i).Replace(" ", "_") & ".jar",
-                    .RequiredForgeVersion = Forge(i).Replace("Forge ", "").Replace("#", "")}
-                If Entry.RequiredForgeVersion.Contains("N/A") Then Entry.RequiredForgeVersion = Nothing
-                Entry.InstanceName = Entry.Inherit & "-OptiFine_" & Name(i).AfterFirst(" ").Replace(" ", "_")
-                Versions.Add(Entry)
-            Next
-            Loader.Output = New DlOptiFineListResult With {.IsOfficial = True, .SourceName = "OptiFine 官方源", .Value = Versions}
-        Catch ex As Exception
-            Throw New Exception("OptiFine 官方源版本列表解析失败（" & Result & "）", ex)
-        End Try
-    End Sub
-
-    ''' <summary>
-    ''' OptiFine 版本列表，BMCLAPI。
-    ''' </summary>
+    ''' <remarks>
+    ''' 官方页会删掉旧预览版，实例重构与整合包安装需要一份「全量且稳定」的清单，故固定用镜像源，
+    ''' 不受版本列表源设置影响。
+    ''' </remarks>
     Public DlOptiFineListBmclapiLoader As New LoaderTask(Of Integer, DlOptiFineListResult)("DlOptiFineList Bmclapi", AddressOf DlOptiFineListBmclapiMain)
     Private Sub DlOptiFineListBmclapiMain(Loader As LoaderTask(Of Integer, DlOptiFineListResult))
-        Dim Json As JArray = NetRequestByClientRetry("https://bmclapi2.bangbang93.com/optifine/versionList", RequireJson:=True).DeserializeJson()
-        Try
-            Dim Versions As New List(Of DlOptiFineListEntry)
-            For Each Token As JObject In Json
-                Dim Entry As New DlOptiFineListEntry With {
-                    .DisplayName = (Token("mcversion").ToString & Token("type").ToString.Replace("HD_U", "").Replace("_", " ") & " " & Token("patch").ToString).Replace(".0 ", " "),
-                    .ReleaseTime = "",
-                    .IsPreview = Token("patch").ToString.ContainsIgnoreCase("pre"),
-                    .Inherit = Token("mcversion").ToString,
-                    .FileName = Token("filename").ToString,
-                    .RequiredForgeVersion = If(Token("forge"), "").ToString.Replace("Forge ", "").Replace("#", "")
-                }
-                If Entry.RequiredForgeVersion.Contains("N/A") Then Entry.RequiredForgeVersion = Nothing
-                Entry.InstanceName = Entry.Inherit & "-OptiFine_" & (Token("type").ToString & " " & Token("patch").ToString).Replace(".0 ", " ").Replace(" ", "_").Replace(Entry.Inherit & "_", "")
-                Versions.Add(Entry)
-            Next
-            Loader.Output = New DlOptiFineListResult With {.IsOfficial = False, .SourceName = "BMCLAPI", .Value = Versions}
-        Catch ex As Exception
-            Throw New Exception("OptiFine BMCLAPI 版本列表解析失败（" & Json.ToString & "）", ex)
-        End Try
+        Dim Result = DlLoaderListClient.FetchOptiFineMirror(Loader.IsForceRestarting, Function() Loader.IsCanceled)
+        If Result Is Nothing Then Return '已取消
+        Dim Versions As New List(Of DlOptiFineListEntry)(Result.Items.Count)
+        For Each Item In Result.Items
+            Versions.Add(New DlOptiFineListEntry With {
+                .DisplayName = Item.DisplayName,
+                .FileName = Item.FileName,
+                .InstanceName = Item.InstanceName,
+                .IsPreview = Item.IsPreview,
+                .Inherit = Item.Inherit,
+                .ReleaseTime = Item.ReleaseTime,
+                .RequiredForgeVersion = Item.RequiredForgeVersion
+            })
+        Next
+        Loader.Output = New DlOptiFineListResult With {
+            .IsOfficial = Result.IsOfficial, .SourceName = Result.SourceName, .Value = Versions}
     End Sub
-
 #End Region
 
 #Region "DlForgeList | Forge Minecraft 版本列表"
@@ -480,51 +460,12 @@ Public Module ModDownload
     ''' </summary>
     Public DlForgeListLoader As New LoaderTask(Of Integer, DlForgeListResult)("DlForgeList Main", AddressOf DlForgeListMain)
     Private Sub DlForgeListMain(Loader As LoaderTask(Of Integer, DlForgeListResult))
-        Select Case Settings.Get(Of Integer)("ToolDownloadVersion")
-            Case 0
-                DlSourceLoader(Loader, New List(Of KeyValuePair(Of LoaderTask(Of Integer, DlForgeListResult), Integer)) From {
-                    New KeyValuePair(Of LoaderTask(Of Integer, DlForgeListResult), Integer)(DlForgeListBmclapiLoader, 30),
-                    New KeyValuePair(Of LoaderTask(Of Integer, DlForgeListResult), Integer)(DlForgeListOfficialLoader, 30 + 60)
-                }, Loader.IsForceRestarting)
-            Case 1
-                DlSourceLoader(Loader, New List(Of KeyValuePair(Of LoaderTask(Of Integer, DlForgeListResult), Integer)) From {
-                    New KeyValuePair(Of LoaderTask(Of Integer, DlForgeListResult), Integer)(DlForgeListOfficialLoader, 5),
-                    New KeyValuePair(Of LoaderTask(Of Integer, DlForgeListResult), Integer)(DlForgeListBmclapiLoader, 5 + 30)
-                }, Loader.IsForceRestarting)
-            Case Else
-                DlSourceLoader(Loader, New List(Of KeyValuePair(Of LoaderTask(Of Integer, DlForgeListResult), Integer)) From {
-                    New KeyValuePair(Of LoaderTask(Of Integer, DlForgeListResult), Integer)(DlForgeListOfficialLoader, 60),
-                    New KeyValuePair(Of LoaderTask(Of Integer, DlForgeListResult), Integer)(DlForgeListBmclapiLoader, 60 + 60)
-                }, Loader.IsForceRestarting)
-        End Select
+        Dim Result = DlLoaderListClient.FetchForgeGameVersions(DlLoaderSourceMode(), Loader.IsForceRestarting,
+                                                              Function() Loader.IsCanceled)
+        If Result Is Nothing Then Return '已取消
+        Loader.Output = New DlForgeListResult With {
+            .IsOfficial = Result.IsOfficial, .SourceName = Result.SourceName, .Value = Result.Items.ToList()}
     End Sub
-
-    ''' <summary>
-    ''' Forge 版本列表，官方源。
-    ''' </summary>
-    Public DlForgeListOfficialLoader As New LoaderTask(Of Integer, DlForgeListResult)("DlForgeList Official", AddressOf DlForgeListOfficialMain)
-    Private Sub DlForgeListOfficialMain(Loader As LoaderTask(Of Integer, DlForgeListResult))
-        Dim Result As String = NetRequestByClientRetry("https://files.minecraftforge.net/maven/net/minecraftforge/forge/index_1.2.4.html", Encoding:=Encoding.Default, Accept:="text/html", SimulateBrowserHeaders:=True)
-        If Result.Length < 200 Then Throw New Exception("获取到的版本列表长度不足（" & Result & "）")
-        '获取所有版本信息
-        Dim Names As List(Of String) = Result.RegexSearch("(?<=a href=""index_)[0-9.]+((_pre|[_-]snapshot[_-]?)[0-9]?)?(?=.html)").ToList
-        Names.Add("1.2.4") '1.2.4 不会被匹配上
-        If Names.Count < 10 Then Throw New Exception("获取到的版本数量不足（" & Result & "）")
-        Loader.Output = New DlForgeListResult With {.IsOfficial = True, .SourceName = "Forge 官方源", .Value = Names}
-    End Sub
-
-    ''' <summary>
-    ''' Forge 版本列表，BMCLAPI。
-    ''' </summary>
-    Public DlForgeListBmclapiLoader As New LoaderTask(Of Integer, DlForgeListResult)("DlForgeList Bmclapi", AddressOf DlForgeListBmclapiMain)
-    Private Sub DlForgeListBmclapiMain(Loader As LoaderTask(Of Integer, DlForgeListResult))
-        Dim Result As JArray = NetRequestByClientRetry("https://bmclapi2.bangbang93.com/forge/minecraft",
-                                                       Encoding:=Encoding.Default, RequireJson:=True).DeserializeJson()
-        Dim Names As List(Of String) = Result.Select(Function(v) v.ToString).ToList
-        If Names.Count < 10 Then Throw New Exception("获取到的版本数量不足")
-        Loader.Output = New DlForgeListResult With {.IsOfficial = False, .SourceName = "BMCLAPI", .Value = Names}
-    End Sub
-
 #End Region
 
 #Region "DlForgeVersion | Forge 版本列表"
@@ -627,154 +568,22 @@ Public Module ModDownload
     ''' Forge 版本列表，主加载器。
     ''' </summary>
     Public Sub DlForgeVersionMain(Loader As LoaderTask(Of String, List(Of DlForgeVersionEntry)))
-        Dim DlForgeVersionOfficialLoader As New LoaderTask(Of String, List(Of DlForgeVersionEntry))("DlForgeVersion Official", AddressOf DlForgeVersionOfficialMain)
-        Dim DlForgeVersionBmclapiLoader As New LoaderTask(Of String, List(Of DlForgeVersionEntry))("DlForgeVersion Bmclapi", AddressOf DlForgeVersionBmclapiMain)
-        Select Case Settings.Get(Of Integer)("ToolDownloadVersion")
-            Case 0
-                DlSourceLoader(Loader, New List(Of KeyValuePair(Of LoaderTask(Of String, List(Of DlForgeVersionEntry)), Integer)) From {
-                    New KeyValuePair(Of LoaderTask(Of String, List(Of DlForgeVersionEntry)), Integer)(DlForgeVersionBmclapiLoader, 30),
-                    New KeyValuePair(Of LoaderTask(Of String, List(Of DlForgeVersionEntry)), Integer)(DlForgeVersionOfficialLoader, 30 + 60)
-                }, Loader.IsForceRestarting)
-            Case 1
-                DlSourceLoader(Loader, New List(Of KeyValuePair(Of LoaderTask(Of String, List(Of DlForgeVersionEntry)), Integer)) From {
-                    New KeyValuePair(Of LoaderTask(Of String, List(Of DlForgeVersionEntry)), Integer)(DlForgeVersionOfficialLoader, 5),
-                    New KeyValuePair(Of LoaderTask(Of String, List(Of DlForgeVersionEntry)), Integer)(DlForgeVersionBmclapiLoader, 5 + 30)
-                }, Loader.IsForceRestarting)
-            Case Else
-                DlSourceLoader(Loader, New List(Of KeyValuePair(Of LoaderTask(Of String, List(Of DlForgeVersionEntry)), Integer)) From {
-                    New KeyValuePair(Of LoaderTask(Of String, List(Of DlForgeVersionEntry)), Integer)(DlForgeVersionOfficialLoader, 60),
-                    New KeyValuePair(Of LoaderTask(Of String, List(Of DlForgeVersionEntry)), Integer)(DlForgeVersionBmclapiLoader, 60 + 60)
-                }, Loader.IsForceRestarting)
-        End Select
-    End Sub
-
-    ''' <summary>
-    ''' Forge 版本列表，官方源。
-    ''' </summary>
-    Public Sub DlForgeVersionOfficialMain(Loader As LoaderTask(Of String, List(Of DlForgeVersionEntry)))
-        Dim Result As String
-        Try
-            Result = NetRequestByLoader("https://files.minecraftforge.net/maven/net/minecraftforge/forge/index_" &
-                                          Loader.Input.Replace("-", "_") & '兼容 Forge 1.7.10-pre4，#4057
-                                          ".html", SimulateBrowserHeaders:=True)
-        Catch ex As Exception
-            If ex.GetDisplay(False).Contains("(404)") Then
-                Throw New Exception("无")
-            Else
-                Throw
-            End If
-        End Try
-        If Result.Length < 1000 Then Throw New Exception("获取到的版本列表长度不足（" & Result & "）")
-        Dim Versions As New List(Of DlForgeVersionEntry)
-        Try
-            '分割版本信息
-            Dim VersionCodes = Result.Substring(0, Result.LastIndexOfF("</table>")).Split("<td class=""download-version")
-            '获取所有版本信息
-            For i = 1 To VersionCodes.Count - 1
-                Dim VersionCode = VersionCodes(i)
-                Try
-                    '基础信息获取
-                    Dim Name As String = VersionCode.RegexSeek("(?<=[^(0-9)]+)[0-9\.]+")
-                    Dim IsRecommended As Boolean = VersionCode.Contains("fa promo-recommended")
-                    Dim Inherit As String = Loader.Input
-                    '分支获取
-                    Dim Branch As String = VersionCode.RegexSeek($"(?<=-{Name}-)[^-""]+(?=-[a-z]+.[a-z]{{3}})")
-                    If String.IsNullOrWhiteSpace(Branch) Then Branch = Nothing
-                    '发布时间获取
-                    Dim ReleaseTimeOriginal = VersionCode.RegexSeek("(?<=""download-time"" title="")[^""]+")
-                    Dim ReleaseTimeSplit = ReleaseTimeOriginal.Split(" -:".ToCharArray) '原格式："2021-02-15 03:24:02"
-                    Dim ReleaseDate As New Date(CInt(ReleaseTimeSplit(0)), CInt(ReleaseTimeSplit(1)), CInt(ReleaseTimeSplit(2)), '年月日
-                                                CInt(ReleaseTimeSplit(3)), CInt(ReleaseTimeSplit(4)), CInt(ReleaseTimeSplit(5)), '时分秒
-                                                0, DateTimeKind.Utc) '以 UTC 时间作为标准
-                    Dim ReleaseTime As String = ReleaseDate.ToLocalTime.ToString("yyyy'/'MM'/'dd HH':'mm") '时区与格式转换
-                    '分类与 MD5 获取
-                    Dim MD5 As String, Category As String
-                    If VersionCode.Contains("classifier-installer""") Then
-                        '类型为 installer.jar，支持范围 ~753 (~ 1.6.1 部分), 738~684 (1.5.2 全部)
-                        VersionCode = VersionCode.Substring(VersionCode.IndexOfF("installer.jar"))
-                        MD5 = VersionCode.RegexSeek("(?<=MD5:</strong> )[^<]+")
-                        Category = "installer"
-                    ElseIf VersionCode.Contains("classifier-universal""") Then
-                        '类型为 universal.zip，支持范围 751~449 (1.6.1 部分), 682~183 (1.5.1 ~ 1.3.2 部分)
-                        VersionCode = VersionCode.Substring(VersionCode.IndexOfF("universal.zip"))
-                        MD5 = VersionCode.RegexSeek("(?<=MD5:</strong> )[^<]+")
-                        Category = "universal"
-                    ElseIf VersionCode.Contains("client.zip") Then
-                        '类型为 client.zip，支持范围 182~ (1.3.2 部分 ~)
-                        VersionCode = VersionCode.Substring(VersionCode.IndexOfF("client.zip"))
-                        MD5 = VersionCode.RegexSeek("(?<=MD5:</strong> )[^<]+")
-                        Category = "client"
-                    Else
-                        '没有任何下载（1.6.4 有一部分这种情况）
-                        Continue For
-                    End If
-                    '添加进列表
-                    Versions.Add(New DlForgeVersionEntry(Name, Branch, Inherit) With {.Category = Category, .IsRecommended = IsRecommended, .Hash = MD5.ReplaceLineEndings(""), .ReleaseTime = ReleaseTime})
-                Catch ex As Exception
-                    Throw New Exception("Forge 官方源版本信息提取失败（" & VersionCode & "）", ex)
-                End Try
-            Next
-        Catch ex As Exception
-            Throw New Exception("Forge 官方源版本列表解析失败（" & Result & "）", ex)
-        End Try
-        If Not Versions.Any() Then Throw New Exception("无")
+        Dim RecommendedPath As String = PathTemp & "Cache\ForgeRecommendedList.json"
+        Dim Result = DlLoaderListClient.FetchForgeVersions(Loader.Input, RecommendedPath, DlLoaderSourceMode(),
+                                                          Loader.IsForceRestarting, Function() Loader.IsCanceled)
+        If Result Is Nothing Then Return '已取消
+        Dim Versions As New List(Of DlForgeVersionEntry)(Result.Items.Count)
+        For Each Item In Result.Items
+            '分支与「司马版本」等特例已由 C# 侧施加，这里复用 VB 构造函数保证字段与旧实现一致
+            Versions.Add(New DlForgeVersionEntry(Item.VersionName, Item.Branch, Item.Inherit) With {
+                .Category = Item.Category,
+                .IsRecommended = Item.IsRecommended,
+                .Hash = Item.Hash,
+                .ReleaseTime = Item.ReleaseTime
+            })
+        Next
         Loader.Output = Versions
     End Sub
-
-    ''' <summary>
-    ''' Forge 版本列表，BMCLAPI。
-    ''' </summary>
-    Public Sub DlForgeVersionBmclapiMain(Loader As LoaderTask(Of String, List(Of DlForgeVersionEntry)))
-        Dim Json As JArray = NetRequestByClientRetry("https://bmclapi2.bangbang93.com/forge/minecraft/" &
-            Loader.Input.Replace("-", "_"), RequireJson:=True).DeserializeJson() '兼容 Forge 1.7.10-pre4，#4057
-        Dim Versions As New List(Of DlForgeVersionEntry)
-        Try
-            Dim Recommended As String = McDownloadForgeRecommendedGet(Loader.Input)
-            For Each Token As JObject In Json
-                '分类与 Hash 获取
-                Dim Hash As String = Nothing, Category As String = "unknown", Proi As Integer = -1
-                For Each File As JObject In Token("files")
-                    Select Case File("category").ToString
-                        Case "installer"
-                            If File("format").ToString = "jar" Then
-                                '类型为 installer.jar，支持范围 ~753 (~ 1.6.1 部分), 738~684 (1.5.2 全部)
-                                Hash = File("hash")
-                                Category = "installer"
-                                Proi = 2
-                            End If
-                        Case "universal"
-                            If Proi <= 1 AndAlso File("format").ToString = "zip" Then
-                                '类型为 universal.zip，支持范围 751~449 (1.6.1 部分), 682~183 (1.5.1 ~ 1.3.2 部分)
-                                Hash = File("hash")
-                                Category = "universal"
-                                Proi = 1
-                            End If
-                        Case "client"
-                            If Proi <= 0 AndAlso File("format").ToString = "zip" Then
-                                '类型为 client.zip，支持范围 182~ (1.3.2 部分 ~)
-                                Hash = File("hash")
-                                Category = "client"
-                                Proi = 0
-                            End If
-                    End Select
-                Next
-                '获取 Entry
-                Dim Branch As String = Token("branch")
-                Dim Name As String = Token("version")
-                '基础信息获取
-                Dim Entry = New DlForgeVersionEntry(Name, Branch, Loader.Input) With {.Hash = Hash, .Category = Category, .IsRecommended = Recommended = Name}
-                Dim TimeSplit = Token("modified").ToString.Split("-"c, "T"c, ":"c, "."c, " "c, "/"c)
-                Entry.ReleaseTime = Token("modified").ToObject(Of Date).ToLocalTime.ToString("yyyy'/'MM'/'dd HH':'mm")
-                '添加项
-                Versions.Add(Entry)
-            Next
-        Catch ex As Exception
-            Throw New Exception("Forge BMCLAPI 版本列表解析失败（" & Json.ToString & "）", ex)
-        End Try
-        If Not Versions.Any() Then Throw New Exception("无")
-        Loader.Output = Versions
-    End Sub
-
 #End Region
 
 #Region "DlNeoForgeList | NeoForge 版本列表"
@@ -864,72 +673,17 @@ Public Module ModDownload
     ''' </summary>
     Public DlNeoForgeListLoader As New LoaderTask(Of Integer, DlNeoForgeListResult)("DlNeoForgeList Main", AddressOf DlNeoForgeListMain)
     Private Sub DlNeoForgeListMain(Loader As LoaderTask(Of Integer, DlNeoForgeListResult))
-        Select Case Settings.Get(Of Integer)("ToolDownloadVersion")
-            Case 0
-                DlSourceLoader(Loader, New List(Of KeyValuePair(Of LoaderTask(Of Integer, DlNeoForgeListResult), Integer)) From {
-                    New KeyValuePair(Of LoaderTask(Of Integer, DlNeoForgeListResult), Integer)(DlNeoForgeListBmclapiLoader, 30),
-                    New KeyValuePair(Of LoaderTask(Of Integer, DlNeoForgeListResult), Integer)(DlNeoForgeListOfficialLoader, 30 + 60)
-                }, Loader.IsForceRestarting)
-            Case 1
-                DlSourceLoader(Loader, New List(Of KeyValuePair(Of LoaderTask(Of Integer, DlNeoForgeListResult), Integer)) From {
-                    New KeyValuePair(Of LoaderTask(Of Integer, DlNeoForgeListResult), Integer)(DlNeoForgeListOfficialLoader, 5),
-                    New KeyValuePair(Of LoaderTask(Of Integer, DlNeoForgeListResult), Integer)(DlNeoForgeListBmclapiLoader, 5 + 30)
-                }, Loader.IsForceRestarting)
-            Case Else
-                DlSourceLoader(Loader, New List(Of KeyValuePair(Of LoaderTask(Of Integer, DlNeoForgeListResult), Integer)) From {
-                    New KeyValuePair(Of LoaderTask(Of Integer, DlNeoForgeListResult), Integer)(DlNeoForgeListOfficialLoader, 60),
-                    New KeyValuePair(Of LoaderTask(Of Integer, DlNeoForgeListResult), Integer)(DlNeoForgeListBmclapiLoader, 60 + 60)
-                }, Loader.IsForceRestarting)
-        End Select
+        Dim Result = DlLoaderListClient.FetchNeoForge(DlLoaderSourceMode(), Loader.IsForceRestarting,
+                                                     Function() Loader.IsCanceled)
+        If Result Is Nothing Then Return '已取消
+        Dim Versions As New List(Of DlNeoForgeListEntry)(Result.Items.Count)
+        For Each Item In Result.Items
+            '版本号归一化由 VB 构造函数完成（规则与 C# 侧一致），这里只传原始 API 版本名
+            Versions.Add(New DlNeoForgeListEntry(Item.ApiName))
+        Next
+        Loader.Output = New DlNeoForgeListResult With {
+            .IsOfficial = Result.IsOfficial, .SourceName = Result.SourceName, .Value = Versions}
     End Sub
-
-    ''' <summary>
-    ''' NeoForge 版本列表，官方源。
-    ''' </summary>
-    Public DlNeoForgeListOfficialLoader As New LoaderTask(Of Integer, DlNeoForgeListResult)("DlNeoForgeList Official", AddressOf DlNeoForgeListOfficialMain)
-    Private Sub DlNeoForgeListOfficialMain(Loader As LoaderTask(Of Integer, DlNeoForgeListResult))
-        '获取版本列表 JSON
-        Dim ResultLatest As String = NetRequestByClientRetry("https://maven.neoforged.net/api/maven/versions/releases/net/neoforged/neoforge", RequireJson:=True)
-        Dim ResultLegacy As String = NetRequestByClientRetry("https://maven.neoforged.net/api/maven/versions/releases/net/neoforged/forge", RequireJson:=True)
-        If ResultLatest.Length < 100 OrElse ResultLegacy.Length < 100 Then Throw New Exception("获取到的版本列表长度不足（" & ResultLatest & "）")
-        '解析
-        Try
-            Loader.Output = New DlNeoForgeListResult With {.IsOfficial = True, .SourceName = "NeoForge 官方源",
-                .Value = GetNeoForgeEntries(ResultLatest, ResultLegacy)}
-        Catch ex As Exception
-            Throw New Exception("NeoForge 官方源版本列表解析失败（" & ResultLatest & vbCrLf & vbCrLf & ResultLegacy & "）", ex)
-        End Try
-    End Sub
-
-    ''' <summary>
-    ''' NeoForge 版本列表，BMCLAPI。
-    ''' </summary>
-    Public DlNeoForgeListBmclapiLoader As New LoaderTask(Of Integer, DlNeoForgeListResult)("DlNeoForgeList Bmclapi", AddressOf DlNeoForgeListBmclapiMain)
-    Public Sub DlNeoForgeListBmclapiMain(Loader As LoaderTask(Of Integer, DlNeoForgeListResult))
-        '获取版本列表 JSON
-        Dim ResultLatest As String = NetRequestByClientRetry("https://bmclapi2.bangbang93.com/neoforge/meta/api/maven/details/releases/net/neoforged/neoforge", RequireJson:=True)
-        Dim ResultLegacy As String = NetRequestByClientRetry("https://bmclapi2.bangbang93.com/neoforge/meta/api/maven/details/releases/net/neoforged/forge", RequireJson:=True)
-        If ResultLatest.Length < 100 OrElse ResultLegacy.Length < 100 Then Throw New Exception("获取到的版本列表长度不足（" & ResultLatest & "）")
-        '解析
-        Try
-            Loader.Output = New DlNeoForgeListResult With {.IsOfficial = True, .SourceName = "BMCLAPI",
-                .Value = GetNeoForgeEntries(ResultLatest, ResultLegacy)}
-        Catch ex As Exception
-            Throw New Exception("NeoForge BMCLAPI 版本列表解析失败（" & ResultLatest & vbCrLf & vbCrLf & ResultLegacy & "）", ex)
-        End Try
-    End Sub
-
-    Private Function GetNeoForgeEntries(LatestJson As String, LatestLegacyJson As String) As List(Of DlNeoForgeListEntry)
-        Dim VersionNames = (LatestLegacyJson & LatestJson).RegexSearch(
-            "(?<="")(1\.20\.1-)?\d+\.[^\.]+\.\d+(\.\d+)?(-(beta|alpha)(\.\d+)?)?(\+snapshot-\d+)?(?="")")
-        Dim Versions = VersionNames.
-            Where(Function(name) name <> "47.1.82"). '这个版本虽然在版本列表中，但不能下载
-            Select(Function(name) New DlNeoForgeListEntry(name)).
-            OrderByDescending(Function(a) a).ToList
-        If Not Versions.Any() Then Throw New Exception("无")
-        Return Versions
-    End Function
-
 #End Region
 
 #Region "DlLiteLoaderList | LiteLoader 版本列表"
@@ -989,81 +743,24 @@ Public Module ModDownload
     ''' </summary>
     Public DlLiteLoaderListLoader As New LoaderTask(Of Integer, DlLiteLoaderListResult)("DlLiteLoaderList Main", AddressOf DlLiteLoaderListMain)
     Private Sub DlLiteLoaderListMain(Loader As LoaderTask(Of Integer, DlLiteLoaderListResult))
-        Select Case Settings.Get(Of Integer)("ToolDownloadVersion")
-            Case 0
-                DlSourceLoader(Loader, New List(Of KeyValuePair(Of LoaderTask(Of Integer, DlLiteLoaderListResult), Integer)) From {
-                    New KeyValuePair(Of LoaderTask(Of Integer, DlLiteLoaderListResult), Integer)(DlLiteLoaderListBmclapiLoader, 30),
-                    New KeyValuePair(Of LoaderTask(Of Integer, DlLiteLoaderListResult), Integer)(DlLiteLoaderListOfficialLoader, 30 + 60)
-                }, Loader.IsForceRestarting)
-            Case 1
-                DlSourceLoader(Loader, New List(Of KeyValuePair(Of LoaderTask(Of Integer, DlLiteLoaderListResult), Integer)) From {
-                    New KeyValuePair(Of LoaderTask(Of Integer, DlLiteLoaderListResult), Integer)(DlLiteLoaderListOfficialLoader, 5),
-                    New KeyValuePair(Of LoaderTask(Of Integer, DlLiteLoaderListResult), Integer)(DlLiteLoaderListBmclapiLoader, 5 + 30)
-                }, Loader.IsForceRestarting)
-            Case Else
-                DlSourceLoader(Loader, New List(Of KeyValuePair(Of LoaderTask(Of Integer, DlLiteLoaderListResult), Integer)) From {
-                    New KeyValuePair(Of LoaderTask(Of Integer, DlLiteLoaderListResult), Integer)(DlLiteLoaderListOfficialLoader, 60),
-                    New KeyValuePair(Of LoaderTask(Of Integer, DlLiteLoaderListResult), Integer)(DlLiteLoaderListBmclapiLoader, 60 + 60)
-                }, Loader.IsForceRestarting)
-        End Select
+        Dim Result = DlLoaderListClient.FetchLiteLoader(DlLoaderSourceMode(), Loader.IsForceRestarting,
+                                                       Function() Loader.IsCanceled)
+        If Result Is Nothing Then Return '已取消
+        Dim Versions As New List(Of DlLiteLoaderListEntry)(Result.Items.Count)
+        For Each Item In Result.Items
+            Versions.Add(New DlLiteLoaderListEntry With {
+                .FileName = Item.FileName,
+                .IsPreview = Item.IsPreview,
+                .Inherit = Item.Inherit,
+                .IsLegacy = Item.IsLegacy,
+                .ReleaseTime = Item.ReleaseTime,
+                .MD5 = Item.Md5,
+                .JsonToken = JToken.Parse(Item.RawJson) '安装编排要读 tweakClass / libraries / version
+            })
+        Next
+        Loader.Output = New DlLiteLoaderListResult With {
+            .IsOfficial = Result.IsOfficial, .SourceName = Result.SourceName, .Value = Versions}
     End Sub
-
-    ''' <summary>
-    ''' LiteLoader 版本列表，官方源。
-    ''' </summary>
-    Public DlLiteLoaderListOfficialLoader As New LoaderTask(Of Integer, DlLiteLoaderListResult)("DlLiteLoaderList Official", AddressOf DlLiteLoaderListOfficialMain)
-    Private Sub DlLiteLoaderListOfficialMain(Loader As LoaderTask(Of Integer, DlLiteLoaderListResult))
-        Dim Result As JObject = NetRequestByClientRetry("https://dl.liteloader.com/versions/versions.json", RequireJson:=True).DeserializeJson()
-        Try
-            Dim Json As JObject = Result("versions")
-            Dim Versions As New List(Of DlLiteLoaderListEntry)
-            For Each Pair As KeyValuePair(Of String, JToken) In Json
-                If Pair.Key.StartsWithF("1.6") OrElse Pair.Key.StartsWithF("1.5") Then Continue For
-                Dim RealEntry As JToken = If(Pair.Value("artefacts"), Pair.Value("snapshots"))("com.mumfrey:liteloader")("latest")
-                Versions.Add(New DlLiteLoaderListEntry With {
-                             .Inherit = Pair.Key,
-                             .IsLegacy = Pair.Key.Split(".")(1) < 8,
-                             .IsPreview = RealEntry("stream").ToString.Lower = "snapshot",
-                             .FileName = "liteloader-installer-" & Pair.Key & If(Pair.Key = "1.8" OrElse Pair.Key = "1.9", ".0", "") & "-00-SNAPSHOT.jar",
-                             .MD5 = RealEntry("md5"),
-                             .ReleaseTime = GetLocalTime(GetDate(RealEntry("timestamp"))).ToString("yyyy'/'MM'/'dd HH':'mm"),
-                             .JsonToken = RealEntry
-                         })
-            Next
-            Loader.Output = New DlLiteLoaderListResult With {.IsOfficial = True, .SourceName = "LiteLoader 官方源", .Value = Versions}
-        Catch ex As Exception
-            Throw New Exception("LiteLoader 官方源版本列表解析失败（" & Result.ToString & "）", ex)
-        End Try
-    End Sub
-
-    ''' <summary>
-    ''' LiteLoader 版本列表，BMCLAPI。
-    ''' </summary>
-    Public DlLiteLoaderListBmclapiLoader As New LoaderTask(Of Integer, DlLiteLoaderListResult)("DlLiteLoaderList Bmclapi", AddressOf DlLiteLoaderListBmclapiMain)
-    Private Sub DlLiteLoaderListBmclapiMain(Loader As LoaderTask(Of Integer, DlLiteLoaderListResult))
-        Dim Result As JObject = NetRequestByClientRetry("https://bmclapi2.bangbang93.com/maven/com/mumfrey/liteloader/versions.json", RequireJson:=True).DeserializeJson()
-        Try
-            Dim Json As JObject = Result("versions")
-            Dim Versions As New List(Of DlLiteLoaderListEntry)
-            For Each Pair As KeyValuePair(Of String, JToken) In Json
-                If Pair.Key.StartsWithF("1.6") OrElse Pair.Key.StartsWithF("1.5") Then Continue For
-                Dim RealEntry As JToken = If(Pair.Value("artefacts"), Pair.Value("snapshots"))("com.mumfrey:liteloader")("latest")
-                Versions.Add(New DlLiteLoaderListEntry With {
-                             .Inherit = Pair.Key,
-                             .IsLegacy = Pair.Key.Split(".")(1) < 8,
-                             .IsPreview = RealEntry("stream").ToString.Lower = "snapshot",
-                             .FileName = "liteloader-installer-" & Pair.Key & If(Pair.Key = "1.8" OrElse Pair.Key = "1.9", ".0", "") & "-00-SNAPSHOT.jar",
-                             .MD5 = RealEntry("md5"),
-                             .ReleaseTime = GetLocalTime(GetDate(RealEntry("timestamp"))).ToString("yyyy'/'MM'/'dd HH':'mm"),
-                             .JsonToken = RealEntry
-                         })
-            Next
-            Loader.Output = New DlLiteLoaderListResult With {.IsOfficial = False, .SourceName = "BMCLAPI", .Value = Versions}
-        Catch ex As Exception
-            Throw New Exception("LiteLoader BMCLAPI 版本列表解析失败（" & Result.ToString & "）", ex)
-        End Try
-    End Sub
-
 #End Region
 
 #Region "DlFabricList | Fabric 列表"
@@ -1088,53 +785,12 @@ Public Module ModDownload
     ''' </summary>
     Public DlFabricListLoader As New LoaderTask(Of Integer, DlFabricListResult)("DlFabricList Main", AddressOf DlFabricListMain)
     Private Sub DlFabricListMain(Loader As LoaderTask(Of Integer, DlFabricListResult))
-        Select Case Settings.Get(Of Integer)("ToolDownloadVersion")
-            Case 0
-                DlSourceLoader(Loader, New List(Of KeyValuePair(Of LoaderTask(Of Integer, DlFabricListResult), Integer)) From {
-                    New KeyValuePair(Of LoaderTask(Of Integer, DlFabricListResult), Integer)(DlFabricListBmclapiLoader, 30),
-                    New KeyValuePair(Of LoaderTask(Of Integer, DlFabricListResult), Integer)(DlFabricListOfficialLoader, 30 + 60)
-                }, Loader.IsForceRestarting)
-            Case 1
-                DlSourceLoader(Loader, New List(Of KeyValuePair(Of LoaderTask(Of Integer, DlFabricListResult), Integer)) From {
-                    New KeyValuePair(Of LoaderTask(Of Integer, DlFabricListResult), Integer)(DlFabricListOfficialLoader, 5),
-                    New KeyValuePair(Of LoaderTask(Of Integer, DlFabricListResult), Integer)(DlFabricListBmclapiLoader, 5 + 30)
-                }, Loader.IsForceRestarting)
-            Case Else
-                DlSourceLoader(Loader, New List(Of KeyValuePair(Of LoaderTask(Of Integer, DlFabricListResult), Integer)) From {
-                    New KeyValuePair(Of LoaderTask(Of Integer, DlFabricListResult), Integer)(DlFabricListOfficialLoader, 60),
-                    New KeyValuePair(Of LoaderTask(Of Integer, DlFabricListResult), Integer)(DlFabricListBmclapiLoader, 60 + 60)
-                }, Loader.IsForceRestarting)
-        End Select
-    End Sub
-
-    ''' <summary>
-    ''' Fabric 列表，官方源。
-    ''' </summary>
-    Public DlFabricListOfficialLoader As New LoaderTask(Of Integer, DlFabricListResult)("DlFabricList Official", AddressOf DlFabricListOfficialMain)
-    Private Sub DlFabricListOfficialMain(Loader As LoaderTask(Of Integer, DlFabricListResult))
-        Dim Result As JObject = NetRequestByClientRetry("https://meta.fabricmc.net/v2/versions", RequireJson:=True).DeserializeJson()
-        Try
-            Dim Output = New DlFabricListResult With {.IsOfficial = True, .SourceName = "Fabric 官方源", .Value = Result}
-            If Output.Value("game") Is Nothing OrElse Output.Value("loader") Is Nothing OrElse Output.Value("installer") Is Nothing Then Throw New Exception("获取到的列表缺乏必要项")
-            Loader.Output = Output
-        Catch ex As Exception
-            Throw New Exception("Fabric 官方源版本列表解析失败（" & Result.ToString & "）", ex)
-        End Try
-    End Sub
-
-    ''' <summary>
-    ''' Fabric 列表，BMCLAPI。
-    ''' </summary>
-    Public DlFabricListBmclapiLoader As New LoaderTask(Of Integer, DlFabricListResult)("DlFabricList Bmclapi", AddressOf DlFabricListBmclapiMain)
-    Private Sub DlFabricListBmclapiMain(Loader As LoaderTask(Of Integer, DlFabricListResult))
-        Dim Result As JObject = NetRequestByClientRetry("https://bmclapi2.bangbang93.com/fabric-meta/v2/versions", RequireJson:=True).DeserializeJson()
-        Try
-            Dim Output = New DlFabricListResult With {.IsOfficial = False, .SourceName = "BMCLAPI", .Value = Result}
-            If Output.Value("game") Is Nothing OrElse Output.Value("loader") Is Nothing OrElse Output.Value("installer") Is Nothing Then Throw New Exception("获取到的列表缺乏必要项")
-            Loader.Output = Output
-        Catch ex As Exception
-            Throw New Exception("Fabric BMCLAPI 版本列表解析失败（" & Result.ToString & "）", ex)
-        End Try
+        Dim Result = DlLoaderListClient.FetchFabric(DlLoaderSourceMode(), Loader.IsForceRestarting,
+                                                   Function() Loader.IsCanceled)
+        If Result Is Nothing Then Return '已取消
+        'Fabric 元数据按原样 JSON 透传：UI 直接读取 game / loader / installer 三个数组
+        Loader.Output = New DlFabricListResult With {
+            .IsOfficial = Result.IsOfficial, .SourceName = Result.SourceName, .Value = Result.RawJson.DeserializeJson()}
     End Sub
 
     ''' <summary>
@@ -1148,7 +804,6 @@ Public Module ModDownload
     ''' </summary>
     Public DlOptiFabricLoader As New LoaderTask(Of Integer, List(Of ResourceVersion))("OptiFabric List Loader",
         Sub(Task As LoaderTask(Of Integer, List(Of ResourceVersion))) Task.Output = ResourceVersion.FromProjectId("322385", ResourcePlatforms.CurseForge, LoadDependencies:=False))
-
 #End Region
 
 #Region "DlMod | Mod 镜像源请求"
@@ -1296,77 +951,6 @@ Public Module ModDownload
             Replace("mediafilez.forgecdn.net", "mod.mcimirror.top").
             Replace("media.forgecdn.net", "mod.mcimirror.top")
     End Function
-
-    'Loader 自动切换
-    Private Sub DlSourceLoader(Of InputType, OutputType)(MainLoader As LoaderTask(Of InputType, OutputType),
-                                                         LoaderList As List(Of KeyValuePair(Of LoaderTask(Of InputType, OutputType), Integer)),
-                                                         Optional IsForceRestart As Boolean = False)
-        Dim WaitCycle As Integer = 0
-        Do While True
-            '检查状态
-            Dim BeforeLoadersAllFailed As Boolean = True
-            For Each SubLoader In LoaderList
-                If WaitCycle = 0 Then '判断是否可以不加载，直接使用已经加载好的结果
-                    If IsForceRestart Then Continue For '强制刷新，不行
-                    If (SubLoader.Key.Input Is Nothing Xor MainLoader.Input Is Nothing) OrElse
-                       (SubLoader.Key.Input IsNot Nothing AndAlso Not SubLoader.Key.Input.Equals(MainLoader.Input)) Then Continue For '父子加载器的输入不一样，也不行
-                End If
-                If SubLoader.Key.State <> LoadState.Failed Then BeforeLoadersAllFailed = False
-                If SubLoader.Key.State = LoadState.Finished Then
-                    '检查加载器成功
-                    MainLoader.Output = SubLoader.Key.Output
-                    DlSourceLoaderCancel(LoaderList)
-                    Return
-                ElseIf BeforeLoadersAllFailed Then
-                    '此前的加载器全部失败，直接启动后续加载器
-                    If WaitCycle < SubLoader.Value * 100 Then WaitCycle = SubLoader.Value * 100
-                End If
-            Next
-            '第一轮时：既然不直接使用已经加载好的结果，那就启动第一个加载器
-            If WaitCycle = 0 Then
-                LoaderList.First.Key.Start(MainLoader.Input, IsForceRestart)
-                For Each Loader In LoaderList.Skip(1)
-                    Loader.Key.State = LoadState.Waiting '将其他源标记为未启动，以确保可以切换下载源（#184）
-                Next
-            End If
-            '检查加载器失败或超时
-            For i = 0 To LoaderList.Count - 1
-                If WaitCycle <> LoaderList(i).Value * 100 Then Continue For
-                If i < LoaderList.Count - 1 AndAlso Not LoaderList.All(Function(l) l.Key.State = LoadState.Failed) Then
-                    '若还有下一个源，则启动下一个源
-                    LoaderList(i + 1).Key.Start(MainLoader.Input, IsForceRestart)
-                Else
-                    '若没有，则失败
-                    Dim ErrorInfo As Exception = Nothing
-                    For ii = 0 To LoaderList.Count - 1
-                        LoaderList(ii).Key.Input = Nothing '重置输入，以免以同样的输入“重试加载”时直接失败
-                        If LoaderList(ii).Key.Error IsNot Nothing Then
-                            If ErrorInfo Is Nothing OrElse LoaderList(ii).Key.Error.Message = "无" Then
-                                ErrorInfo = LoaderList(ii).Key.Error
-                            End If
-                        End If
-                    Next
-                    If ErrorInfo Is Nothing Then ErrorInfo = New TimeoutException("下载源连接超时")
-                    DlSourceLoaderCancel(LoaderList)
-                    Throw ErrorInfo
-                End If
-                Exit For
-            Next
-            '计时
-            Thread.Sleep(10)
-            WaitCycle += 1
-            '检查父加载器中断
-            If MainLoader.IsCanceled Then
-                DlSourceLoaderCancel(LoaderList)
-                Return
-            End If
-        Loop
-    End Sub
-    Private Sub DlSourceLoaderCancel(Of InputType, OutputType)(LoaderList As List(Of KeyValuePair(Of LoaderTask(Of InputType, OutputType), Integer)))
-        For Each Loader In LoaderList
-            If Loader.Key.State = LoadState.Loading Then Loader.Key.Cancel()
-        Next
-    End Sub
 
 #End Region
 
