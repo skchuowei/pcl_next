@@ -1,19 +1,31 @@
 name: Release
-# 发布任务由版本标签触发，而不是普通构建（《分支与发布规范》§5.3、§6.1）
+# 发布任务由版本标签触发，而不是普通构建（《分支与发布规范》§5.3、§6.1）。
+# 2026-11-07 §0C.3 增补：除主阶梯 v* 外，另开放两条平台发布通道——
+#   linux/v*   同步指针：Linux 制品上传进同名主 tag 对应的同一个 Release；
+#   android/v* 独立节奏：独立的 prerelease Release。
+# 平台归档 tag（linux/<名称>、android/<内核版本>-<N>）不带 v 前缀，不会触发本工作流。
 on:
   push:
     tags:
       - 'v*'
+      - 'linux/v*'
+      - 'android/v*'
   workflow_dispatch:
     inputs:
       tag:
         description: '版本标签，如 v2.100.0.1-alpha.1'
         required: true
         type: string
+    # 平台通道只由 push tag 驱动（§0C.3）：workflow_dispatch 不提供平台参数，
+    # 避免手填 tag 与 ref_name 不一致时解析出错。
 
 jobs:
   release:
-    name: Release
+    name: Release (Windows main ladder)
+    # 平台 tag 也会触发本 workflow，必须把 Windows 主流程排除掉：
+    # 否则 linux/v* 会被当成版本标签解析并创建出错误的 Release（§0C.3）。
+    # workflow_dispatch 时 ref_name 是分支名，条件仍成立，原手动发布行为不变。
+    if: ${{ !startsWith(github.ref_name, 'linux/') && !startsWith(github.ref_name, 'android/') }}
     runs-on: windows-latest
     permissions:
       contents: write
@@ -131,3 +143,203 @@ jobs:
         # alpha / beta / sp 为测试通道，《分支与发布规范》§5.3
         if ('${{ github.ref_name }}' -notmatch '^v[\d\.]+$') { $args += '--prerelease' }
         gh @args
+
+  # ── 平台发布通道：Linux（§0C.3 / §0C.4）──────────────────────────────────
+  # linux/v<...> 是同步指针，必须与同名主阶梯 tag v<...> 成对；
+  # Linux 制品作为多 RID 附件上传进**同一个** GitHub Release，不另建 Release。
+  release-linux:
+    name: Platform channel (linux-x64)
+    if: ${{ startsWith(github.ref_name, 'linux/v') }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v6
+      with:
+        fetch-depth: 0
+        submodules: true
+
+    - name: Resolve sync pointer
+      id: ptr
+      shell: bash
+      run: |
+        tag='${{ github.ref_name }}'
+        main_tag="${tag#linux/}"
+        if [ -z "$main_tag" ]; then echo "::error::空的主 tag"; exit 1; fi
+        # 同步发布的机械保障：没有同名主 tag 就不许发 Linux 版（§0C.4）
+        if ! git rev-parse -q --verify "refs/tags/$main_tag" >/dev/null; then
+          echo "::error::同步指针 $tag 缺少同名主阶梯 tag $main_tag；Linux 必须与 Windows 同步发布（§0C.4）"
+          exit 1
+        fi
+        echo "main_tag=$main_tag" >> "$GITHUB_OUTPUT"
+        echo "Linux 同步指针 $tag -> 主 Release $main_tag"
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '10.0.x'
+
+    - name: Refresh build number cache
+      shell: bash
+      run: |
+        # 与 build-linux 护栏同源：MSBuild 求值期不能跑 git，先落盘构建号
+        pwsh -File scripts/Get-BuildSmallVersion.ps1 \
+          -RepoRoot "$GITHUB_WORKSPACE" \
+          -CacheFile "$GITHUB_WORKSPACE/pcl-next/obj/pcl-build.small"
+
+    - name: Build kernel + CLI (linux-x64)
+      shell: bash
+      run: |
+        dotnet build PCL.Download/PCL.Download.csproj -c Release -r linux-x64
+        dotnet build PCL.Cli/PCL.Cli.csproj -c Release -r linux-x64
+
+    - name: Unit tests + offline selftest
+      shell: bash
+      run: |
+        dotnet test PCL.Download.Tests/PCL.Download.Tests.csproj -c Release
+        dll=$(find bin-net10 -name 'pclcli.dll' -print -quit)
+        if [ -z "$dll" ]; then echo "::error::未找到 pclcli.dll，产物未落在 bin-net10 三段树内"; exit 1; fi
+        dotnet "$dll" selftest --suite offline --workdir "$RUNNER_TEMP/pclcli"
+
+    - name: Package linux-x64 bundle
+      id: pack
+      shell: bash
+      run: |
+        main_tag='${{ steps.ptr.outputs.main_tag }}'
+        version="${main_tag#v}"; version="${version%%-*}"
+        short='${{ github.sha }}'; short="${short:0:7}"
+        name="PCL-Next-${version}-linux-x64-${short}"
+        mkdir -p out staging
+        cli=$(find bin-net10 -name 'pclcli.dll' -print -quit)
+        cp -a "$(dirname "$cli")/." staging/
+        tar -czf "out/${name}.tar.gz" -C staging .
+        echo "asset=out/${name}.tar.gz" >> "$GITHUB_OUTPUT"
+        echo "name=${name}" >> "$GITHUB_OUTPUT"
+        echo "制品：$name.tar.gz（内核 + CLI，linux-x64）"
+
+    - name: Upload workflow artifact
+      uses: actions/upload-artifact@v7
+      with:
+        name: ${{ steps.pack.outputs.name }}
+        path: ${{ steps.pack.outputs.asset }}
+
+    # 合规 gate（§0C.4）：书面问询答复留存到 docs/合规/ 后，才把仓库变量
+    # PLATFORM_RELEASE_ENABLED 设为 true。未开启时只上传 artifact，不对外分发。
+    - name: Attach to the paired main Release
+      if: ${{ vars.PLATFORM_RELEASE_ENABLED == 'true' }}
+      shell: bash
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        main_tag='${{ steps.ptr.outputs.main_tag }}'
+        if ! gh release view "$main_tag" >/dev/null 2>&1; then
+          echo "::error::主 Release $main_tag 尚未创建，Linux 必须与之同步发布（§0C.4）"
+          exit 1
+        fi
+        gh release upload "$main_tag" '${{ steps.pack.outputs.asset }}' --clobber
+        echo "已作为多 RID 附件上传进 $main_tag"
+
+    - name: Compliance gate is closed
+      if: ${{ vars.PLATFORM_RELEASE_ENABLED != 'true' }}
+      shell: bash
+      run: echo "PLATFORM_RELEASE_ENABLED != true：仅上传 workflow artifact，不创建 / 修改任何 Release（§0C.4）"
+
+  # ── 平台发布通道：Android（§0C.3 / §0C.4）────────────────────────────────
+  # android/v<内核版本>-<N> 独立节奏：不绑主阶梯 tag，独立 prerelease Release。
+  # SDK / workload / 签名未就绪（阶段 A–E 未完成）时只登记通道，不挂必过门禁（§0A.2 CI）。
+  release-android:
+    name: Platform channel (android-arm64)
+    if: ${{ startsWith(github.ref_name, 'android/v') }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v6
+      with:
+        fetch-depth: 0
+        submodules: true
+
+    - name: Resolve android tag
+      id: ptr
+      shell: bash
+      run: |
+        tag='${{ github.ref_name }}'
+        body="${tag#android/v}"
+        kernel="${body%%-*}"
+        n="${body##*-}"
+        if [ -z "$kernel" ] || [ -z "$n" ] || [ "$kernel" = "$body" ]; then
+          echo "::error::标签格式应为 android/v<内核版本>-<N>（§0C.3），实际为 $tag"
+          exit 1
+        fi
+        echo "kernel=$kernel" >> "$GITHUB_OUTPUT"
+        echo "n=$n" >> "$GITHUB_OUTPUT"
+        echo "apk=PCL-Next-${kernel}-android-${n}-arm64.apk" >> "$GITHUB_OUTPUT"
+        echo "Android 独立发布：内核 $kernel，第 $n 版"
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '10.0.x'
+
+    - name: Detect Android toolchain readiness
+      id: ready
+      shell: bash
+      run: |
+        proj=$(find . -maxdepth 3 -name '*.csproj' -path '*Android*' -print -quit)
+        if [ -z "$proj" ]; then
+          echo "ready=false" >> "$GITHUB_OUTPUT"
+          echo "Android 工程尚未建立（阶段 A–E 未完成）：本次只登记通道，不构建 APK，不挂必过门禁"
+        else
+          echo "ready=true" >> "$GITHUB_OUTPUT"
+          echo "project=$proj" >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: Build signed APK
+      if: ${{ steps.ready.outputs.ready == 'true' }}
+      shell: bash
+      run: |
+        # 具体 workload / 签名参数待《计划-安卓UI移植.md》阶段 B 选型后校准；
+        # 此处只保证「工程存在即走同一条通道」，不在骨架里硬编码签名密钥。
+        dotnet workload install android
+        dotnet publish '${{ steps.ready.outputs.project }}' -c Release \
+          -p:AndroidPackageFormat=apk -p:PublishDir="$GITHUB_WORKSPACE/out-apk/"
+        apk=$(find out-apk -name '*.apk' -print -quit)
+        if [ -z "$apk" ]; then echo "::error::工程存在但未产出 APK，请检查阶段 B 的打包配置"; exit 1; fi
+        mkdir -p out
+        cp "$apk" "out/${{ steps.ptr.outputs.apk }}"
+
+    - name: Write channel manifest (toolchain not ready)
+      if: ${{ steps.ready.outputs.ready != 'true' }}
+      shell: bash
+      run: |
+        mkdir -p out
+        printf '{"tag":"%s","kernel":"%s","iteration":"%s","status":"toolchain-not-ready","channel":"android"}\n' \
+          '${{ github.ref_name }}' '${{ steps.ptr.outputs.kernel }}' '${{ steps.ptr.outputs.n }}' \
+          > out/channel-manifest.json
+
+    - name: Upload workflow artifact
+      uses: actions/upload-artifact@v7
+      with:
+        name: android-${{ steps.ptr.outputs.kernel }}-${{ steps.ptr.outputs.n }}
+        path: out/
+
+    - name: Create independent prerelease
+      if: ${{ vars.PLATFORM_RELEASE_ENABLED == 'true' && steps.ready.outputs.ready == 'true' }}
+      shell: bash
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        notes="ReleaseNotes/android/${{ github.ref_name }}.md"
+        args=(release create '${{ github.ref_name }}' out/*.apk --verify-tag --prerelease
+              --title '${{ github.ref_name }} (Android)')
+        if [ -f "$notes" ]; then args+=(--notes-file "$notes"); else args+=(--generate-notes); fi
+        gh "${args[@]}"
+
+    - name: Compliance gate is closed
+      if: ${{ vars.PLATFORM_RELEASE_ENABLED != 'true' }}
+      shell: bash
+      run: echo "PLATFORM_RELEASE_ENABLED != true：仅上传 workflow artifact，不创建独立 Release（§0C.4）"
