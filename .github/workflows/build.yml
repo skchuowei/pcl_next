@@ -18,7 +18,8 @@ on:
       - 'pcl-next/**'
       - 'PCLCS/**'
       - 'MeloongCore/**'
-      - 'PCL.Download/**'
+      - 'PCL.Download/**'        # 内核本体
+      - 'PCL.Download.Tests/**'  # Windows job 已跑这批单测，改测试同样要验证
       - 'PCL.Cli/**'
       - 'Directory.Build.props'
       - 'scripts/**'
@@ -28,7 +29,8 @@ on:
       - 'pcl-next/**'
       - 'PCLCS/**'
       - 'MeloongCore/**'
-      - 'PCL.Download/**'
+      - 'PCL.Download/**'        # 内核本体
+      - 'PCL.Download.Tests/**'  # Windows job 已跑这批单测，改测试同样要验证
       - 'PCL.Cli/**'
       - 'Directory.Build.props'
       - 'scripts/**'
