@@ -1924,42 +1924,33 @@ Retry:
     ''' 将安装好的临时版本文件夹覆盖到一个现有文件夹中。
     ''' </summary>
     Public Sub McInstallCommit(Instance As McInstance, NewManifest As McInstallManifest, BuildFolder As String, TargetFolder As String)
-        Dim OldFiles = If(Configs.McInstallManifest.Get(Instance.Config)?.ManagedFiles, {})
+        Dim OldFiles = If(Configs.McInstallManifest.Get(Instance.Config)?.ManagedFiles, New List(Of McInstallManifest.ManagedFile)())
         Dim NewFiles = NewManifest.ManagedFiles
+        Dim OldJsonPath As String = Instance.GetJsonPath()
 
         '============== 整理变更的文件列表 ==============
-
-        Dim FilesToDelete As New List(Of String)
-        Dim FilesToMove As New List(Of (Source As String, Target As String))
-        'ManagedFiles
-        '新版里有：添加或覆盖新版文件
-        For Each NewFile In NewFiles
-            FilesToMove.Add((Path.Combine(BuildFolder, NewFile.RelativePath), Path.Combine(TargetFolder, NewFile.RelativePath)))
-        Next
-        '新版里没有，老版里有：删除本地文件到回收站
-        Dim NewFilePaths As New HashSet(Of String)(NewFiles.Select(Function(File) File.RelativePath))
-        For Each OldFile In OldFiles
-            If NewFilePaths.Contains(OldFile.RelativePath) Then Continue For
-            FilesToDelete.Add(PathUtils.ForCompare(Path.Combine(TargetFolder, OldFile.RelativePath)))
-        Next
-        '老版本 MC 的 assets 文件
-        If DirectoryUtils.Exists(BuildFolder & "resources\") Then DirectoryUtils.Copy(BuildFolder & "resources\", TargetFolder & "resources\")
-        'json 与 jar
-        Dim OldJsonPath As String = Instance.GetJsonPath()
-        FilesToDelete.Add(OldJsonPath)
-        FilesToDelete.Add(Path.ChangeExtension(OldJsonPath, ".jar"))
-        FilesToDelete.Add(Instance.PathVersion & Instance.Name & ".jar")
-        FilesToDelete = FilesToDelete.Distinct(StringComparer.OrdinalIgnoreCase).ToList()
+        '哪些覆盖、哪些删除、旧版 resources 要不要一起搬，规则见 PCL.Download.InstallCommitPlanner
+        Dim Plan = PCL.Download.InstallCommitPlanner.Build(New PCL.Download.InstallCommitPlanRequest With {
+            .BuildFolder = BuildFolder,
+            .TargetFolder = TargetFolder,
+            .VersionFolder = If(Instance.PathVersion, ""),
+            .InstanceName = Instance.Name,
+            .OldJsonPath = OldJsonPath,
+            .NewRelativePaths = NewFiles.Select(Function(File) File.RelativePath).ToList(),
+            .OldRelativePaths = OldFiles.Select(Function(File) File.RelativePath).ToList(),
+            .LegacyResourcesExist = DirectoryUtils.Exists(BuildFolder & "resources\")})
 
         '============== 实际修改 ==============
 
+        '老版本 MC 的 assets 文件
+        If Plan.CopyLegacyResources Then DirectoryUtils.Copy(BuildFolder & "resources\", TargetFolder & "resources\")
         Instance.Config.Save()
-        For Each TargetPath In FilesToDelete
+        For Each TargetPath In Plan.FilesToDelete
             FileUtils.Delete(TargetPath, True)
         Next
         FileUtils.Move(BuildFolder & Instance.Name & ".jar", Instance.PathVersion & Instance.Name & ".jar")
         FileUtils.Move(BuildFolder & Instance.Name & ".json", OldJsonPath)
-        For Each File In FilesToMove
+        For Each File In Plan.FilesToMove
             DirectoryUtils.Create(PathUtils.RemoveLastPart(File.Target))
             FileUtils.Copy(File.Source, File.Target)
         Next

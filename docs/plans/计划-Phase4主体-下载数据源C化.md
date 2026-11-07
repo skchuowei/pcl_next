@@ -161,7 +161,22 @@ LiteLoader 的版本 json 是一段 30 行的字符串拼接，Fabric 的 `∞ �
   收益不在删行，而在把四处「各写一遍的目录名」收敛到一处。
 - `PCL.Download.Tests/InstallLayoutTests.cs`（新增，23 例）。
 
-### 4.8 后续（未动）
+### 4.8 第八轮：修改安装的变更计划
+
+`McInstallCommit` 是「修改版本」的最后一步：把临时构建目录里的文件覆盖到现有实例上，
+顺手清掉旧清单里多出来的文件。它是本次安装里唯一会**删用户磁盘上的文件**的地方，
+而决定删什么的那段整理逻辑与 `LoaderBase` 完全无关，可以整体搬走。
+
+- `PCL.Download/InstallCommitPlan.cs`（新增）：`InstallCommitPlanRequest` / `InstallCommitPlan` /
+  `InstallCommitMove` / `InstallCommitPlanner`。
+  `Build` 产出「要删的绝对路径（已按忽略大小写去重）/ 要搬的文件对 / 是否要复制旧版 `resources`」；
+  `ForCompare` 用纯 BCL 复现 `PathUtils.ForCompare` 的归一口径（内核不能引用 MeloongCore）。
+- `pcl-next/Pages/PageDownload/ModDownloadLib.vb`：`McInstallCommit` 的整理段（22 行）改为一次
+  `InstallCommitPlanner.Build`；执行段（删除 / 移动 / 复制）原样保留——那些走的是
+  `FileUtils.Delete(…, True)` 的回收站语义与重试。净 −9 行（+16 / −25）。
+- `PCL.Download.Tests/InstallCommitPlanTests.cs`（新增，15 例）。
+
+### 4.9 后续（未动）
 
 - `pcl-next/Pages/PageDownload/ModDownloadLib.vb`：安装编排的 `LoaderBase` 生成改为 C# 输出。
 - `pcl-next/Pages/PageDownload/Resource/PageDownloadCompDetail.xaml.vb`：资源详情版本列表改由 Provider 提供（已通过 `ResourceVersion.FromProjectId` 转发完成）。
@@ -276,6 +291,15 @@ LiteLoader 的版本 json 是一段 30 行的字符串拼接，Fabric 的 `∞ �
     `NormalizeLoaderVersion` 里 Forge 取「最后一个 `-` 之后」而 NeoForge 只剥固定的 `1.20.1-`。
     后者会让老命名 `1.7.10-10.13.4.1614-1.7.10` 被剥成 `1.7.10`——看着像 bug，但这是已装实例在
     修改页里对得上的前提；要么统一改、要么不动，只改一半会让一部分实例突然「加载器版本不认识」。
+35. **修改安装的两处比较规则不一致，是原实现的状态，不是笔误**：判断「新清单里有没有这一项」用的是
+    区分大小写的集合，删除列表本身却按忽略大小写去重。理论上会出现「同一文件的两种写法：既被判为
+    『新清单没有』而删除，又被去重成一条」，实践里因为清单的相对路径在生成时就已小写化而不会撞车。
+    这次只是把它搬进 C# 并各配一条用例锁住，**没有统一**——统一会改变「已装实例改名大小写」这类
+    边角场景的删除行为，属于另一个决定。
+36. **`ForCompare` 必须在核心里重新实现一份**：`PathUtils.ForCompare` 在 MeloongCore，
+    而架构护栏禁止无 GUI 内核引用它。复现口径是「`GetFullPath` → 去 `\\?\` → 分隔符归一 → 去尾分隔符」。
+    注意 MeloongCore 那份的注释写着「将短路径展开」，实际代码里并没有这一步——照注释实现反而会引入
+    行为差异，所以按实现而不是按注释搬。
 
 ## 6. 回归面
 
@@ -333,6 +357,10 @@ LiteLoader 的版本 json 是一段 30 行的字符串拼接，Fabric 的 `∞ �
   两种情况下 OptiFine 都不参与版本合并，且装完能启动。
 - 修改页（`PageDownloadModify`）对一个旧版 PCL 装出来的实例：Mod 列表、加载器版本标记全部能认出来
   （第七轮改了清单里相对路径与版本串的生成方式，这里最容易看出回归）。
+- 修改安装（第八轮）：对一个装了 Fabric API + OptiFine 的实例改一次版本，改完 `mods` 里
+  旧文件按清单删掉、新文件覆盖进去、实例 json 与 jar 被替换；被删的文件进回收站而不是直接消失。
+- 修改安装时旧清单很大（几十个 Mod）的实例：删除列表里没有重复项，也不会有「本该保留却被删」的 Mod
+  （去重是忽略大小写的，判定新清单是区分大小写的，这两条规则各自都要对）。
 
 ## 7. 验证
 
@@ -419,6 +447,13 @@ LiteLoader 的版本 json 是一段 30 行的字符串拼接，Fabric 的 `∞ �
   M1 一次挂掉 2 例（配 LiteLoader / 配 LiteLoader+Fabric 各一条），M2 挂 3 例、M3 挂 2 例——
   说明这几条规则确实被多条路径同时依赖，不是单点断言。
 - 第七轮 `pcl-next.vbproj` 编译：0 错误。
+- 第八轮（修改安装的变更计划）：`PCL.Download.Tests` 新增 `InstallCommitPlanTests` 15 例，
+  全量 **452 / 453**。唯一失败仍是 `SlowSource_IsRotatedToFastSource`。
+- 第八轮反向验证（5 条变异，全部一次抓住）：
+  M1 新清单集合改成忽略大小写；M2 删除列表不去重；M3 `ForCompare` 不去尾分隔符；
+  M4 不再清理版本目录下的 jar；M5 不再复制旧版 `resources`。
+  M4 挂了 2 例（除目标用例外还有那条数条数的），其余各 1 例。
+- 第八轮 `pcl-next.vbproj` 编译：0 错误。
 
 ## 8. 回滚
 
@@ -466,3 +501,12 @@ LiteLoader 的版本 json 是一段 30 行的字符串拼接，Fabric 的 `∞ �
   `OptiFineFolder & FileName` 也随之换成了 `BuildOptiFineInstallerPath`。若只回滚目录推导而保留
   调用点，OptiFine 会落到 `modsOptiFine_xxx.jar` 这种拼错的路径——这两处必须一起回滚。
 - 无数据结构变更、无缓存格式变化：安装清单的键名、`mods/` 前缀与小写规则与旧版逐字一致。
+
+第八轮（修改安装的变更计划）只换了 `McInstallCommit` 的整理段，执行段与签名都没动：
+
+- 回滚只需把 `McInstallCommit` 的方法体还原到上一版，`InstallCommitPlanner` 留在内核不参与即可。
+- 一个**与第七轮联动的点**：路径归一由 VB 的 `PathUtils.ForCompare` 换成了内核里的
+  `InstallCommitPlanner.ForCompare`。若只回滚 `McInstallCommit` 而内核版本被别处引用，两套归一
+  可能给出不同结果（内核版不做 8.3 短名展开、Linux 上用 `/`）。目前内核版只被这一处调用，
+  回滚后无人引用即无影响。
+- 无数据结构变更：清单结构、缓存格式、配置项均未改动。
