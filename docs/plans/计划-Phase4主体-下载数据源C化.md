@@ -22,10 +22,13 @@
 | MC 版本清单 | 本轮迁到 `McVersionManifestClient` | ✅ C# |
 | OptiFine / Forge / NeoForge / LiteLoader / Fabric 列表 | 已由 `LoaderListClient` 提供（六类入口全在 C#） | ✅ C#（投影保留） |
 | 本地 Mod 列表扫描 / 在线反查与更新检测 | 本轮改由 `LocalResourceScanner` / `LocalResourceOnlineLoader` 提供 | ✅ C#（投影保留） |
-| 工程批量查询（`FromProjectIds`） | VB 实现，仅整合包安装使用 | ⬜ |
+| 工程批量查询（`FromProjectIds`） | 本轮改由 `ResourceProject.FromProjectIds` 提供（批量接口 + 进程内缓存） | ✅ C#（投影保留） |
 | 版本合并（原版 + 加载器 json 合成） | 本轮迁到 `VersionMerger` | ✅ C# |
 | Forge / NeoForge 安装器的版本串归一化、下载地址、启动参数、进度映射 | 本轮迁到 `ForgelikeInstaller` | ✅ C# |
-| 安装编排（`ModDownloadLib`，安装器执行 / 库分析 / 版本落盘） | VB，与 `MyListItem` / `LoaderTask` 深度耦合 | 🟡 纯逻辑已出，编排仍在 VB |
+| OptiFine 安装器的 Java 版本探测、启动参数、成败判定 | 本轮迁到 `OptiFineInstaller` | ✅ C# |
+| OptiFine 下载源、安装器落盘位置、旧式版本 json | 本轮迁到 `OptiFineProfile`（「安装」与「另存为」共用一份） | ✅ C# |
+| LiteLoader 版本 json / Fabric 实例名与 profile 地址 | 本轮迁到 `LiteLoaderProfile` / `FabricProfile` | ✅ C# |
+| 安装编排（`ModDownloadLib`，安装器执行 / 库分析 / 版本落盘） | VB，与 `MyListItem` / `LoaderTask` 深度耦合 | 🟡 各加载器的数据推导已全出，编排仍在 VB |
 | 下载任务列表 / 进度 | VB `LoaderBase`，底层已由 C# 引擎驱动 | ⬜ |
 
 ## 4. 文件清单
@@ -107,7 +110,34 @@ Phase 6 的库与资源分析。本轮只摘**不依赖加载器状态机的纯�
 - `PCL.Download.Tests/VersionMergerTests.cs`：14 例。
 - `PCL.Download.Tests/ForgelikeInstallerTests.cs`：30 例。
 
-### 4.6 后续（未动）
+### 4.6 第六轮：其余三类加载器的安装数据推导
+
+第五轮把 Forge / NeoForge 的纯逻辑摘出来之后，剩下三类的安装路径上还有一批「拼字符串」的逻辑，
+各自有两个衍生问题：OptiFine 的下载源推导在「安装」与「另存为」里各写了一遍（逐字相同，已经开始漂移），
+LiteLoader 的版本 json 是一段 30 行的字符串拼接，Fabric 的 `∞ → infinite` 替换与实例名生成顺序耦合。
+
+- `PCL.Download/OptiFineInstaller.cs`（新增）：`OptiFineJavaProbe` / `OptiFineInstaller`。
+  `ProbeRequiredJava` 读 jar 内 `optifine/Installer.class` 的 class 版本号推出所需 Java 主版本；
+  `BuildArguments` 拼启动参数；`IsFailed` 判成败；`ProgressPerLine` 收掉 `0.7 / 7000` 这个魔数。
+- `PCL.Download/OptiFineProfile.cs`（新增）：`OptiFineLegacyProfile` / `OptiFineProfile`。
+  `BuildMirrorUrl`（含 1.8 / 1.9 目录补 `.0`、预览版路径形状）、`BuildOfficialPageUrl` /
+  `FindOfficialDownloadUrl`（从官方页抠真下载地址）、`BuildInstallerTarget`（落临时目录还是留 libraries）、
+  `BuildLegacyProfileJson`（方式 B 的版本 json）。
+- `PCL.Download/LiteLoaderProfile.cs`（新增）：`BuildVersionJson` 由条目原文构造版本 json，
+  含「条目自带 `libraries` + 追加 `com.mumfrey:liteloader`」这条隐式规则。
+- `PCL.Download/FabricProfile.cs`（新增）：`BuildInstanceName` / `BuildProfileUrls`。
+- `pcl-next/Pages/PageDownload/ModDownloadLib.vb`：
+  `McDownloadOptiFineInstall` 的探测 / 参数 / 进度 / 成败四段改为调用；
+  新增 `McDownloadOptiFineSources` 收敛两处重复的源推导；
+  `McDownloadOptiFineLoader` 的 `Target` 与方式 B 的 json 各改一次调用；
+  `McDownloadLiteLoaderLoader` 的整份 json 拼接收成一次调用；`McDownloadFabricLoader` 的 id 与地址各一次。
+- `pcl-next/Modules/Resource/ResourceProject.vb`：`FromProjectIds` 改调 C# 批量接口，逐项投影并回填本地快查缓存。
+- `PCL.Download.Tests/OptiFineInstallerTests.cs`：27 例。
+- `PCL.Download.Tests/OptiFineProfileTests.cs`：21 例。
+- `PCL.Download.Tests/LiteLoaderProfileTests.cs`：11 例。
+- `PCL.Download.Tests/FabricProfileTests.cs`：4 例。
+
+### 4.7 后续（未动）
 
 - `pcl-next/Pages/PageDownload/ModDownloadLib.vb`：安装编排的 `LoaderBase` 生成改为 C# 输出。
 - `pcl-next/Pages/PageDownload/Resource/PageDownloadCompDetail.xaml.vb`：资源详情版本列表改由 Provider 提供（已通过 `ResourceVersion.FromProjectId` 转发完成）。
@@ -185,6 +215,24 @@ Phase 6 的库与资源分析。本轮只摘**不依赖加载器状态机的纯�
     `--add-exports cpw.mods.bootstraplauncher/...=ALL-UNNAMED`（模块系统默认不导出内部包）。
     JavaWrapper 模式下多一个 `-Doolloo.jlw.tmpdir` 与 `-jar`；拿不到 wrapper 路径时要退回普通模式，
     不能把空路径拼进去。
+25. **OptiFine 的 Java 版本是靠读 class 文件头推出来的**：`optifine/Installer.class` 的第 6、7 字节是
+    class 版本号，减 44 即 Java 主版本（52 → 8，61 → 17）。原实现把探测整段包在 `Try` 里吞掉异常，
+    任何失败都只是「按 21 处理」，用户装错 Java 时看不出卡在哪一步；现在失败原因（找不到条目 /
+    文件头不对 / 长度不足 / 版本超范围）会带回日志。
+26. **OptiFine 的候选源推导原先有两份**：「安装」与「另存为」各写了一遍 BMCLAPI 地址拼接，
+    逐字相同但没有共享，改一处就会让两个入口打到不同地址（Forge 的地址拼接就是这样漂移的）。
+    现在收敛到 `OptiFineProfile` + VB 侧一个 `McDownloadOptiFineSources`。
+27. **官方下载页抠不到链接时不要硬拼地址**：`optifine.net/adloadx?f=...` 返回的是 HTML，
+    真正的地址藏在页面里的 `downloadx?f=...`。原实现用 `RegexSearch(...).First`，匹配不到会抛
+    `IndexOutOfRange`，被外层 `Try` 吞掉后照样走镜像；现在显式返回 null 并记一条 warn，
+    而不是拼一个必然 404 的地址去下几百字节的错误页——那种失败只会在「最小体积」检查处暴露。
+28. **OptiFine 方式 B 的 json 有两处不能「顺手修正」**：时间戳的时分秒写死 `T23:33:33+08:00`
+    （列表只给到日期），以及新格式的 `minimumLauncherVersion` 是**字符串** `"21"`、旧格式是数字 `18`。
+29. **LiteLoader 的版本 json 里 `libraries` 的顺序是语义**：条目自带的那几条必须在前，
+    `com.mumfrey:liteloader` 追加在后且必须带 `url`。少了 url 启动器解析不了坐标，
+    顺序颠倒则可能被后面的同名库覆盖。构造时必须**深拷贝**条目里的数组，否则会把这条写回列表条目。
+30. **Fabric 的 `∞ → infinite` 只用于请求地址**：实例名（= 版本文件夹名 = json 文件名）要保留原始串，
+    否则实例列表里对不上。两者由 `FabricProfile` 一并给出，避免以后有人把替换提到前面。
 
 ## 6. 回归面
 
@@ -223,6 +271,16 @@ Phase 6 的库与资源分析。本轮只摘**不依赖加载器状态机的纯�
 - 「另存为安装器」对 Forge / NeoForge 都能拿到文件，且与「安装」路径用的是同一份地址。
 - 整合包安装传入 `1.19.3-41.2.8` 这种自带 MC 版本的 Forge 串时，实例的 `inheritsFrom` 是 `1.19.3`
   而不是整合包声明的值。
+- OptiFine 安装：1.14+（方式 A，走临时目录 + 安装器）与 1.12.2 及更早（方式 B，只拼 json）各一次；
+  方式 B 装完能启动（`--tweakClass optifine.OptiFineTweaker` 生效，光影可用）。
+- OptiFine「另存为」：官方源可用时两个源都在候选里，官方页取不到链接时只剩镜像且日志有 warn；
+  1.8 / 1.9 两个老版本的镜像地址带 `.0`（#4281），预览版的路径形状与正式版不同。
+- OptiFine 安装器要求的 Java 版本：1.20+ 的安装器应识别为 Java 21 而不再一律按默认值下载。
+- LiteLoader 安装：1.12.2 与 1.7.10 各一次，版本 json 里 `libraries` 含条目自带的几条 +
+  `com.mumfrey:liteloader:<version>`（带 `url`），且能启动。
+- LiteLoader 列表多次打开后再安装：同一份列表条目在两次安装之间不被上一次的追加污染。
+- Fabric 安装：`1.20.1` 与 `1.20.1∞` 各一次，后者实例文件夹名保留 `∞`、请求地址走 `infinite`。
+- 整合包安装的工程批量查询：Mod 缺失列表一次查询回来，重复查询走缓存不再联网。
 
 ## 7. 验证
 
@@ -285,6 +343,19 @@ Phase 6 的库与资源分析。本轮只摘**不依赖加载器状态机的纯�
 - 脚本坑（与 dev.4 同一个坑的镜像面）：还原时若把 mtime 写回**原始旧时间戳**，MSBuild 会认为源码比
   变异后的 dll 还旧，于是不重编，最后那次全量跑用的仍是变异程序集，会显示一条假失败
   （本次表现为 `Normalize_NeoForge_为1点20点1补齐包名前缀` 失败）。还原后必须 `os.utime(path, None)`。
+- 第六轮（OptiFine / LiteLoader / Fabric 的安装数据推导）：`PCL.Download.Tests` 新增 63 例
+  （`OptiFineInstallerTests` 27、`OptiFineProfileTests` 21、`LiteLoaderProfileTests` 11、
+  `FabricProfileTests` 4），全量 **407 例**。
+- 第六轮反向验证（11 条变异，全部**一次**抓住）：
+  M1 去掉 Java 9+ 的 `--add-exports`；M2 class 版本偏移改成 52；M3 行数下限判定改成 `<=`；
+  M4 镜像侧 1.8/1.9 不再补 `.0`；M5 预览版路径不再把空格换斜杠；M6 `minimumLauncherVersion` 写成数字；
+  M7 抠不到官方链接照样拼地址；M8 LiteLoader 不深拷贝；M9 liteloader 库插到最前；
+  M10 实例名也替换 `∞`；M11 Fabric 候选源顺序颠倒。
+  对应失败用例与变异一一对应，没有出现「改了不报错」的情况——这一批逻辑的共同点是出错不抛异常，
+  所以每条都配了能区分行为的断言（如「输入文档未被改动」「库顺序」「null 而不是拼地址」）。
+- 第六轮全量结果：**406 / 407**。唯一失败是 `DownloadEngineTests.SlowSource_IsRotatedToFastSource`
+  （并行工作线正在改 `DownloadFileTask.cs` / `DownloadEngineTests.cs`，工作区是脏的；
+  这条用例此前已多次被判定为时序敏感）。与本轮改动无关：本轮没有触碰下载引擎任何文件。
 
 ## 8. 回滚
 
