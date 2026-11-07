@@ -147,6 +147,21 @@ public sealed class LocalResourceFile
 
     private uint? _curseForgeHash;
 
+    /// <summary>
+    /// 由宿主灌入已经算好的指纹，避免重复读盘。
+    /// <para/>
+    /// VB 侧的 <c>CurseForgeHash</c> / <c>ModrinthHash</c> 有跨运行的 <c>Cache\ModHash.ini</c> 缓存，
+    /// 而本类的缓存只在进程内 —— 不灌入的话，每次启动都要把全部 Mod 文件重新读一遍算哈希
+    /// （200 个 Mod 的整合包约 1~2 GB 磁盘读）。
+    /// </summary>
+    /// <param name="modrinthSha1">已算好的 SHA1；为 null / 空表示不覆盖。</param>
+    /// <param name="curseForge">已算好的 MurmurHash2；为 null 表示不覆盖。</param>
+    public void PrimeHashes(string? modrinthSha1, uint? curseForge)
+    {
+        if (_modrinthHash is null && !string.IsNullOrEmpty(modrinthSha1)) _modrinthHash = modrinthSha1;
+        if (_curseForgeHash is null && curseForge is not null) _curseForgeHash = curseForge;
+    }
+
     /// <summary>用于 CurseForge 信息获取的 Hash 值（MurmurHash2，十进制 uint）。</summary>
     public uint CurseForgeHash
     {

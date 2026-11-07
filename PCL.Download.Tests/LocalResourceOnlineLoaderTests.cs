@@ -189,6 +189,110 @@ public class LocalResourceOnlineLoaderTests : IDisposable
         Assert.DoesNotContain(api.Requests, r => r.Url.Contains("curseforge"));
     }
 
+    [Fact]
+    public void Load_ModrinthUpdateWithDifferentLoaders_IsIgnored()
+    {
+        var file = CreateModFile("loader-mismatch-1.0.jar");
+        var sha1 = file.ModrinthHash;
+        var api = new FakeResourceApi();
+
+        // 本地文件是纯 Fabric，更新候选是 Fabric + Forge：加载器集合不完全一致 → 不能当作更新
+        api.MapJson("api.modrinth.com/v2/version_files/update_individual", new JsonObject
+        {
+            [sha1] = VersionJson("1111111111111111111111111111111111111111", "P2", "mm-1.1.jar", "1.1",
+                "2026-06-01T00:00:00Z", ["fabric", "forge"]),
+        }.ToJsonString());
+        api.MapJson("api.modrinth.com/v2/version_files", new JsonObject
+        {
+            [sha1] = VersionJson(sha1, "P2", "loader-mismatch-1.0.jar", "1.0", "2026-01-01T00:00:00Z"),
+        }.ToJsonString());
+        api.MapJson("api.modrinth.com/v2/projects?ids=", new JsonArray(ProjectJson("P2", "mm")).ToJsonString());
+
+        var registry = new ResourceProviderRegistry([new ModrinthProvider(api)]);
+        var report = new LocalResourceOnlineLoader(registry)
+            .Load([file], _cache, new OnlineLoadContext { GameVersion = "1.20.1", Loaders = ModLoaders.Fabric })!;
+
+        Assert.Equal(1, report.Resolved);
+        Assert.Equal(0, report.UpdatesFound);
+        Assert.NotNull(file.Project);            // 工程信息照常回填
+        Assert.Null(file.UpdateFile);            // 但不能给出加载器不一致的更新
+        Assert.Empty(file.ChangelogUrls);
+    }
+
+    [Fact]
+    public void Load_RequestFailed_DoesNotMarkCacheAsLoaded()
+    {
+        var file = CreateModFile("retry-1.0.jar");
+        var sha1 = file.ModrinthHash;
+        var context = new OnlineLoadContext { GameVersion = "1.20.1", Loaders = ModLoaders.Fabric };
+
+        // 工程信息拿得到，但更新查询炸掉（未注册的 URL 会让桩请求器抛错）
+        var brokenApi = new FakeResourceApi();
+        // 必须抢在 version_files 之前注册：update_individual 的 URL 同样包含 version_files
+        brokenApi.Map(u => u.Contains("update_individual", StringComparison.Ordinal),
+            _ => throw new InvalidOperationException("模拟更新查询失败"));
+        brokenApi.MapJson("api.modrinth.com/v2/version_files", new JsonObject
+        {
+            [sha1] = VersionJson(sha1, "P3", "retry-1.0.jar", "1.0", "2026-01-01T00:00:00Z"),
+        }.ToJsonString());
+        brokenApi.MapJson("api.modrinth.com/v2/projects?ids=", new JsonArray(ProjectJson("P3", "retry")).ToJsonString());
+
+        var first = new LocalResourceOnlineLoader(new ResourceProviderRegistry([new ModrinthProvider(brokenApi)]))
+            .Load([file], _cache, context)!;
+
+        Assert.True(first.Failed);
+        Assert.Equal(1, first.Resolved);
+        Assert.False(file.OnlineDataLoaded);     // 有站点失败时不给「已加载」标记
+        Assert.True(_cache.ContainsKey(LocalResourceOnlineLoader.CacheKey(file, context)));
+
+        // 下一次必须重试，不能因为「6 小时内」就跳过
+        var secondApi = new FakeResourceApi();
+        secondApi.MapJson("api.modrinth.com/v2/version_files", "{}");
+        var second = new LocalResourceOnlineLoader(new ResourceProviderRegistry([new ModrinthProvider(secondApi)]))
+            .Load([file], _cache, context)!;
+
+        Assert.Equal(1, second.Pending);
+        Assert.NotEmpty(secondApi.Requests);
+    }
+
+    [Fact]
+    public void Load_Canceled_ReturnsNullAndStops()
+    {
+        var file = CreateModFile("cancel-1.0.jar");
+        var api = new FakeResourceApi();
+
+        var report = new LocalResourceOnlineLoader(new ResourceProviderRegistry([new ModrinthProvider(api)]))
+            .Load([file], _cache, new OnlineLoadContext { GameVersion = "1.20.1", Loaders = ModLoaders.Fabric },
+                isCancelled: () => true);
+
+        Assert.Null(report);
+        Assert.Empty(api.Requests);   // 第一条就开始检查，一个请求都不该发
+    }
+
+    [Fact]
+    public void PrimeHashes_OverridesFileDerivedFingerprints()
+    {
+        var file = CreateModFile("primed-1.0.jar");
+        var reference = new LocalResourceFile(file.File.FullName);
+        var realSha1 = reference.ModrinthHash;
+        var realCurseForge = reference.CurseForgeHash;
+
+        // 宿主（VB）侧算好的指纹必须被原样采用，否则每次启动都要重读全部 Mod 文件
+        var primed = new LocalResourceFile(file.File.FullName);
+        primed.PrimeHashes("deadbeefdeadbeefdeadbeefdeadbeefdeadbeef", 12345u);
+
+        Assert.Equal("deadbeefdeadbeefdeadbeefdeadbeefdeadbeef", primed.ModrinthHash);
+        Assert.Equal(12345u, primed.CurseForgeHash);
+        Assert.NotEqual(realSha1, primed.ModrinthHash);
+        Assert.NotEqual(realCurseForge, primed.CurseForgeHash);
+
+        // 传 null 表示「不覆盖」，先灌入的值也不会被后来的覆盖（先到先得）
+        primed.PrimeHashes(null, null);
+        primed.PrimeHashes("cafebabe", 999u);
+        Assert.Equal("deadbeefdeadbeefdeadbeefdeadbeefdeadbeef", primed.ModrinthHash);
+        Assert.Equal(12345u, primed.CurseForgeHash);
+    }
+
     // ---- 夹具 ----
 
     private LocalResourceFile CreateModFile(string name)
@@ -198,7 +302,8 @@ public class LocalResourceOnlineLoaderTests : IDisposable
         return new LocalResourceFile(path);
     }
 
-    private static JsonObject VersionJson(string sha1, string projectId, string fileName, string version, string publishedAt) => new()
+    private static JsonObject VersionJson(string sha1, string projectId, string fileName, string version, string publishedAt,
+        string[]? loaders = null) => new()
     {
         ["id"] = $"{projectId}-{version}",
         ["project_id"] = projectId,
@@ -214,7 +319,7 @@ public class LocalResourceOnlineLoaderTests : IDisposable
             ["size"] = 100,
             ["hashes"] = new JsonObject { ["sha1"] = sha1 },
         }),
-        ["loaders"] = new JsonArray("fabric"),
+        ["loaders"] = new JsonArray((loaders ?? ["fabric"]).Select(l => (JsonNode)JsonValue.Create(l)!).ToArray()),
         ["game_versions"] = new JsonArray("1.20.1"),
     };
 

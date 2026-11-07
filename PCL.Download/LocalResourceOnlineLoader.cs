@@ -53,7 +53,7 @@ public sealed class OnlineLoadReport
 /// <list type="bullet">
 /// <item>两个站点<b>串行</b>执行而非各起线程，保证结果确定、便于测试；</item>
 /// <item>缓存只回写到传入的 <see cref="JsonObject"/>，落盘由宿主负责（VB 直接写 <c>Cache\LocalMod.json</c>）；</item>
-/// <item>不使用 <c>LoaderTask</c> 状态机与 UI 刷新，改用 <see cref="CancellationToken"/>。</item>
+/// <item>不使用 <c>LoaderTask</c> 状态机与 UI 刷新，改用取消谓词 / <see cref="CancellationToken"/>。</item>
 /// </list>
 /// </para>
 /// </summary>
@@ -72,20 +72,37 @@ public sealed class LocalResourceOnlineLoader
     /// <param name="modList">本地 Mod 列表（通常来自 <see cref="LocalResourceScanner"/>）。</param>
     /// <param name="cache">缓存对象（键为「指纹 + 原版版本 + 加载器」）。</param>
     /// <param name="context">目标版本与加载器。</param>
+    /// <param name="isCancelled">取消谓词；返回 true 时尽快退出并返回 null（与 <see cref="LoaderListClient"/> 一致的宿主口径）。</param>
     /// <param name="ct">取消令牌。</param>
-    public OnlineLoadReport Load(IReadOnlyList<LocalResourceFile> modList, JsonObject cache,
-        OnlineLoadContext context, CancellationToken ct = default)
+    /// <returns>结果统计；被取消时返回 null。</returns>
+    public OnlineLoadReport? Load(IReadOnlyList<LocalResourceFile> modList, JsonObject cache,
+        OnlineLoadContext context, Func<bool>? isCancelled = null, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(modList);
         ArgumentNullException.ThrowIfNull(cache);
         ArgumentNullException.ThrowIfNull(context);
         ArgumentException.ThrowIfNullOrWhiteSpace(context.GameVersion);
 
+        var cancel = new CancelState(isCancelled, ct);
+        try
+        {
+            return LoadCore(modList, cache, context, cancel);
+        }
+        catch (OperationCanceledException) when (cancel.IsCanceled)
+        {
+            DownloadLog.Info("本地资源在线反查已取消");
+            return null;
+        }
+    }
+
+    private OnlineLoadReport LoadCore(IReadOnlyList<LocalResourceFile> modList, JsonObject cache,
+        OnlineLoadContext context, CancelState cancel)
+    {
         // ① 读缓存，挑出需要联网的条目
         var pending = new List<LocalResourceFile>();
         foreach (var file in modList)
         {
-            ct.ThrowIfCancellationRequested();
+            cancel.Check();
             if (cache[CacheKey(file, context)] is JsonObject cached)
             {
                 file.FromJson(cached);
@@ -110,9 +127,9 @@ public sealed class LocalResourceOnlineLoader
         {
             try
             {
-                LoadFromModrinth(modrinth, pending, context, ct);
+                LoadFromModrinth(modrinth, pending, context, cancel);
             }
-            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            catch (OperationCanceledException) when (cancel.IsCanceled)
             {
                 throw;
             }
@@ -129,9 +146,9 @@ public sealed class LocalResourceOnlineLoader
             curseForgeUsed = true;
             try
             {
-                LoadFromCurseForge(curseForge, pending, context, ct);
+                LoadFromCurseForge(curseForge, pending, context, cancel);
             }
-            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            catch (OperationCanceledException) when (cancel.IsCanceled)
             {
                 throw;
             }
@@ -174,7 +191,7 @@ public sealed class LocalResourceOnlineLoader
            && DateTime.Now - project["CacheTime"].AsDate() < expiry;
 
     private static void LoadFromModrinth(ModrinthProvider provider, IReadOnlyList<LocalResourceFile> pending,
-        OnlineLoadContext context, CancellationToken ct)
+        OnlineLoadContext context, CancelState cancel)
     {
         // 步骤 1：指纹 → 工程
         var fingerprints = pending.Select(f => new ResourceFingerprint(f.ModrinthHash, null)).ToList();
@@ -189,7 +206,7 @@ public sealed class LocalResourceOnlineLoader
 
         foreach (var match in matches)
         {
-            ct.ThrowIfCancellationRequested();
+            cancel.Check();
             if (match.Fingerprint.ModrinthSha1 is null) continue;
             if (!byHash.TryGetValue(match.Fingerprint.ModrinthSha1, out var entry)) continue;
 
@@ -223,7 +240,7 @@ public sealed class LocalResourceOnlineLoader
 
         foreach (var entry in toUpdate)
         {
-            ct.ThrowIfCancellationRequested();
+            cancel.Check();
             if (!updates.TryGetValue(entry.ModrinthHash, out var update)) continue;
             if (entry.ProjectVersion is null || !update.File.DownloadAvailable) continue;
             // 更新版本的加载器必须与本地的完全一致（VB 的 SequenceEqual 判定）
@@ -249,7 +266,7 @@ public sealed class LocalResourceOnlineLoader
     }
 
     private static void LoadFromCurseForge(CurseForgeProvider provider, IReadOnlyList<LocalResourceFile> pending,
-        OnlineLoadContext context, CancellationToken ct)
+        OnlineLoadContext context, CancelState cancel)
     {
         // 步骤 1：指纹 → 工程
         var fingerprints = pending.Select(f => new ResourceFingerprint(null, f.CurseForgeHash)).ToList();
@@ -262,7 +279,7 @@ public sealed class LocalResourceOnlineLoader
 
         foreach (var match in matches)
         {
-            ct.ThrowIfCancellationRequested();
+            cancel.Check();
             if (match.Fingerprint.CurseForge is null) continue;
             if (!byHash.TryGetValue(match.Fingerprint.CurseForge.Value, out var entry)) continue;
 
@@ -287,7 +304,7 @@ public sealed class LocalResourceOnlineLoader
             if (!projectFiles.TryGetValue(bundle.Project.Id, out var localFiles)) continue;
             foreach (var localFile in localFiles)
             {
-                ct.ThrowIfCancellationRequested();
+                cancel.Check();
                 // 若该文件已在 Modrinth 找到工程，保留 Modrinth 的信息（VB 同样优先 Modrinth）
                 if (localFile.Project is null || localFile.Project.Platform != ResourcePlatforms.Modrinth)
                     localFile.Project = bundle.Project;
@@ -332,7 +349,7 @@ public sealed class LocalResourceOnlineLoader
         // 步骤 4：判定更新
         foreach (var (entry, updateFile) in best)
         {
-            ct.ThrowIfCancellationRequested();
+            cancel.Check();
             if (entry.ProjectVersion is null) continue;
             if (entry.ProjectVersion.ReleaseDate >= updateFile.ReleaseDate || entry.ProjectVersion.Hash == updateFile.Hash)
                 continue;
@@ -361,4 +378,19 @@ public sealed class LocalResourceOnlineLoader
     /// </summary>
     private static bool IsLoaderMatch(ModLoaders local, ModLoaders candidate)
         => local == ModLoaders.None ? candidate == ModLoaders.None : local.HasFlagF(candidate);
+
+    /// <summary>
+    /// 统一的取消判定：宿主谓词（<c>LoaderTask.IsCanceled</c>）与 <see cref="CancellationToken"/> 取或。
+    /// </summary>
+    private sealed class CancelState(Func<bool>? isCancelled, CancellationToken ct)
+    {
+        /// <summary>是否已取消（供 catch 过滤器使用，不抛异常）。</summary>
+        public bool IsCanceled => ct.IsCancellationRequested || isCancelled?.Invoke() == true;
+
+        /// <summary>已取消则抛 <see cref="OperationCanceledException"/>。</summary>
+        public void Check()
+        {
+            if (IsCanceled) throw new OperationCanceledException();
+        }
+    }
 }
