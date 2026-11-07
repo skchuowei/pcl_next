@@ -12,8 +12,8 @@ on:
       - beta
       - pc
       - snapshot
-      - android
-      - linux
+      - android          # 平台长期线（《分支与发布规范》§0A）
+      - linux            # 平台长期线（《分支与发布规范》§0B）；push 时须过 build-linux 跨平台护栏
     paths:
       - 'pcl-next/**'
       - 'PCLCS/**'
