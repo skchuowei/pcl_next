@@ -1348,21 +1348,9 @@ Retry:
         Sub()
             Try
                 Logger.Info("刷新 Forge 推荐版本缓存开始")
-                Dim Result As String = NetRequestByClientRetry("https://bmclapi2.bangbang93.com/forge/promos", RequireJson:=True)
-                If Result.Length < 1000 Then Throw New Exception("获取的结果过短（" & Result & "）")
-                Dim ResultJson As JContainer = Result.DeserializeJson()
-                '获取所有推荐版本列表
-                Dim RecommendedList As New List(Of String)
-                For Each Version As JObject In ResultJson
-                    If Version("name") Is Nothing OrElse Version("build") Is Nothing Then Continue For
-                    Dim Name As String = Version("name")
-                    If Not Name.EndsWithF("-recommended") Then Continue For
-                    '内容为："1.15.2":"31.2.0"
-                    RecommendedList.Add("""" & Name.Replace("-recommended", """:""" & Version("build")("version").ToString & """"))
-                Next
-                If RecommendedList.Count < 5 Then Throw New Exception("获取的推荐版本数过少（" & Result & "）")
-                '保存
-                Dim CacheJson As String = "{" & RecommendedList.Join(",") & "}"
+                Dim Result As String = NetRequestByClientRetry(PCL.Download.ForgeRecommended.PromosUrl, RequireJson:=True)
+                '推荐通道 → 扁平表 的解析与两处下限校验已迁至 C#
+                Dim CacheJson As String = PCL.Download.ForgeRecommended.BuildCacheJson(Result)
                 FileUtils.Write(PathTemp & "Cache\ForgeRecommendedList.json", CacheJson)
                 Logger.Info("刷新 Forge 推荐版本缓存成功")
             Catch ex As Exception
