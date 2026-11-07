@@ -841,8 +841,7 @@ internal sealed class FileTask
             return; // 自定义请求头拥有最高优先级，直接接管
         }
         if (!fileRequest.SimulateBrowserHeaders) return;
-        request.Headers.UserAgent.ParseAdd(
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36");
+        // UA 由共享客户端的全局默认浏览器头统一提供，这里只补 Referer，避免叠加多个 UA 头。
         request.Headers.Referrer = new Uri("https://www.minecraft.net/");
     }
 
@@ -997,7 +996,16 @@ internal sealed class FileTask
             }
         }
 
-        if (FileSize == -2) Reset(options);
+        // 首分块失败（从未收到响应头，FileSize 仍为 -2）：清空重来，并让调度器重新认领。
+        // 修复前只 Reset 不设状态：多文件并行时该文件 State 停在 Connecting，调度器既不认为它在等待、
+        // 又因全局速度够快不补线程、也没有 broken chunk 可续传 → 永久卡死（真机 NeoForge 安装卡死根因）。
+        // 已失败（Canceled）的文件不能覆盖回等待态，否则引擎会重复调度一个已放弃的任务。
+        if (FileSize == -2)
+        {
+            Reset(options);
+            if (State < DownloadFileState.Canceled)
+                State = DownloadFileState.WaitingToDownload;
+        }
     }
 
     /// <summary>最近一次「有活动分块或已完成」的时刻，用于兜底重启的静默时长统计。</summary>

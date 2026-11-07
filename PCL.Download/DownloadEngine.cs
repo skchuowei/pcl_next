@@ -23,9 +23,20 @@ public sealed class DownloadEngine : IDownloadEngine
         {
             if (request.Sources is not { Count: > 0 })
                 throw new ArgumentException($"下载请求缺少下载源：{request.LocalPath}");
-            var localPath = request.LocalPath.Replace("/", "\\");
-            if (!localPath.Contains(":\\")) throw new ArgumentException($"输入的本地文件地址不正确：{localPath}");
-            if (localPath.EndsWith("\\")) throw new ArgumentException($"请输入含文件名的完整文件路径：{localPath}");
+            // 路径校验：Windows 要求盘符+反斜杠（VB 原版行为），其他平台要求绝对路径。
+            // 此前硬编码 Windows 格式导致 Linux/macOS 上所有路径被拒，引擎无法在非 Windows 环境测试。
+            var localPath = request.LocalPath;
+            if (OperatingSystem.IsWindows())
+            {
+                localPath = localPath.Replace("/", "\\");
+                if (!localPath.Contains(":\\")) throw new ArgumentException($"输入的本地文件地址不正确：{localPath}");
+            }
+            else
+            {
+                localPath = localPath.Replace("\\", "/");
+                if (!Path.IsPathRooted(localPath)) throw new ArgumentException($"输入的本地文件地址不正确：{localPath}");
+            }
+            if (localPath.EndsWith(Path.DirectorySeparatorChar)) throw new ArgumentException($"请输入含文件名的完整文件路径：{localPath}");
             var key = localPath.ToLowerInvariant();
             if (taskByPath.ContainsKey(key)) continue; // 同目标文件只保留一个任务
             var normalized = new DownloadFileRequest
@@ -440,6 +451,9 @@ public static class LocalFileReuse
     {
         if (reuseFolders.Count == 0) return null;
 
+        // TypeMarkers 用反斜杠书写，跨平台统一成反斜杠后再匹配
+        localPath = localPath.Replace('/', '\\');
+
         // 大致判断文件类别
         var typeHits = TypeMarkers
             .Select(marker => (Marker: marker, Index: localPath.IndexOf(marker, StringComparison.OrdinalIgnoreCase)))
@@ -473,7 +487,7 @@ public static class LocalFileReuse
             {
                 foreach (var folder in reuseFolders)
                 {
-                    var candidate = Path.Combine(folder, type.TrimStart('\\'), relativeAfter.Replace('\\', Path.DirectorySeparatorChar));
+                    var candidate = Path.Combine(folder, type.Trim('\\'), relativeAfter.Replace('\\', Path.DirectorySeparatorChar));
                     if (CandidateOk(candidate)) return candidate;
                 }
                 return null;
@@ -497,7 +511,7 @@ public static class LocalFileReuse
                 if (check.ActualSize < 0 || check.Hash is null) return null;
                 foreach (var folder in reuseFolders)
                 {
-                    var dir = Path.Combine(folder, type.TrimStart('\\'));
+                    var dir = Path.Combine(folder, type.Trim('\\'));
                     if (!Directory.Exists(dir)) continue;
                     foreach (var candidate in Directory.EnumerateFiles(dir, "*", SearchOption.AllDirectories))
                         if (CandidateOk(candidate)) return candidate;
@@ -536,10 +550,17 @@ internal sealed class EngineContext
             // （下载提速插件 NetworkServiceTuningMixin 同款调优：64KB → 1MB）
             InitialHttp2StreamWindowSize = 1024 * 1024,
         };
-        return new HttpClient(handler)
+        var client = new HttpClient(handler)
         {
             Timeout = Timeout.InfiniteTimeSpan, // 超时由引擎自行控制（含分块级动态超时）
         };
+        // 全局默认浏览器 UA：兼容按 UA 拦截 .NET 默认客户端（dotnet/10.0）的镜像/WAF。
+        // 注意：另有部分 WAF 按 TLS ClientHello 指纹（JA3）识别 .NET 栈，此类 403 与 UA 无关、
+        // .NET 内无法绕开（curl 同链路 200、.NET 改 UA/HTTP 版本/Referer 仍 403 实锤）。
+        client.DefaultRequestHeaders.TryAddWithoutValidation(
+            "User-Agent",
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36");
+        return client;
     }
 
     public EngineContext(DownloadOptions options, string tempFolder)

@@ -229,10 +229,10 @@ public sealed class DownloadOptions
     /// 对冲后约 1 秒即可切到 BMCLAPI。仅作用于文件首块，整体请求量不放大。
     /// 0 表示关闭对冲（退回纯顺序换源）。
     /// </summary>
-    public int HedgeDelayMilliseconds { get; init; } = 1000;
+    public int HedgeDelayMilliseconds { get; init; } = 500;
 
     /// <summary>测速/调度轮询间隔。</summary>
-    public int TickMilliseconds { get; init; } = 100;
+    public int TickMilliseconds { get; init; } = 50;
 
     /// <summary>
     /// 需要限制「发起新连接」频率的主机关键字（防止请求过密触发服务器限速）。

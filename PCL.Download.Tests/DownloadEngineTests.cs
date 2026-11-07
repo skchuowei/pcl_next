@@ -399,6 +399,7 @@ public class DownloadEngineTests
         {
             MaxConcurrentChunks = 4,
             SpeedLimitLow = 1L << 30,
+            HedgeDelayMilliseconds = 0,  // 关闭对冲，单独验证慢速换源逻辑
             SlowSourceRotateAfterMilliseconds = 1000,
             SlowSourceRotateSpeedBytesPerSecond = 512 * 1024,
             Log = s => { lock (logs) logs.Add(s); },
@@ -704,6 +705,53 @@ public class DownloadEngineTests
                         $"已下载字节超过文件大小：{sample.TotalBytesDone} > {sample.TotalBytesExpected}");
             }
         }
+    }
+
+    #endregion
+
+    #region 多文件并行与卡死回归
+
+    /// <summary>
+    /// 首分块失败后（从未收到响应头 FileSize=-2），引擎必须重置状态并让调度器重新认领。
+    /// 修复前：RunChunkAsync 末尾 Reset 清空分块但 State 停在 Connecting，
+    /// 多文件并行时另一文件保持高速 → needMoreThreads=false → 本文件永远不被调度，永久卡死。
+    /// </summary>
+    [Fact]
+    public async Task FirstChunkFailure_ReschedulesFile_NotStuck()
+    {
+        var smallData = RandomBytes(16 * 1024);
+        var bigData = RandomBytes(2 * 1024 * 1024);
+
+        using var dead = new FakeFileServer { RefuseConnections = true };
+        using var good = new FakeFileServer { Data = smallData };
+        using var bigServer = new FakeFileServer { Data = bigData };
+
+        var tmpRoot = Path.Combine(TempRoot, Guid.NewGuid().ToString("N"));
+        var targetA = Path.Combine(tmpRoot, "big.bin");
+        var targetB = Path.Combine(tmpRoot, "small.bin");
+
+        var options = new DownloadOptions
+        {
+            MaxConcurrentChunks = 8,
+            SpeedLimitLow = 1,
+            RetryBackoffMilliseconds = 50,
+            TickMilliseconds = 20,
+            MinConnectTimeoutMilliseconds = 500,
+            ConnectTimeoutMilliseconds = 1000,
+            ReadStallTimeoutMilliseconds = 2000,
+        };
+
+        var engine = new DownloadEngine();
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+
+        var report = await engine.DownloadAsync(
+        [
+            new DownloadFileRequest { Sources = [bigServer.Url], LocalPath = targetA, Check = Sha1Rule(bigData) },
+            new DownloadFileRequest { Sources = [dead.Url, good.Url], LocalPath = targetB, Check = Sha1Rule(smallData) },
+        ], options, cancellationToken: cts.Token);
+
+        Assert.Equal(smallData, await File.ReadAllBytesAsync(targetB));
+        Assert.Equal(DownloadFileState.Finished, report.Files.First(f => f.LocalPath == targetB).State);
     }
 
     #endregion
