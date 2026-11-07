@@ -63,7 +63,9 @@ jobs:
     - name: Set Describe
       shell: bash
       run: |
-          describe=`git describe --tags --always`
+          # §0C.3：平台 tag（linux/v*、android/v*、linux/<名称>）不得参与阶段判定与 artifact 名。
+          # 必须显式限定主阶梯命名空间，否则 git describe 会取到平台 tag，导致 §6.2 代号误判。
+          describe=`git describe --tags --always --match 'v*'`
           echo "describe=$describe" >> $GITHUB_ENV
 
     - name: Resolve channel
