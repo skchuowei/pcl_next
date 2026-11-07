@@ -49,7 +49,10 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v6
       with:
-        fetch-depth: 1
+        # 必须是完整历史：构建号 = 自固定锚点以来的提交数 × 0.01（§5.2.1）。
+        # 浅克隆取不到锚点，脚本会退化为「自首个提交起算」，而 fetch-depth: 1 时
+        # 只剩 1 个提交 → 构建号恒为 0.01，产物目录名与本地永远对不上。
+        fetch-depth: 0
         submodules: true
 
     - name: Set Describe
@@ -106,6 +109,16 @@ jobs:
       run: |
         (gc "pcl-next\Modules\ModSecret.vb") -replace 'Public OAuthClientId As String = If(Environment.GetEnvironmentVariable("PCL_MS_CLIENT_ID"), "")', 'Public OAuthClientId As String = If(Environment.GetEnvironmentVariable("PCL_MS_CLIENT_ID"), "${{ secrets.CLIENT_ID }}")' | Out-File "pcl-next\Modules\ModSecret.vb"
         (gc "pcl-next\Modules\ModSecret.vb") -replace 'Public CurseForgeAPIKey As String = If(Environment.GetEnvironmentVariable("PCL_CURSEFORGE_API_KEY"), "")', 'Public CurseForgeAPIKey As String = If(Environment.GetEnvironmentVariable("PCL_CURSEFORGE_API_KEY"), "${{ secrets.CURSEFORGE_API_KEY }}")' | Out-File "pcl-next\Modules\ModSecret.vb"
+
+    - name: Refresh build number cache
+      shell: pwsh
+      run: |
+        # 产物目录名带构建号（bin-net10\<代号>\<版本>-<构建号>\<RID>\）。
+        # MSBuild 的属性求值阶段不能执行 git 命令，必须在构建前先把编号落盘，
+        # 否则 Directory.Build.props 读到的是旧值（或没有值 → 目录名缺构建号）。
+        & "${{ GITHUB.WORKSPACE }}\scripts\Get-BuildSmallVersion.ps1" `
+            -RepoRoot "${{ GITHUB.WORKSPACE }}" `
+            -CacheFile "${{ GITHUB.WORKSPACE }}\pcl-next\obj\pcl-build.small"
 
     - name: Build CLI + offline selftest
       shell: pwsh

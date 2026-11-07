@@ -70,6 +70,16 @@ jobs:
         (gc "pcl-next\Modules\ModSecret.vb") -replace 'Public OAuthClientId As String = If(Environment.GetEnvironmentVariable("PCL_MS_CLIENT_ID"), "")', 'Public OAuthClientId As String = If(Environment.GetEnvironmentVariable("PCL_MS_CLIENT_ID"), "${{ secrets.CLIENT_ID }}")' | Out-File "pcl-next\Modules\ModSecret.vb"
         (gc "pcl-next\Modules\ModSecret.vb") -replace 'Public CurseForgeAPIKey As String = If(Environment.GetEnvironmentVariable("PCL_CURSEFORGE_API_KEY"), "")', 'Public CurseForgeAPIKey As String = If(Environment.GetEnvironmentVariable("PCL_CURSEFORGE_API_KEY"), "${{ secrets.CURSEFORGE_API_KEY }}")' | Out-File "pcl-next\Modules\ModSecret.vb"
 
+    - name: Refresh build number cache
+      shell: pwsh
+      run: |
+        # 产物目录名带构建号（bin-net10\<代号>\<版本>-<构建号>\<RID>\）。
+        # MSBuild 求值阶段不能执行 git 命令，须在构建前把编号落盘。
+        # 发布构建必须与制品名里的构建号同源，否则目录名与 exe 名会对不上。
+        & "${{ GITHUB.WORKSPACE }}\scripts\Get-BuildSmallVersion.ps1" `
+            -RepoRoot "${{ GITHUB.WORKSPACE }}" `
+            -CacheFile "${{ GITHUB.WORKSPACE }}\pcl-next\obj\pcl-build.small"
+
     - name: Publish (self-contained single file)
       run: dotnet publish "pcl-next\pcl-next.vbproj" -c Release -p:PclChannel=${{ steps.channel.outputs.channel }} -p:PublishProfile=win-x64-single
 

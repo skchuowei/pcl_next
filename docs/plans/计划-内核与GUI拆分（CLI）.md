@@ -87,7 +87,7 @@
 - **下载策略不能硬编码**：`ModDownloadPolicy` 的生效顺序是「环境变量 `PCL_ALLOW_MC_DOWNLOAD` → `DownloadPolicy.ini` → 内置默认 `True`」，且**首次访问即缓存**（运行期改文件不生效）。CLI 必须复刻同一顺序，否则会出现「GUI 禁用、CLI 照下」的合规漏洞。
 - **BMCLAPI 限频**：高频 403/429 时**不禁用源**，且请求前 `Thread.Sleep(100)`。CLI 压测 B1 时最容易把这条规则打穿，务必走 `PCL.Download` 现有实现，不另写循环。
 - **`DownloadLog` 命名冲突**：`PCL.Download` 里叫 `DownloadLog`（不是 `Logger`），原因是避免与 VB 的 `MeloongCore.Logger` 抢符号。CLI 侧引用时不要再引入同名类型。
-- **产物路径锁死**：CLI 产物也必须在 `bin-net10\<代号>\<版本名>\<RID>\` 三段树内（§零），否则按错误产物处理。
+- **产物路径锁死**：CLI 产物也必须在 `bin-net10\<代号>\<版本名>-<构建号>\<RID>\` 三段树内（§零），否则按错误产物处理。
 
 ---
 
@@ -253,7 +253,7 @@ PCL_ALLOW_MC_DOWNLOAD=False pclcli install --version-json <x> --dir /tmp/i   # �
 | 策略同源 | `PCL_ALLOW_MC_DOWNLOAD=False pclcli install …` | 退出码 **4**，stdout 有 `policy_blocked` 事件 |
 | stdout 纯净 | `pclcli selftest 2>/dev/null` | 仅 JSON Lines，无杂字符 |
 
-产物落点：`PCL2/bin-net10/Dev/2.100.0.3/any/cli/pclcli.exe`（三段树内 `cli/` 子层）。
+产物落点：`PCL2/bin-net10/Dev/2.100.0.3-0.20/win-x64/cli/pclcli.exe`（三段树内 `cli/` 子层；目录名含构建号，见 AGENTS §0.1）。
 
 ### 9.4 与计划的偏离（三处，均有理由）
 

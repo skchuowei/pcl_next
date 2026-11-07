@@ -75,31 +75,61 @@ if (-not $Version) {
     $Version = $line.Matches[0].Groups[1].Value
 }
 
-# --- 2. 计算三段输出路径（§5.3：代号\版本\运行环境，位于 pcl-next 项目树下） -----
-$OutPath = Join-Path $RepoRoot "pcl-next\bin-net10\$Channel\$Version\$Rid"
-$OutPathWithSlash = "$OutPath\"
+# --- 1.5 刷新构建号缓存 ------------------------------------------------------
+# 目录名里带构建号（bin-net10\<代号>\<版本>-<构建号>\<RID>\），而 MSBuild 求值期
+# 不能跑 git，所以必须**在这里**先把编号落到缓存文件，再让第 2 步去查 OutputPath。
+# 顺序不能颠倒：先查路径后刷缓存，查到的是上一次的编号。
+$CacheFile = Join-Path $RepoRoot 'pcl-next\obj\pcl-build.small'
+$BuildInfo = (& (Join-Path $PSScriptRoot 'Get-BuildSmallVersion.ps1') `
+        -RepoRoot $RepoRoot -CacheFile $CacheFile -Json) | ConvertFrom-Json
+$BuildSmall = $BuildInfo.BuildSmall
+if (-not $BuildSmall) {
+    throw "无法取得构建号；请检查 scripts\Get-BuildSmallVersion.ps1 是否可执行。"
+}
 
-Write-Host "==> 渠道 $Channel | 版本 $Version | RID $Rid | 配置 $Configuration" -ForegroundColor Cyan
+# --- 2. 从工程配置查询三段输出路径（唯一真相源：Directory.Build.props 的 PclGuiTreeRoot） ---
+# 本脚本**不再自己拼路径**，也不再向 MSBuild 传 -p:OutputPath。
+# 历史上这里手拼 "pcl-next\bin-net10\$Channel\$Version\$Rid" 并用 -p:OutputPath 硬灌，
+# 恰好掩盖了 vbproj 里 OutputPath 只写「代号」一段的缺陷：走脚本是对的，
+# 一旦直接 dotnet build / IDE 编译就退回单层树，两套产物目录并存（2026-11-01 事故）。
+$OutPath = (& dotnet build $MainProj -getProperty:OutputPath `
+        -p:Configuration=$Configuration -p:RuntimeIdentifier=$Rid -p:PclChannel=$Channel 2>$null |
+        Out-String).Trim()
+if ([string]::IsNullOrWhiteSpace($OutPath)) {
+    throw "无法从工程查询 OutputPath；请检查 Directory.Build.props 的 PclGuiTreeRoot 是否定义。"
+}
+$OutPath = $OutPath.TrimEnd('\', '/')
+
+# 防漂移断言：查询结果必须以 <开发代号>\<版本名>-<构建号>\<运行环境> 收尾
+$ExpectedTail = "$Channel\$Version-$BuildSmall\$Rid"
+if (-not $OutPath.EndsWith($ExpectedTail, [System.StringComparison]::OrdinalIgnoreCase)) {
+    throw "产物路径不符合三段树规范（AGENTS §0.1）：`n  实际：$OutPath`n  期望以：\$ExpectedTail 结尾`n请勿在工程体内手写 OutputPath，改用 `$(PclGuiTreeRoot)。"
+}
+Write-Host "==> 渠道 $Channel | 版本 $Version-$BuildSmall | RID $Rid | 配置 $Configuration" -ForegroundColor Cyan
 Write-Host "==> 输出：$OutPath"
 
 # --- 3. 可选清理（保留 PCL\ 运行数据目录） -------------------------------------
 if ($Clean -and (Test-Path $OutPath)) {
+    # 注意：PowerShell 5.1 下 Remove-Item 不接受 FileInfo 管道输入（会报 ParameterBindingException），
+    # 必须用 ForEach-Object 显式传 -LiteralPath。
     Get-ChildItem -Path $OutPath -Force |
         Where-Object { $_.Name -ne 'PCL' } |
-        Remove-Item -Recurse -Force -Confirm:$false
+        ForEach-Object { Remove-Item -LiteralPath $_.FullName -Recurse -Force }
     Write-Host "==> 已清空目标目录（保留 PCL\ 运行数据）"
 }
 
 # --- 4. 构建（项目级：.NET 10 禁止 sln + -r，见 NETSDK1134） --------------------
 dotnet build $MainProj `
     -c $Configuration -r $Rid --self-contained `
-    -p:PclChannel=$Channel `
-    "-p:OutputPath=$OutPathWithSlash"
+    -p:PclChannel=$Channel
 if ($LASTEXITCODE -ne 0) {
     throw "dotnet build 失败，退出码 $LASTEXITCODE"
 }
 
 # --- 4.5 可选：构建 CLI 内核前端（§0.1 允许的三段树内 cli\ 子层） ---------------
+# 注意 CLI 的树根是**仓库根**（$(PclTreeRoot)），不是 GUI 的 pcl-next\bin-net10，
+# 所以不能用 $OutPath 去拼它的 exe 路径——必须单独向 CLI 工程查询自己的 OutputPath。
+$CliOutPath = $null
 if ($WithCli) {
     $CliProj = Join-Path $RepoRoot 'PCL.Cli\PCL.Cli.csproj'
     if (-not (Test-Path $CliProj)) {
@@ -111,6 +141,9 @@ if ($WithCli) {
     if ($LASTEXITCODE -ne 0) {
         throw "PCL.Cli 构建失败，退出码 $LASTEXITCODE"
     }
+    $CliOutPath = (& dotnet build $CliProj -getProperty:OutputPath `
+            -p:Configuration=$Configuration -p:RuntimeIdentifier=$Rid -p:PclChannel=$Channel 2>$null |
+            Out-String).Trim().TrimEnd('\', '/')
 }
 
 # --- 5. 防呆检查（§5.3）：产物只允许出现在三段路径下 ----------------------------
@@ -140,7 +173,7 @@ else {
 
 # --- 7. CLI 产物提示（仅在 -WithCli 时） ---------------------------------------
 if ($WithCli) {
-    $CliExe = Join-Path $OutPath 'cli\pclcli.exe'
+    $CliExe = Join-Path $CliOutPath 'pclcli.exe'
     if (Test-Path $CliExe) {
         $cliItem = Get-Item $CliExe
         Write-Host ("    cli：{0}（{1:yyyy-MM-dd HH:mm}，{2:N0} KB）" -f `

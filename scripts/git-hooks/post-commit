@@ -1,0 +1,41 @@
+#!/bin/sh
+# 提交成功后刷新「构建小版本」缓存（《分支与发布规范》§5.2.1）。
+#
+# 为什么需要这个钩子：
+#   产物目录名带构建号（bin-net10\<代号>\<版本>-<构建号>\<RID>\），而 MSBuild 的
+#   属性求值发生在所有 Target 之前，那个阶段**不能执行 git 命令**，提交数算不出来。
+#   所以由本钩子在提交完成后立即把编号落到 pcl-next/obj/pcl-build.small，
+#   供 Directory.Build.props 在求值期直接读文件。
+#   没有它，提交后第一次在 IDE 里直接编译会沿用上一次的编号（目录名少一版）。
+#
+# 这里用纯 sh 计算而不是调用 PowerShell：钩子每次提交都跑，PowerShell 启动开销
+# 与 sh 相差一个数量级；且算法只有三行，与 Get-BuildSmallVersion.ps1 完全同源
+# （固定锚点 + 提交数 × 0.01 + 满百进位），不会漂。
+#
+# 由 scripts/Install-GitHooks.ps1 安装到 .git/hooks/post-commit。
+
+REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
+CACHE="$REPO_ROOT/pcl-next/obj/pcl-build.small"
+
+ANCHOR=85c17f13003322a4025e09379bb1ed2d852ea63c
+if git rev-parse --verify --quiet "$ANCHOR^{commit}" > /dev/null 2>&1; then
+    COUNT=$(git rev-list --count "$ANCHOR..HEAD" 2>/dev/null || echo 0)
+else
+    # 浅克隆取不到锚点时退化，与脚本保持同一行为
+    COUNT=$(git rev-list --count HEAD 2>/dev/null || echo 0)
+fi
+
+MAJOR=$((COUNT / 100))
+MINOR=$((COUNT % 100))
+SMALL=$(printf '%d.%02d' "$MAJOR" "$MINOR")
+
+mkdir -p "$(dirname "$CACHE")" 2>/dev/null
+
+# 内容未变则不重写，避免无谓地刷新文件时间戳
+CURRENT=$(cat "$CACHE" 2>/dev/null | tr -d ' \r\n')
+if [ "$CURRENT" != "$SMALL" ]; then
+    printf '%s\n' "$SMALL" > "$CACHE"
+fi
+
+# 钩子永远不阻断提交
+exit 0

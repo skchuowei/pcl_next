@@ -30,17 +30,34 @@
 .PARAMETER Json
     以 JSON 输出全部字段，便于脚本调用方解析。
 
+.PARAMETER CacheFile
+    把当前编号写入该文件（单行，如 0.20），供 MSBuild 在**属性求值期**读取，
+    用于拼产物目录名（bin-net10\<代号>\<版本名>-<构建号>\<RID>\）。
+
+    为什么需要缓存文件：MSBuild 的属性求值发生在任何 Target 之前，那个阶段
+    只有一组白名单内的属性函数可用，**不能执行 git 命令**，所以提交数无法在
+    求值期直接算出。缓存把「运行期算出来的值」提前落到磁盘，求值期只读文件。
+    刷新时机：scripts\Build.ps1 构建前、CI 构建前、以及 post-commit 钩子提交后。
+
+    ⚠ 缓存必然有「过期窗口」：新克隆的仓库里没有它，此时回退为不含构建号的
+    目录名；下一次构建（或任意一次脚本调用）会把它补上。这是有意取舍——
+    宁可首刷少一段，也不要为了「每次都对」在求值期塞 git 调用而拖慢并搞脆构建。
+
 .EXAMPLE
     .\scripts\Get-BuildSmallVersion.ps1
     2.27
 
 .EXAMPLE
     .\scripts\Get-BuildSmallVersion.ps1 -Json
+
+.EXAMPLE
+    .\scripts\Get-BuildSmallVersion.ps1 -CacheFile .\pcl-next\obj\pcl-build.small
 #>
 [CmdletBinding()]
 param(
     [string]$RepoRoot = (Split-Path -Parent $PSScriptRoot),
     [string]$OutFile,
+    [string]$CacheFile,
     [switch]$Json
 )
 
@@ -94,6 +111,23 @@ $minor = [int]($commits % 100)
 $buildSmall = '{0}.{1:00}' -f $major, $minor
 $token = "$buildSmall.g$commit"
 if ($dirty) { $token = "$token.dirty" }
+
+# ---- 可选：把编号落盘成缓存，供 MSBuild 求值期读取（目录名用）----
+# 放在 -Json / -OutFile 分支之前，确保任何调用方式都会刷新缓存。
+if ($CacheFile) {
+    $cacheDir = Split-Path -Parent $CacheFile
+    if ($cacheDir -and -not (Test-Path $cacheDir)) {
+        New-Item -ItemType Directory -Path $cacheDir -Force | Out-Null
+    }
+    $cached = ''
+    if (Test-Path $CacheFile) {
+        $cached = (Get-Content -Path $CacheFile -Raw).Trim()
+    }
+    if ($cached -ne $buildSmall) {
+        # 不写 BOM：MSBuild 用 File::ReadAllText 读，BOM 会变成一个不可见前导字符
+        [System.IO.File]::WriteAllText($CacheFile, $buildSmall + "`r`n", (New-Object System.Text.UTF8Encoding $false))
+    }
+}
 
 if ($Json) {
     $result = [ordered]@{

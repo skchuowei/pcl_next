@@ -25,8 +25,24 @@
     <ApplicationIcon>Images\icon.ico</ApplicationIcon>
     <!-- 不使用面向 .NET Framework 的 App.config（其中的 system.net 段在 net10 上会直接报错） -->
     <AppConfig>App.net10.config</AppConfig>
-    <OutputPath>bin-net10\$(PclChannel)\</OutputPath>
+    <!--
+      产物路径：**不得**在此手写 bin-net10\... 字面量，一律用 Directory.Build.props 的
+      PclGuiTreeRoot（= pcl-next\bin-net10\<代号>\<版本>\<RID>\，见 AGENTS §0.1）。
+
+      历史教训（2026-11-01）：这里曾写死 `<OutputPath>bin-net10\$(PclChannel)\</OutputPath>`，
+      只有「代号」一段。MSBuild 求值顺序是 Directory.Build.props 先、工程体后，于是这行
+      把三段树覆盖成了单层树，版本层整个丢失：
+        无 -r 构建 → bin-net10\Dev\            （连 RID 都没有，看起来像「跑到 bin 根」）
+        带 -r 构建 → bin-net10\Dev\win-x64\    （RID 是 SDK 自动追加的，纯属巧合）
+      而 scripts\Build.ps1 靠外部 -p:OutputPath 硬灌三段路径，所以只有走脚本才是对的，
+      两套目录并存 → IDE 编译与脚本编译的产物互不可见，表现成「改了代码没生效」。
+    -->
+    <OutputPath>$(PclGuiTreeRoot)</OutputPath>
+    <!-- 必须关掉：否则 SDK 会在已是 ...\<版本>\<RID>\ 的路径后再追加一层同名 RID -->
+    <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <!-- 启用 Directory.Build.props 的 PclTreePathGuard（OutputPath 必须含代号与版本两段） -->
+    <PclUseTreePath>true</PclUseTreePath>
     <DefineDebug>false</DefineDebug>
     <DefineTrace>false</DefineTrace>
     <ProduceReferenceAssembly>false</ProduceReferenceAssembly>
@@ -232,8 +248,15 @@
   <Target Name="PclBuildInfo" BeforeTargets="CoreCompile">
     <PropertyGroup>
       <_PclBuildInfoFile>$(IntermediateOutputPath)PclBuildInfo.g.vb</_PclBuildInfoFile>
+      <!--
+        缓存文件固定放在 obj\pcl-build.small（不带配置层），与 Directory.Build.props 的
+        PclBuildCacheFile 必须完全一致，否则求值期读的和这里写的不是同一个文件。
+        顺带在这里刷新缓存：IDE 里直接编译（没走 Build.ps1、也没装钩子）时，
+        本次目录名可能仍用旧值，但下一次就正确了，不会长期缺段。
+      -->
+      <_PclBuildCacheFile>$(MSBuildProjectDirectory)\obj\pcl-build.small</_PclBuildCacheFile>
     </PropertyGroup>
-    <Exec Command="powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\scripts\Get-BuildSmallVersion.ps1&quot; -RepoRoot &quot;$(MSBuildProjectDirectory)\..&quot; -OutFile &quot;$(_PclBuildInfoFile)&quot;"
+    <Exec Command="powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\scripts\Get-BuildSmallVersion.ps1&quot; -RepoRoot &quot;$(MSBuildProjectDirectory)\..&quot; -OutFile &quot;$(_PclBuildInfoFile)&quot; -CacheFile &quot;$(_PclBuildCacheFile)&quot;"
           IgnoreExitCode="true"
           StandardOutputImportance="low"
           StandardErrorImportance="low" />
