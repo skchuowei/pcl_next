@@ -20,6 +20,15 @@ Public Class Application
             End If
             '提升主线程优先级
             Thread.CurrentThread.Priority = ThreadPriority.Highest
+            '把内核（PCL.Download）的日志接进 Log1.txt
+            'Phase 3/4 起，候选源竞速、资源站请求、加载器列表、本地反查都改在 C# 里打日志；
+            '此前宿主从未设置 sink，这些日志只写进 Console，用户反馈时附带的 Log1.txt 里一行都看不到
+            Try
+                PCL.Download.DownloadLog.InfoSink = Sub(message) Logger.Info(message)
+                PCL.Download.DownloadLog.WarnSink = Sub(message) Logger.Warn(message)
+            Catch ex As Exception
+                Logger.Warn(ex, "接入 C# 内核日志失败")
+            End Try
             '注入 C# 侧资源站客户端（Phase 3/4）：资源搜索、指纹反查、版本枚举都经 ResourceApi.Default 联网
             Try
                 ResourceSourceGate.EnsureInitialized()
