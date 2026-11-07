@@ -13,7 +13,7 @@ on:
       - pc
       - snapshot
       - android          # 平台长期线（《分支与发布规范》§0A）
-      - linux            # 平台长期线（《分支与发布规范》§0B）；push 时须过 build-linux 跨平台护栏
+      - linux            # 平台长期线（《分支与发布规范》§0B）；push 时须过 kernel-guard.yml 的 build-linux 护栏
     paths:
       - 'pcl-next/**'
       - 'PCLCS/**'
@@ -146,6 +146,17 @@ jobs:
         & $exe.FullName selftest --suite offline --workdir "$env:RUNNER_TEMP\pclcli"
         if ($LASTEXITCODE -ne 0) { throw "pclcli 离线自检失败，退出码 $LASTEXITCODE" }
 
+    - name: Unit tests (kernel)
+      # 内核单测原先只在 Linux 门禁里跑，于是「Windows job 全绿」实际只等于「能编译」。
+      # 2026-11-07 拆分 workflow 时补上这一步：Windows 侧必须自己证明逻辑正确，
+      # 否则跨平台护栏红着时，Windows 的绿会被误读成「Windows 没问题」。
+      # 只跑 Release：Debug 与 Release 是同一份测试程序集，重复跑纯浪费 runner 时间。
+      if: matrix.configuration == 'Release'
+      shell: pwsh
+      run: |
+        dotnet test "PCL.Download.Tests\PCL.Download.Tests.csproj" -c ${{ matrix.configuration }}
+        if ($LASTEXITCODE -ne 0) { throw "内核单测失败，退出码 $LASTEXITCODE" }
+
     - name: Publish (self-contained single file)
       run: dotnet publish "pcl-next\pcl-next.vbproj" -c ${{ matrix.configuration }} -p:PclChannel=${{ steps.channel.outputs.channel }} -p:PublishProfile=win-x64-single
 
@@ -155,56 +166,5 @@ jobs:
         name: ${{ matrix.configuration }} ${{ steps.channel.outputs.channel }} ${{ env.describe }}
         path: pcl-next\publish\win-x64\${{ steps.channel.outputs.channel }}\pcl-next.exe
 
-  # ── 跨平台护栏（Linux runner，android / linux 两条平台线共用）──────────
-  # 目的：只验证「无 GUI 内核」在 Linux 上可编译、可测试、可离线自检，
-  # 不产出任何对外制品，也不参与代号发布（《分支与发布规范》§0A.2 / §0B.3）。
-  # 护栏只做一份：两条平台线都从 dev 吸收内核，共用同一套「内核可跨平台」判据，
-  # 各写一份 CI 迟早漂移（AGENTS §0.3.1 的教训）。
-  # 2026-11-07 发现 Directory.Build.props 用反斜杠拼路径会让 Linux 上 Exists() 失效后加的
-  # 机械护栏：若有人把 Windows 专属路径或 WPF 引用重新带进内核，这条 job 会直接失败。
-  # Android APK 构建在 SDK / workload 就绪前**不挂必过门禁**。
-  build-linux:
-    name: Kernel cross-platform guard (Linux)
-    runs-on: ubuntu-latest
-
-    steps:
-    - name: Checkout
-      uses: actions/checkout@v6
-      with:
-        # 构建号按固定锚点以来的提交数推导，浅克隆会让锚点不可达（§5.2.1）
-        fetch-depth: 0
-        submodules: true
-
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v4
-      with:
-        dotnet-version: '10.0.x'
-
-    - name: Refresh build number cache
-      shell: bash
-      run: |
-        # 与 Windows job 同源：PclTreePathGuard 要求版本段含构建号，
-        # 而 MSBuild 求值期不能跑 git，故先由脚本落盘。
-        pwsh -File scripts/Get-BuildSmallVersion.ps1 \
-          -RepoRoot "$GITHUB_WORKSPACE" \
-          -CacheFile "$GITHUB_WORKSPACE/pcl-next/obj/pcl-build.small"
-
-    - name: Build download engine
-      run: dotnet build PCL.Download/PCL.Download.csproj -c Release -r linux-x64
-
-    - name: Build CLI (architecture + output path guards)
-      run: dotnet build PCL.Cli/PCL.Cli.csproj -c Release -r linux-x64
-
-    - name: Unit tests
-      run: dotnet test PCL.Download.Tests/PCL.Download.Tests.csproj -c Release
-
-    - name: CLI offline selftest
-      shell: bash
-      run: |
-        dll=$(find bin-net10 -name 'pclcli.dll' -print -quit)
-        if [ -z "$dll" ]; then
-          echo "未找到 pclcli.dll：产物可能未落在 bin-net10 三段树内"
-          exit 1
-        fi
-        echo "CLI 产物：$dll"
-        dotnet "$dll" selftest --suite offline --workdir "$RUNNER_TEMP/pclcli"
+  # Linux 内核跨平台护栏已拆到独立 workflow（kernel-guard.yml）：
+  # Windows 线不再等 Linux 跑完，两条线各自出结论、各自重跑。
