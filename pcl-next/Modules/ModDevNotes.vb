@@ -31,6 +31,17 @@ Public Module ModDevNotes
     Public ReadOnly Property DevStageNotice As String
         Get
             Select Case VersionCode
+                Case 5004 ' dev 2.100.0.5
+                    Return "你正在使用 PCL Next 的开发版（dev）。本版把安装流程里的纯逻辑搬进了 C# —— " &
+                           "版本合并、Forge/NeoForge/OptiFine 安装器的参数推导、OptiFine 与 LiteLoader 的版本 json、" &
+                           "安装临时目录布局、修改安装的变更计划；实例 Mod 页的本地列表与在线反查也改由 C# 提供。" &
+                           "另外修复了内核日志从不写进日志文件的问题，现在 PCL/Log1.txt 里能看到下载与安装的内核日志。" & vbCrLf & vbCrLf &
+                           "本版本已知限制：" & vbCrLf &
+                           "- 下载 UI 的编排外壳（加载器树的生成、任务列表与进度）仍是旧实现，纯逻辑虽已换到 C#；" & vbCrLf &
+                           "- 六类加载器列表仍未逐类真机安装冒烟，遇到条目异常请附 PCL/Log1.txt；" & vbCrLf &
+                           "- 修改安装里「清单有没有这一项」与「待删除列表去重」用了不同的比较规则（前者区分大小写、" &
+                           "后者忽略），本版只补用例锁住现状、未统一；" & vbCrLf &
+                           "- 配置与存档结构可能在后续版本调整，建议定期备份；遇到异常请附 PCL/Log1.txt。"
                 Case 5003 ' dev 2.100.0.4
                     Return "你正在使用 PCL Next 的开发版（dev）。本版补齐了资源子系统的联网半边（平台接口、密钥降级、" &
                            "在线反查），并把下载页的数据源全部切到了 C#：MC 版本清单、资源详情页、六类加载器列表" &
@@ -69,6 +80,23 @@ Public Module ModDevNotes
     Public ReadOnly Property DevChangelog As String
         Get
             Select Case VersionCode
+                Case 5004 ' dev 2.100.0.5
+                    Return "· 重写：安装编排的纯逻辑入 PCL.Download——VersionMerger（版本 json 合并）、" &
+                           "ForgelikeInstaller（Forge/NeoForge 安装器参数与进度）、OptiFineInstaller（参数与 Java 版本探测）、" &
+                           "OptiFineProfile（镜像地址与旧式版本 json）、LiteLoaderProfile、FabricProfile、" &
+                           "ForgeRecommended（推荐版本缓存）、InstallLayout（安装目录布局与清单字符串规则）、" &
+                           "InstallCommitPlanner（修改安装的变更计划）。" & vbCrLf &
+                           "· 重写：JObject.Merge 的语义在 System.Text.Json 上逐条复现——数组拼接（目标在前）、" &
+                           "来源 null 忽略、对象递归、其余替换；minecraftArguments 的取值吸附到 flag 的规则一并保留。" & vbCrLf &
+                           "· 重写：实例 Mod 页接管——LocalResourceLoaders.vb 345 行降至 139 行；新增 PrimeHashes，" &
+                           "宿主把已算好的 SHA1/Murmur 灌进内核，避免每次打开页面重读整个 mods 目录。" & vbCrLf &
+                           "· 优化：宿主挂接 DownloadLog.InfoSink/WarnSink——此前 GUI 从未挂接，Phase 3/4 迁进内核的日志" &
+                           "全写进 Console，Log1.txt 里一行都没有。" & vbCrLf &
+                           "· 优化：OptiFine 候选源推导由「安装」与「另存为」两处收敛为一处（两处已开始漂移）。" & vbCrLf &
+                           "· 优化：CI 拆线——Windows 构建与 Linux 内核门禁各自 workflow、各自出结论；Windows 侧补跑全部单测，" &
+                           "此前 452 例只在 Linux 跑，「Windows 全绿」实际只等于「能编译」。" & vbCrLf &
+                           "· 修复：快照版本的 Forge 安装器「另存为」必定 404——拼 maven 路径时漏了把 - 换成 _。" & vbCrLf &
+                           "· 修复：OptiFine 所需 Java 版本的四种探测失败原因全部退化成同一句日志，现已分别带出。"
                 Case 5003 ' dev 2.100.0.4
                     Return "· 重写：资源子系统联网半边入 PCL.Download——IResourceProvider（工程查询/批量/版本枚举/指纹反查/搜索分页）、" &
                            "CurseForge/Modrinth 适配器、候选源解析（官方+MCIM 多镜像，逐候选超时）、请求签名（UA/Referer/x-api-key/{CDN}）。" & vbCrLf &
