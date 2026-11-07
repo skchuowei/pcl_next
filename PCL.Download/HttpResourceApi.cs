@@ -90,7 +90,7 @@ public sealed class HttpResourceApiOptions
 /// 每个候选使用自己的超时；差异在于**错误分类**——4xx（429 除外）视为不可恢复，立即抛出而不再换源，
 /// 429 与 5xx 则按冷却退避后换下一个候选。
 /// </summary>
-public sealed class HttpResourceApi : IResourceApi, IDirectResourceApi, IDisposable
+public sealed class HttpResourceApi : IResourceApi, IDirectResourceApi, IDirectTextResourceApi, IDisposable
 {
     private readonly HttpClient _client;
     private readonly bool _ownsClient;
@@ -164,8 +164,7 @@ public sealed class HttpResourceApi : IResourceApi, IDirectResourceApi, IDisposa
     public JsonNode RequestDirect(string url, TimeSpan timeout)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(url);
-        var seconds = timeout <= TimeSpan.Zero ? 1 : (int)Math.Ceiling(timeout.TotalSeconds);
-        var candidate = new ResourceSourceCandidate(url, Math.Max(1, seconds), false);
+        var candidate = BuildDirectCandidate(url, timeout);
         try
         {
             return SendOnce(candidate, null, null, null);
@@ -173,6 +172,26 @@ public sealed class HttpResourceApi : IResourceApi, IDirectResourceApi, IDisposa
         catch (ResourceRequestException ex)
         {
             DownloadLog.Warn($"直连请求失败（{ex.Kind}，{candidate.TimeoutSeconds}s 超时，{url}）：{ex.Message}");
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// 请求单个地址并返回原始文本（供 HTML 页面使用，例如 OptiFine / Forge 的版本列表）。
+    /// </summary>
+    /// <param name="url">请求地址，原样使用。</param>
+    /// <param name="timeout">本次请求的超时；内部按整秒向上取整，最小 1 秒。</param>
+    public string RequestDirectText(string url, TimeSpan timeout)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(url);
+        var candidate = BuildDirectCandidate(url, timeout);
+        try
+        {
+            return SendOnceText(candidate, null, null, null);
+        }
+        catch (ResourceRequestException ex)
+        {
+            DownloadLog.Warn($"直连文本请求失败（{ex.Kind}，{candidate.TimeoutSeconds}s 超时，{url}）：{ex.Message}");
             throw;
         }
     }
@@ -191,7 +210,32 @@ public sealed class HttpResourceApi : IResourceApi, IDirectResourceApi, IDisposa
         _ => ResourceRequestErrorKind.ClientError,
     };
 
+    private static ResourceSourceCandidate BuildDirectCandidate(string url, TimeSpan timeout)
+    {
+        var seconds = timeout <= TimeSpan.Zero ? 1 : (int)Math.Ceiling(timeout.TotalSeconds);
+        return new ResourceSourceCandidate(url, Math.Max(1, seconds), false);
+    }
+
     private JsonNode SendOnce(ResourceSourceCandidate candidate, HttpMethod? method, string? content, string? contentType)
+    {
+        var body = SendOnceText(candidate, method, content, contentType);
+        try
+        {
+            return JsonNode.Parse(body)
+                   ?? throw new ResourceRequestException(ResourceRequestErrorKind.Parse, candidate.Url, "响应 JSON 为 null");
+        }
+        catch (JsonException ex)
+        {
+            throw new ResourceRequestException(ResourceRequestErrorKind.Parse, candidate.Url,
+                $"响应不是合法 JSON：{ex.Message}", null, ex);
+        }
+    }
+
+    /// <summary>
+    /// 单次请求的传输与错误归类：成功时返回响应正文，失败时抛出已分类的
+    /// <see cref="ResourceRequestException"/>。JSON 与 HTML 两条通道共用它。
+    /// </summary>
+    private string SendOnceText(ResourceSourceCandidate candidate, HttpMethod? method, string? content, string? contentType)
     {
         var timeout = TimeSpan.FromSeconds(Math.Max(1, candidate.TimeoutSeconds));
         using var cts = new CancellationTokenSource(timeout);
@@ -215,16 +259,7 @@ public sealed class HttpResourceApi : IResourceApi, IDirectResourceApi, IDisposa
             if (string.IsNullOrWhiteSpace(body))
                 throw new ResourceRequestException(ResourceRequestErrorKind.Parse, candidate.Url, "响应内容为空");
 
-            try
-            {
-                return JsonNode.Parse(body)
-                       ?? throw new ResourceRequestException(ResourceRequestErrorKind.Parse, candidate.Url, "响应 JSON 为 null");
-            }
-            catch (JsonException ex)
-            {
-                throw new ResourceRequestException(ResourceRequestErrorKind.Parse, candidate.Url,
-                    $"响应不是合法 JSON：{ex.Message}", null, ex);
-            }
+            return body;
         }
         catch (OperationCanceledException ex) when (cts.IsCancellationRequested)
         {

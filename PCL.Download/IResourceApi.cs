@@ -40,6 +40,23 @@ public interface IDirectResourceApi
 }
 
 /// <summary>
+/// 支持「单地址 + 显式超时 + 原样文本」请求的可选能力。
+/// <para>
+/// OptiFine 与 Forge 的版本列表是 HTML 页面，不是 JSON；<see cref="IDirectResourceApi"/>
+/// 只能返回已解析的 JSON 节点，因此这类场景需要单独的文本通道。
+/// </para>
+/// </summary>
+public interface IDirectTextResourceApi
+{
+    /// <summary>
+    /// 请求单个地址并返回原始文本（不做 JSON 解析），超时由调用方指定。
+    /// </summary>
+    /// <param name="url">请求地址（原样使用，不做镜像映射）。</param>
+    /// <param name="timeout">本次请求的超时。</param>
+    string RequestDirectText(string url, TimeSpan timeout);
+}
+
+/// <summary>
 /// <see cref="IResourceApi"/> 的全局默认实例持有者。
 /// </summary>
 public static class ResourceApi

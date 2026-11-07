@@ -17,7 +17,7 @@ public static class McVersionUtil
     {
         if (version is null) return false;
         if (Regex.IsMatch(version, @"^1\.\d")) return true;
-        string? head = RegexSeek(version, @"^[2-9]\d\.\d+");
+        string? head = VbCompat.RegexSeek(version, @"^[2-9]\d\.\d+");
         return double.TryParse(head, NumberStyles.Float, CultureInfo.InvariantCulture, out double value) && value >= 26;
     }
 
@@ -77,7 +77,7 @@ public static class McVersionUtil
         {
             if (index >= segments.Length) return 0;
             // 只读取该段开头连续的数字，忽略其后的预览版标记。
-            return int.TryParse(RegexSeek(segments[index], @"^\d+"), NumberStyles.Integer,
+            return int.TryParse(VbCompat.RegexSeek(segments[index], @"^\d+"), NumberStyles.Integer,
                 CultureInfo.InvariantCulture, out int value) ? value : 0;
         }
     }
@@ -96,8 +96,8 @@ public static class McVersionUtil
         right = right.ToLowerInvariant();
         var leftParts = left.Replace("快照", "snapshot").Replace("预览版", "pre");
         var rightParts = right.Replace("快照", "snapshot").Replace("预览版", "pre");
-        var leftTokens = RegexSearch(leftParts, @"[a-z]+|[0-9]+");
-        var rightTokens = RegexSearch(rightParts, @"[a-z]+|[0-9]+");
+        var leftTokens = VbCompat.RegexSearch(leftParts, @"[a-z]+|[0-9]+");
+        var rightTokens = VbCompat.RegexSearch(rightParts, @"[a-z]+|[0-9]+");
         for (int i = 0; ; i++)
         {
             if (i >= leftTokens.Count && i >= rightTokens.Count)
@@ -130,19 +130,4 @@ public static class McVersionUtil
     /// 比较两个版本名；左侧不旧于右侧返回 true。
     /// </summary>
     public static bool CompareVersionGE(string left, string right) => CompareVersion(left, right) >= 0;
-
-    /// <summary>获取字符串中的第一个正则匹配项，若无匹配则返回 null。</summary>
-    private static string? RegexSeek(string input, string pattern)
-    {
-        var match = Regex.Match(input, pattern);
-        return match.Success ? match.Value : null;
-    }
-
-    /// <summary>获取字符串中的全部正则匹配项。</summary>
-    private static List<string> RegexSearch(string input, string pattern)
-    {
-        var result = new List<string>();
-        foreach (Match match in Regex.Matches(input, pattern)) result.Add(match.Value);
-        return result;
-    }
 }

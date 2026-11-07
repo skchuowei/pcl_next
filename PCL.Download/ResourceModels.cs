@@ -1,3 +1,5 @@
+using System.Text.RegularExpressions;
+
 namespace PCL.Download;
 
 /// <summary>
@@ -175,6 +177,21 @@ internal static class VbCompat
     /// <summary>忽略大小写的 Contains（MeloongCore ContainsIgnoreCase）。</summary>
     public static bool ContainsIgnoreCase(this string value, string subString)
         => value.IndexOf(subString, StringComparison.OrdinalIgnoreCase) >= 0;
+
+    /// <summary>获取字符串中的第一个正则匹配项，无匹配返回 null（MeloongCore RegexSeek）。</summary>
+    public static string? RegexSeek(string input, string pattern)
+    {
+        var match = Regex.Match(input, pattern);
+        return match.Success ? match.Value : null;
+    }
+
+    /// <summary>获取字符串中的全部正则匹配项（MeloongCore RegexSearch）。</summary>
+    public static List<string> RegexSearch(string input, string pattern)
+    {
+        var result = new List<string>();
+        foreach (Match match in Regex.Matches(input, pattern)) result.Add(match.Value);
+        return result;
+    }
 
     /// <summary>是否全部为 ASCII 字符（VB 的 IsAsciiOnly）。</summary>
     public static bool IsAsciiOnly(this string value)
