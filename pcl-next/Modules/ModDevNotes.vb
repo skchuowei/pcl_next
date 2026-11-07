@@ -33,10 +33,13 @@ Public Module ModDevNotes
             Select Case VersionCode
                 Case 5003 ' dev 2.100.0.4
                     Return "你正在使用 PCL Next 的开发版（dev）。本版补齐了资源子系统的联网半边（平台接口、密钥降级、" &
-                           "在线反查），并把下载页的搜索与列表切到了 C# 实现；dev.2 起欠下的四项真机验证已清偿。" & vbCrLf & vbCrLf &
+                           "在线反查），并把下载页的数据源全部切到了 C#：MC 版本清单、资源详情页、六类加载器列表" &
+                           "（OptiFine / Forge / NeoForge / LiteLoader / Fabric）；dev.2 起欠下的四项真机验证已清偿。" & vbCrLf & vbCrLf &
                            "本版本已知限制：" & vbCrLf &
                            "- 未配置环境变量 PCL_CURSEFORGE_API_KEY 时只有 Modrinth 源，资源页会给出提示；" & vbCrLf &
-                           "- 下载 UI 的其余部分（安装流程、任务列表）与 Mod 管理页的本地更新检测仍是旧实现；" & vbCrLf &
+                           "- 下载 UI 的编排层（安装流程、任务列表与进度）仍是旧实现，数据源虽已换到 C#；" & vbCrLf &
+                           "- Mod 管理页的本地更新检测仍走旧实现；" & vbCrLf &
+                           "- 六类加载器列表本版只做了单测（20 例）与反向验证，未逐类真机安装冒烟，遇到条目异常请附 PCL/Log1.txt；" & vbCrLf &
                            "- 配置与存档结构可能在后续版本调整，建议定期备份；遇到异常请附 PCL/Log1.txt。"
                 Case 5002 ' dev 2.100.0.3
                     Return "你正在使用 PCL 的开发版（dev）。本项目仍在用 C# 重写 PCL，本版把资源子系统的" &
@@ -81,7 +84,23 @@ Public Module ModDevNotes
                            "· 修复：dev.3 标签构建漏含引擎修复（工作区未提交），线上仍会 NeoForge 卡 2%/16%、速度掉零不补分块、进度 NaN%；" &
                            "已纳入本版：分块退避、429/503 主机冷却、读停滞超时、首包对冲、死源快判、慢源换源续传、MaxChunksPerHost、进度原子镜像。" & vbCrLf &
                            "· 限流：429/5xx 冷却 5000ms 后换下一个候选（尊重 Retry-After，上限同值）；4xx 立即失败不换源。" & vbCrLf &
-                           "· 降级：PCL_CURSEFORGE_API_KEY 缺失时 CurseForge 源置灰并给出可展示文案，请求自动改由 Modrinth 承接，不抛错中断。"
+                           "· 降级：PCL_CURSEFORGE_API_KEY 缺失时 CurseForge 源置灰并给出可展示文案，请求自动改由 Modrinth 承接，不抛错中断。" & vbCrLf &
+                           "· 重写：下载数据源三块入 PCL.Download——MC 版本清单（McVersionManifestClient，三档源排期 + 特供合并 + Drop 分组）、" &
+                           "资源详情页（ResourceVersion.FromProjectId，工程查询 → 版本枚举 → 依赖补全）、六类加载器列表" &
+                           "（LoaderListClient，OptiFine/Forge MC 版本/Forge 版本/NeoForge/LiteLoader/Fabric）。VB 侧只留 LoaderTask 外壳与结果投影。" & vbCrLf &
+                           "· 重构：候选源竞速抽成 SourceRace，版本清单与六类加载器列表共用；保留「已启动源全部失败 → 立即启动下一个」加速、" &
+                           "单源 45s 兜底、取消返回 null。此前加载器列表要先等到下一个源的排期时刻（最坏 60s）才换源。" & vbCrLf &
+                           "· 新增：IDirectTextResourceApi 文本通道——OptiFine 官方页与 Forge 版本列表页是 HTML，走 JSON 通道会在解析阶段" &
+                           "抛 Parse 并被当成源故障；HttpResourceApi 的单次请求拆成 SendOnceText（传输 + 错误归类）与 JSON 解析两层。" & vbCrLf &
+                           "· 缓存：LoaderListClient 实例内按 Kind|参数|后缀 缓存，forceRestart 绕过，对齐旧实现「子加载器结果复用」的进程内语义。" & vbCrLf &
+                           "· 透传：LiteLoader 原样保存 endpoint token（安装编排要读 tweakClass / libraries / version，强类型化会丢字段）、" &
+                           "Fabric 整份 JSON 交给 UI（直接读 game / loader / installer 三个数组）。" & vbCrLf &
+                           "· 保留：Forge 的「司马版本」分支补全与 1.7.10 分支注入、LiteLoader 的 1.8/1.9 文件名补 .0、NeoForge 过滤不可下载的 47.1.82。" &
+                           "这些决定已装实例能否被反查到，未做「顺手改对」。" & vbCrLf &
+                           "· 删除：DlSourceLoader / DlSourceLoaderCancel（六类入口迁完后全仓无引用）、ModDownloadLib.McDownloadForgeRecommendedGet" &
+                           "（推荐版本改由 C# 读同一份 Cache/ForgeRecommendedList.json）。VB 净减 435 行。" & vbCrLf &
+                           "· 测试：LoaderListTests 20 例；反向验证 5 条变异（去掉加速 / 改坏 installer 优先级 / 不过滤 47.1.82 / 去掉 .0 补全 / 忽略 forceRestart）" &
+                           "均被抓，其中「installer 优先于 universal」原本没有用例守着，已补夹具与用例。"
                 Case 5002 ' dev 2.100.0.3
                     Return "· 重写：资源子系统前半平移为 C#（PCL.Download，net10.0）——" &
                            "统一 HashType（MD5/SHA1/SHA256/SHA512/MurmurHash2）、ResourceProject/ResourceVersion 双平台解析、" &
