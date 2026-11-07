@@ -28,6 +28,7 @@
 | OptiFine 安装器的 Java 版本探测、启动参数、成败判定 | 本轮迁到 `OptiFineInstaller` | ✅ C# |
 | OptiFine 下载源、安装器落盘位置、旧式版本 json | 本轮迁到 `OptiFineProfile`（「安装」与「另存为」共用一份） | ✅ C# |
 | LiteLoader 版本 json / Fabric 实例名与 profile 地址 | 本轮迁到 `LiteLoaderProfile` / `FabricProfile` | ✅ C# |
+| Forge 推荐版本缓存（promos → 扁平表） | 本轮迁到 `ForgeRecommended`（请求仍在宿主，带重试与浏览器头） | ✅ C# |
 | 安装编排（`ModDownloadLib`，安装器执行 / 库分析 / 版本落盘） | VB，与 `MyListItem` / `LoaderTask` 深度耦合 | 🟡 各加载器的数据推导已全出，编排仍在 VB |
 | 下载任务列表 / 进度 | VB `LoaderBase`，底层已由 C# 引擎驱动 | ⬜ |
 
@@ -126,6 +127,8 @@ LiteLoader 的版本 json 是一段 30 行的字符串拼接，Fabric 的 `∞ �
 - `PCL.Download/LiteLoaderProfile.cs`（新增）：`BuildVersionJson` 由条目原文构造版本 json，
   含「条目自带 `libraries` + 追加 `com.mumfrey:liteloader`」这条隐式规则。
 - `PCL.Download/FabricProfile.cs`（新增）：`BuildInstanceName` / `BuildProfileUrls`。
+- `PCL.Download/ForgeRecommended.cs`（新增）：`BuildCacheJson` 把 promos 的「构建通道」列表
+  转成「每个 MC 版本一个推荐版本」的扁平表，含两处下限校验（响应长度、条目数）。
 - `pcl-next/Pages/PageDownload/ModDownloadLib.vb`：
   `McDownloadOptiFineInstall` 的探测 / 参数 / 进度 / 成败四段改为调用；
   新增 `McDownloadOptiFineSources` 收敛两处重复的源推导；
@@ -136,6 +139,7 @@ LiteLoader 的版本 json 是一段 30 行的字符串拼接，Fabric 的 `∞ �
 - `PCL.Download.Tests/OptiFineProfileTests.cs`：21 例。
 - `PCL.Download.Tests/LiteLoaderProfileTests.cs`：11 例。
 - `PCL.Download.Tests/FabricProfileTests.cs`：4 例。
+- `PCL.Download.Tests/ForgeRecommendedTests.cs`：8 例。
 
 ### 4.7 后续（未动）
 
@@ -233,6 +237,12 @@ LiteLoader 的版本 json 是一段 30 行的字符串拼接，Fabric 的 `∞ �
     顺序颠倒则可能被后面的同名库覆盖。构造时必须**深拷贝**条目里的数组，否则会把这条写回列表条目。
 30. **Fabric 的 `∞ → infinite` 只用于请求地址**：实例名（= 版本文件夹名 = json 文件名）要保留原始串，
     否则实例列表里对不上。两者由 `FabricProfile` 一并给出，避免以后有人把替换提到前面。
+31. **Forge 推荐版本缓存是「构建通道 → 扁平表」的转换**：promos 返回的是 `1.15.2-recommended`、
+    `1.20.1-latest` 这类通道，UI 要的是「每个 MC 版本一个推荐版本」。原实现用字符串拼 JSON
+    （`""" & Name.Replace(...) & """"`），拼错一个引号整份不可读，表现只是「推荐标记不见了」。
+    两处下限（响应长度 1000、条目数 5）一并搬过来：镜像降级时返回几十字节的错误页，
+    没有下限就会写出一份空缓存，而空缓存看起来和「刚装完还没刷」没有区别。
+    另外「整个 build 缺失」是跳过、「build 在但 version 不在」是报错——这两者原实现语义不同，别合并。
 
 ## 6. 回归面
 
@@ -281,6 +291,8 @@ LiteLoader 的版本 json 是一段 30 行的字符串拼接，Fabric 的 `∞ �
 - LiteLoader 列表多次打开后再安装：同一份列表条目在两次安装之间不被上一次的追加污染。
 - Fabric 安装：`1.20.1` 与 `1.20.1∞` 各一次，后者实例文件夹名保留 `∞`、请求地址走 `infinite`。
 - 整合包安装的工程批量查询：Mod 缺失列表一次查询回来，重复查询走缓存不再联网。
+- Forge 版本列表的「推荐」标记：`Cache/ForgeRecommendedList.json` 缺失时启动后会生成；
+  文件内容为紧凑的单行 JSON，键是 MC 版本、值是推荐 Forge 版本（不带 `-recommended` 后缀）。
 
 ## 7. 验证
 
@@ -343,19 +355,20 @@ LiteLoader 的版本 json 是一段 30 行的字符串拼接，Fabric 的 `∞ �
 - 脚本坑（与 dev.4 同一个坑的镜像面）：还原时若把 mtime 写回**原始旧时间戳**，MSBuild 会认为源码比
   变异后的 dll 还旧，于是不重编，最后那次全量跑用的仍是变异程序集，会显示一条假失败
   （本次表现为 `Normalize_NeoForge_为1点20点1补齐包名前缀` 失败）。还原后必须 `os.utime(path, None)`。
-- 第六轮（OptiFine / LiteLoader / Fabric 的安装数据推导）：`PCL.Download.Tests` 新增 63 例
+- 第六轮（OptiFine / LiteLoader / Fabric / Forge 推荐版本）：`PCL.Download.Tests` 新增 71 例
   （`OptiFineInstallerTests` 27、`OptiFineProfileTests` 21、`LiteLoaderProfileTests` 11、
-  `FabricProfileTests` 4），全量 **407 例**。
-- 第六轮反向验证（11 条变异，全部**一次**抓住）：
+  `FabricProfileTests` 4、`ForgeRecommendedTests` 8），全量 **415 例全绿**。
+- 第六轮反向验证（15 条变异，全部**一次**抓住）：
   M1 去掉 Java 9+ 的 `--add-exports`；M2 class 版本偏移改成 52；M3 行数下限判定改成 `<=`；
   M4 镜像侧 1.8/1.9 不再补 `.0`；M5 预览版路径不再把空格换斜杠；M6 `minimumLauncherVersion` 写成数字；
   M7 抠不到官方链接照样拼地址；M8 LiteLoader 不深拷贝；M9 liteloader 库插到最前；
-  M10 实例名也替换 `∞`；M11 Fabric 候选源顺序颠倒。
+  M10 实例名也替换 `∞`；M11 Fabric 候选源顺序颠倒；M12 不过滤 `-recommended` 通道；
+  M13 缺 `build` 的条目不再跳过；M14 去掉条目数下限；M15 键里不去掉 `-recommended` 后缀。
   对应失败用例与变异一一对应，没有出现「改了不报错」的情况——这一批逻辑的共同点是出错不抛异常，
-  所以每条都配了能区分行为的断言（如「输入文档未被改动」「库顺序」「null 而不是拼地址」）。
-- 第六轮全量结果：**406 / 407**。唯一失败是 `DownloadEngineTests.SlowSource_IsRotatedToFastSource`
-  （并行工作线正在改 `DownloadFileTask.cs` / `DownloadEngineTests.cs`，工作区是脏的；
-  这条用例此前已多次被判定为时序敏感）。与本轮改动无关：本轮没有触碰下载引擎任何文件。
+  所以每条都配了能区分行为的断言（如「输入文档未被改动」「库顺序」「null 而不是拼地址」
+  「键里没有通道后缀」）。
+- 第六轮全量结果：415 / 415。此前偶发的 `DownloadEngineTests.SlowSource_IsRotatedToFastSource`
+  本次通过（同一台机器上并行工作线正在改下载引擎，工作区是脏的；这条用例已多次被判定为时序敏感）。
 
 ## 8. 回滚
 
