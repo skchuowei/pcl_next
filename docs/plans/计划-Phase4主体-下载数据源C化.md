@@ -23,7 +23,9 @@
 | OptiFine / Forge / NeoForge / LiteLoader / Fabric 列表 | 已由 `LoaderListClient` 提供（六类入口全在 C#） | ✅ C#（投影保留） |
 | 本地 Mod 列表扫描 / 在线反查与更新检测 | 本轮改由 `LocalResourceScanner` / `LocalResourceOnlineLoader` 提供 | ✅ C#（投影保留） |
 | 工程批量查询（`FromProjectIds`） | VB 实现，仅整合包安装使用 | ⬜ |
-| 安装编排（`ModDownloadLib`，2176 行） | VB，与 `MyListItem` / `LoaderTask` 深度耦合 | ⬜ |
+| 版本合并（原版 + 加载器 json 合成） | 本轮迁到 `VersionMerger` | ✅ C# |
+| Forge / NeoForge 安装器的版本串归一化、下载地址、启动参数、进度映射 | 本轮迁到 `ForgelikeInstaller` | ✅ C# |
+| 安装编排（`ModDownloadLib`，安装器执行 / 库分析 / 版本落盘） | VB，与 `MyListItem` / `LoaderTask` 深度耦合 | 🟡 纯逻辑已出，编排仍在 VB |
 | 下载任务列表 / 进度 | VB `LoaderBase`，底层已由 C# 引擎驱动 | ⬜ |
 
 ## 4. 文件清单
@@ -86,7 +88,26 @@
 - `PCL.Download.Tests/LocalResourceOnlineLoaderTests.cs`：新增 4 例（加载器集合不一致不算更新、
   站点失败不写「已加载」标记、取消返回 null、宿主预置指纹生效）。
 
-### 4.5 后续（未动）
+### 4.5 第五轮：安装编排的纯逻辑
+
+安装编排（`ModDownloadLib`）与 `LoaderBase` / `LoaderTask` / `McInstance` 深度耦合，整体搬迁会同时牵动
+Phase 6 的库与资源分析。本轮只摘**不依赖加载器状态机的纯逻辑**：
+
+- `PCL.Download/VersionMerger.cs`（新增）：`VersionProfile` / `VersionMergeSource` / `VersionMerger`。
+  承接 VB `MergeJson`：读各 profile 的同名 json、按叠加顺序深合并、回填 `minecraftArguments`、
+  摘掉 `_comment_` / `inheritsFrom` / `jar`、写入新 `id`。文件读写（含建目录与占用重试）也在内核里。
+- `PCL.Download/ForgelikeInstaller.cs`（新增）：`ForgelikeVersionTarget` / `ForgelikeInstallerFile` /
+  `ForgelikeProgressStep` / `ForgelikeInstaller`，承接四件事：
+  `Normalize`（版本串归一化）、`BuildForgeInstaller` / `BuildNeoForgeInstaller`（安装器下载地址）、
+  `BuildArguments`（安装器启动参数）、`ReadProgress`（安装器输出 → 进度动作）。
+- `pcl-next/Pages/PageDownload/ModDownloadLib.vb`：`MergeJson` 缩成「按安装形态挑选参与合并的目录」；
+  `ForgelikeInjectorLine` 只剩取表 + 赋值；`ForgelikeInjector` 的参数拼接改为一次调用；
+  `McDownloadForgelikeLoader` 的版本串特例改为一次 `Normalize`；
+  「另存为安装器」与「安装」两条路径的四段地址拼接统一到 C#。净 −58 行（+68 / −126）。
+- `PCL.Download.Tests/VersionMergerTests.cs`：14 例。
+- `PCL.Download.Tests/ForgelikeInstallerTests.cs`：30 例。
+
+### 4.6 后续（未动）
 
 - `pcl-next/Pages/PageDownload/ModDownloadLib.vb`：安装编排的 `LoaderBase` 生成改为 C# 输出。
 - `pcl-next/Pages/PageDownload/Resource/PageDownloadCompDetail.xaml.vb`：资源详情版本列表改由 Provider 提供（已通过 `ResourceVersion.FromProjectId` 转发完成）。
@@ -139,6 +160,31 @@
     `New ResourceVersion(Core)`），只有缓存 JSON 需要 `Newtonsoft ↔ System.Text.Json` 转一次。
 18. **缓存落盘仍归宿主**：C# `Load` 只就地改传入的 `JsonObject`，写文件、`version` 字段校验与
     `ModeDebug` 缩进都在 VB——与 `LocalResourceOnlineLoader` 的类注释一致，也避免内核依赖宿主路径约定。
+19. **Newtonsoft 的 `JObject.Merge` 语义不会随 STJ 一起继承**，必须逐条复现，否则合并出来的 version json
+    依然是一份合法 JSON，但启动时才炸：
+    - 数组是**拼接**（目标在前 + 来源追加），不是覆盖——`libraries` / `arguments.game` 全靠这条；
+    - 来源值为 `null` 时**忽略**（加载器 json 里常见 `"assets": null`，不能把原版的值清掉）；
+    - 对象**递归**合并，同名对象继续往下钻；
+    - 其余情况（标量、类型不同）直接替换。
+    另外 `releaseTime` / `time` 属于「这份 profile 什么时候生成的」，合并前必须从加载器侧剔掉，
+    否则版本列表显示的是加载器的构建时间。
+20. **`minecraftArguments` 的取值要吸附到 flag 上**：旧版启动器只认这条扁平字符串，加载器往里塞
+    `--tweakClass xxx` 这类成对参数。直接按空格切开再 `Distinct` 会把 flag 与取值拆散——
+    两个加载器都写 `--tweakClass` 时，第二个取值会变成孤立参数（客户端直接崩）。故先把
+    「紧跟 flag 的第一个非 flag 词」吸附上去再去重；多个取值时只吸附第一个（与 VB 一致，
+    交给启动器按空白切分，结果等价）。
+21. **合并写文件要保留建目录与重试**：VB 的 `FileUtils.Write` 会建父目录、并在 `IOException` 时重试
+    （200ms）。版本 json 可能被杀毒/索引服务短暂占用，丢掉重试会把「偶发占用」变成安装失败。
+22. **Forge 快照版本在 maven 里用下划线**（`1.20.2_pre1`），这条替换原先只写在「安装」路径，
+    「另存为安装器」路径漏了——快照版本另存会拼出 404 地址。本轮统一到一处并顺手修掉；
+    这是本轮唯一的**行为变更**（对外可见结果：快照版本的安装器另存从必失败变为可用）。
+23. **安装器进度表是精确文案匹配**：`"  File exists: Checksum validated."` 有两个前导空格、
+    `"Splitting: "` 有一个尾部空格，写错就只是「进度条不动」，不报错、难发现，故逐字搬进 C# 并加用例锁住。
+    其中校验命中那条是**累加**（`+= 0.003`）而不是赋值——安装器会连打很多行，改成赋值进度会来回跳。
+24. **安装器启动参数的两个易错点**：classpath 用 `;` 拼（Windows 分隔符）、Java 9 起必须补
+    `--add-exports cpw.mods.bootstraplauncher/...=ALL-UNNAMED`（模块系统默认不导出内部包）。
+    JavaWrapper 模式下多一个 `-Doolloo.jlw.tmpdir` 与 `-jar`；拿不到 wrapper 路径时要退回普通模式，
+    不能把空路径拼进去。
 
 ## 6. 回归面
 
@@ -167,6 +213,16 @@
 - `Cache\LocalMod.json` 的跨版本兼容：本版改由 System.Text.Json 写出，旧缓存（Newtonsoft 写）仍要能读。
 - Mod 页的「切换启用/禁用」重命名后 `NewModEntity.FromJson(ModEntity.ToJson)` 仍要保住网络信息。
 - `Log1.txt` 里能看到 `PCL.Download` 的日志（如「本地资源在线反查：N 个文件需要联网」）。
+- 版本合并：安装 原版 + OptiFine + Forge + LiteLoader 的组合实例，合并后的 json 里
+  `libraries` / `arguments` 是各方之和、`mainClass` 取最后一个加载器、`id` 为新版本名、
+  没有 `inheritsFrom` / `jar` / `_comment_`。
+- 版本合并后能正常启动游戏（这是合并正确性的**唯一**可信判据，单测只能守结构）。
+- Forge 安装：Java 8 与 Java 17+ 各一次（后者走 `--add-exports`）；启用/禁用 JavaWrapper 各一次。
+- NeoForge 安装：1.20.1（走 `net/neoforged/forge` 包名）与 1.20.4+（走 `neoforge`）各一次。
+- 快照版本 + Forge（如 `1.20.2-pre1`）能下到安装器（下划线路径）。
+- 「另存为安装器」对 Forge / NeoForge 都能拿到文件，且与「安装」路径用的是同一份地址。
+- 整合包安装传入 `1.19.3-41.2.8` 这种自带 MC 版本的 Forge 串时，实例的 `inheritsFrom` 是 `1.19.3`
+  而不是整合包声明的值。
 
 ## 7. 验证
 
@@ -211,6 +267,24 @@
   跳过速度检查；300KB 文件一旦被拆成 4 个 75KB 分块，每块只写两次，「速度过慢换源」永远不会被判定。
   改为 1MB 文件 + 512KB/s 阈值，使任意分块数下都必然多次写入并触发判定；断言顺序也改为
   先验证「第二源被使用」这一核心行为，再匹配日志（速度换源 / 死源禁用两条路径文案不同）。
+- 第五轮（安装编排的纯逻辑）：`PCL.Download.Tests` 新增 44 例（`VersionMergerTests` 14、
+  `ForgelikeInstallerTests` 30），全量 **344 例全绿**（含此前偶发的 `SlowSource_IsRotatedToFastSource`）。
+- 第五轮反向验证（7 条变异，同一套脚本口径）：
+  ① 数组改为「覆盖」而非拼接 → `Merge_数组拼接而非覆盖` 失败；
+  ② 不再忽略来源 `null` → `Merge_来源为null时保留目标已有值` 失败；
+  ③ 去掉「参数值与 flag 吸附」→ **第一次没失败**，见下；
+  ④ 快照版本的横线不再换成下划线 → `BuildForgeInstaller_快照版本的横线换成下划线` 失败；
+  ⑤ 无条件加 `--add-exports` → `BuildArguments_Java8不加模块导出参数` 失败；
+  ⑥ 校验命中的进度改为赋值 → `ReadProgress_校验命中时是累加而非覆盖` 失败；
+  ⑦ NeoForge 1.20.1 不再补包名前缀 → `Normalize_NeoForge_为1点20点1补齐包名前缀` 失败。
+- ③ 抓到的缺口：原来的用例只断言「结果包含 `--username ${auth_player_name}`」「`--username` 只出现一次」，
+  而变异后这两条**仍然成立**——去重前的 token 序列恰好让断言无法区分。真正能暴露问题的是
+  「两份 profile 的同一个 flag 取值不同」：`--tweakClass a` + `--tweakClass b`，不吸附就会退化成
+  `--tweakClass a --demo b`（`b` 成为孤立参数）。已补 `Merge_每个flag的取值各自绑定_不被去重拆散`，
+  再跑③确认守住。**这是本轮最有价值的一条**：吸附逻辑原本只是「看起来对」。
+- 脚本坑（与 dev.4 同一个坑的镜像面）：还原时若把 mtime 写回**原始旧时间戳**，MSBuild 会认为源码比
+  变异后的 dll 还旧，于是不重编，最后那次全量跑用的仍是变异程序集，会显示一条假失败
+  （本次表现为 `Normalize_NeoForge_为1点20点1补齐包名前缀` 失败）。还原后必须 `os.utime(path, None)`。
 
 ## 8. 回滚
 
@@ -238,3 +312,13 @@
 - `LocalResourceFile.FromJson` / `ToJson` 仍留在 VB 侧（`PageInstanceMod` 切换启用/禁用时用它复制网络信息），
   没有被删。
 - 新增的 `PrimeHashes` 与本轮引入的 `isCancelled` 参数都是可选/附加的，回滚后无人调用即可。
+
+第五轮（安装编排的纯逻辑）**没有删除任何公开入口**，VB 侧的 `MergeJson` / `ForgelikeInjectorLine` /
+`McDownloadForgelikeLoader` / `McDownloadForgelikeSave` 签名全部保留，只换了方法体：
+
+- 回滚只需把 `ModDownloadLib.vb` 的这三处方法体还原到上一版（git 历史），
+  `VersionMerger` / `ForgelikeInstaller` 留在内核不参与即可。
+- 一个**不可无脑回滚**的点：第 22 条的「快照版本换成下划线」是修 bug，回滚会把
+  「另存为安装器 + 快照版本」的 404 一起带回来。若确需回滚，建议只回滚调用点、保留 C# 内的修正。
+- 无数据结构变更、无缓存格式变化、无配置迁移；合并产物的 json 字段与旧版一致
+  （序列化改用 System.Text.Json，缩进风格可能有细微差别，解析结果相同）。
