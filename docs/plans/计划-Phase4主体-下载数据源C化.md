@@ -29,7 +29,7 @@
 | OptiFine 下载源、安装器落盘位置、旧式版本 json | 本轮迁到 `OptiFineProfile`（「安装」与「另存为」共用一份） | ✅ C# |
 | LiteLoader 版本 json / Fabric 实例名与 profile 地址 | 本轮迁到 `LiteLoaderProfile` / `FabricProfile` | ✅ C# |
 | Forge 推荐版本缓存（promos → 扁平表） | 本轮迁到 `ForgeRecommended`（请求仍在宿主，带重试与浏览器头） | ✅ C# |
-| 安装编排（`ModDownloadLib`，安装器执行 / 库分析 / 版本落盘） | VB，与 `MyListItem` / `LoaderTask` 深度耦合 | 🟡 各加载器的数据推导已全出，编排仍在 VB |
+| 安装编排（`ModDownloadLib`，安装器执行 / 库分析 / 版本落盘） | VB，与 `MyListItem` / `LoaderTask` 深度耦合 | 🟡 各加载器的数据推导与临时目录布局已全出，编排仍在 VB |
 | 下载任务列表 / 进度 | VB `LoaderBase`，底层已由 C# 引擎驱动 | ⬜ |
 
 ## 4. 文件清单
@@ -141,7 +141,27 @@ LiteLoader 的版本 json 是一段 30 行的字符串拼接，Fabric 的 `∞ �
 - `PCL.Download.Tests/FabricProfileTests.cs`：4 例。
 - `PCL.Download.Tests/ForgeRecommendedTests.cs`：8 例。
 
-### 4.7 后续（未动）
+### 4.7 第七轮：安装临时目录布局与清单规则
+
+第六轮把各加载器的「安装数据推导」搬完之后，`McInstallLoadersGet` 开头还剩一段纯字符串拼接：
+每个加载器的缓存目录、OptiFine 什么时候退化成 Mod、清单里记的相对路径与版本串。
+这几条共同的特点是**拼错不抛异常**，只在结果里体现（OptiFine 装到别的目录、合并时少一份源、
+修改页认不出已装的 Mod），所以单独摘出来用例锁住。
+
+- `PCL.Download/InstallLayout.cs`（新增）：`InstallLayoutRequest` / `InstallLayout` /
+  `InstallManifestRules`。
+  - `InstallLayout.Create` 推导 `VersionsRoot` / `ModsRoot` / `OptiFineFolder` / `ForgeFolder` /
+    `NeoForgeFolder` / `LiteLoaderFolder` / `FabricFolder` 与 `OptiFineAsMod`；
+    `BuildOptiFineInstallerPath` 拼 OptiFine 安装器的完整落盘路径；`LogLines` 给出与原实现同序的缓存目录日志。
+  - `InstallManifestRules.ManagedModPath`：清单里 `mods/xxx` 的规范化（正斜杠 + 小写）。
+  - `InstallManifestRules.NormalizeLoaderVersion`：清单里的加载器版本串剥离 MC 前缀（Forge / NeoForge 各一套规则）。
+- `pcl-next/Pages/PageDownload/ModDownloadLib.vb`：`McInstallLoadersGet` 的目录推导段（35 行）改为一次
+  `InstallLayout.Create` + 属性读取；`OptiFineFolder & FileName` 两处改为 `BuildOptiFineInstallerPath`；
+  清单里的相对路径与版本串归一化改为调用 C#。行数基本持平（+31 / −30）——这段本来就只有三十来行拼接，
+  收益不在删行，而在把四处「各写一遍的目录名」收敛到一处。
+- `PCL.Download.Tests/InstallLayoutTests.cs`（新增，23 例）。
+
+### 4.8 后续（未动）
 
 - `pcl-next/Pages/PageDownload/ModDownloadLib.vb`：安装编排的 `LoaderBase` 生成改为 C# 输出。
 - `pcl-next/Pages/PageDownload/Resource/PageDownloadCompDetail.xaml.vb`：资源详情版本列表改由 Provider 提供（已通过 `ResourceVersion.FromProjectId` 转发完成）。
@@ -243,6 +263,19 @@ LiteLoader 的版本 json 是一段 30 行的字符串拼接，Fabric 的 `∞ �
     两处下限（响应长度 1000、条目数 5）一并搬过来：镜像降级时返回几十字节的错误页，
     没有下限就会写出一份空缓存，而空缓存看起来和「刚装完还没刷」没有区别。
     另外「整个 build 缺失」是跳过、「build 在但 version 不在」是报错——这两者原实现语义不同，别合并。
+32. **安装的临时目录名是「一次拼错、到处静默」的典型**：`versions\forge-{版本}` 少个前缀、Fabric 的
+    版本与 MC 版本顺序颠倒、LiteLoader 用错 MC 版号，都不会报错——只是安装器把 profile 写到别处，
+    随后合并时那份源读不到，最后得到的是一份「少了几条库」但依然合法的版本 json，启动才崩。
+    七处拼接原先是内联在 `McInstallLoadersGet` 里的字面量，现在由 `InstallLayout` 统一给出，
+    并且属性一律不带尾分隔符（尾分隔符只给 `VersionsRoot` / `ModsRoot` 这两个「目录前缀」）。
+33. **OptiFine 要不要退化成 Mod，判据是「有没有选 Mod 加载器」而不是「OptiFine 版本串长什么样」**：
+    VB 用的是 `ModLoaderVersions.Any`（字典非空），所以字典里存在键但版本串是空串时**也算**有加载器。
+    C# 侧因此保留了一个可空的 `HasAnyModLoader` 让宿主显式传入，只有在宿主不传时才按四个版本号推断——
+    纯按版本串推断会在「键在、值为空串」这个边界上与旧行为分叉。
+34. **清单里的两条规范化不能「顺手统一」**：`ManagedModPath` 必须是正斜杠 + 全小写（跨平台比较靠它），
+    `NormalizeLoaderVersion` 里 Forge 取「最后一个 `-` 之后」而 NeoForge 只剥固定的 `1.20.1-`。
+    后者会让老命名 `1.7.10-10.13.4.1614-1.7.10` 被剥成 `1.7.10`——看着像 bug，但这是已装实例在
+    修改页里对得上的前提；要么统一改、要么不动，只改一半会让一部分实例突然「加载器版本不认识」。
 
 ## 6. 回归面
 
@@ -293,6 +326,13 @@ LiteLoader 的版本 json 是一段 30 行的字符串拼接，Fabric 的 `∞ �
 - 整合包安装的工程批量查询：Mod 缺失列表一次查询回来，重复查询走缓存不再联网。
 - Forge 版本列表的「推荐」标记：`Cache/ForgeRecommendedList.json` 缺失时启动后会生成；
   文件内容为紧凑的单行 JSON，键是 MC 版本、值是推荐 Forge 版本（不带 `-recommended` 后缀）。
+- 安装目录布局（第七轮）：单加载器四种各装一次（Forge / NeoForge / LiteLoader / Fabric），
+  缓存目录都落在 `临时目录\versions\{原实现的名字}` 下；日志里五行「xx 缓存：」的顺序为
+  OptiFine / Forge / NeoForge / Fabric / LiteLoader。
+- OptiFine 作为 Mod：配 Forge 时装到 `mods\`，配 LiteLoader 时装到 `mods\{MC版本}\`（#8147），
+  两种情况下 OptiFine 都不参与版本合并，且装完能启动。
+- 修改页（`PageDownloadModify`）对一个旧版 PCL 装出来的实例：Mod 列表、加载器版本标记全部能认出来
+  （第七轮改了清单里相对路径与版本串的生成方式，这里最容易看出回归）。
 
 ## 7. 验证
 
@@ -369,6 +409,16 @@ LiteLoader 的版本 json 是一段 30 行的字符串拼接，Fabric 的 `∞ �
   「键里没有通道后缀」）。
 - 第六轮全量结果：415 / 415。此前偶发的 `DownloadEngineTests.SlowSource_IsRotatedToFastSource`
   本次通过（同一台机器上并行工作线正在改下载引擎，工作区是脏的；这条用例已多次被判定为时序敏感）。
+- 第七轮（安装布局与清单规则）：`PCL.Download.Tests` 新增 `InstallLayoutTests` 23 例，
+  全量 **437 / 438**。唯一失败仍是 `SlowSource_IsRotatedToFastSource`（单独跑通过，
+  与第六轮同一个时序敏感用例，工作区仍有并行线的引擎改动未提交）。
+- 第七轮反向验证（6 条变异，全部一次抓住）：
+  M1 去掉 #8147 的 `mods\{MC版本}` 分支；M2 `OptiFineAsMod` 不看「有无 Mod 加载器」；
+  M3 清单路径不转小写；M4 Forge 取第一个 `-` 之后而非最后一个；M5 NeoForge 不剥 `1.20.1-`；
+  M6 根目录不带尾分隔符。
+  M1 一次挂掉 2 例（配 LiteLoader / 配 LiteLoader+Fabric 各一条），M2 挂 3 例、M3 挂 2 例——
+  说明这几条规则确实被多条路径同时依赖，不是单点断言。
+- 第七轮 `pcl-next.vbproj` 编译：0 错误。
 
 ## 8. 回滚
 
@@ -406,3 +456,13 @@ LiteLoader 的版本 json 是一段 30 行的字符串拼接，Fabric 的 `∞ �
   「另存为安装器 + 快照版本」的 404 一起带回来。若确需回滚，建议只回滚调用点、保留 C# 内的修正。
 - 无数据结构变更、无缓存格式变化、无配置迁移；合并产物的 json 字段与旧版一致
   （序列化改用 System.Text.Json，缩进风格可能有细微差别，解析结果相同）。
+
+第七轮（安装临时目录布局与清单规则）同样没有删除任何公开入口，`McInstallLoadersGet` /
+`McInstallCommit` 的签名不变，只换了开头的目录推导与清单的两处字符串生成：
+
+- 回滚只需把 `ModDownloadLib.vb` 这三处还原到上一版（git 历史），
+  `InstallLayout` / `InstallManifestRules` 留在内核不参与即可。
+- 一个**需要留意的点**：`OptiFineFolder` 在 C# 侧统一成「不带尾分隔符」，VB 侧原先用的
+  `OptiFineFolder & FileName` 也随之换成了 `BuildOptiFineInstallerPath`。若只回滚目录推导而保留
+  调用点，OptiFine 会落到 `modsOptiFine_xxx.jar` 这种拼错的路径——这两处必须一起回滚。
+- 无数据结构变更、无缓存格式变化：安装清单的键名、`mods/` 前缀与小写规则与旧版逐字一致。

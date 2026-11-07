@@ -1613,37 +1613,37 @@ Retry:
         Dim TempMcFolder As String = RequestTaskTempFolder(Request.Components.OptiFineEntry IsNot Nothing OrElse
             Request.Components.ModLoaderVersions.ContainsKey(ModLoaders.Forge) OrElse Request.Components.ModLoaderVersions.ContainsKey(ModLoaders.NeoForge))
 
-        '获取各个 Mod 加载器的缓存文件夹
+        '获取各个 Mod 加载器的缓存文件夹（推导规则见 PCL.Download.InstallLayout）
         Dim OptiFineEntry = Request.Components.OptiFineEntry?.ToObject(Of DlOptiFineListEntry)()
-        Dim OptiFineFolder = If(OptiFineEntry Is Nothing, Nothing, $"{TempMcFolder}versions\{OptiFineEntry.InstanceName}")
         Dim ForgeVersion = If(Request.Components.ModLoaderVersions.ContainsKey(ModLoaders.Forge), Request.Components.ModLoaderVersions(ModLoaders.Forge), Nothing)
-        Dim ForgeFolder = If(ForgeVersion Is Nothing, Nothing, $"{TempMcFolder}versions\forge-{ForgeVersion}")
         Dim NeoForgeVersion = If(Request.Components.ModLoaderVersions.ContainsKey(ModLoaders.NeoForge), Request.Components.ModLoaderVersions(ModLoaders.NeoForge), Nothing)
-        Dim NeoForgeFolder = If(NeoForgeVersion Is Nothing, Nothing, $"{TempMcFolder}versions\neoforge-{NeoForgeVersion}")
         Dim LiteLoaderVersion = If(Request.Components.ModLoaderVersions.ContainsKey(ModLoaders.LiteLoader), Request.Components.ModLoaderVersions(ModLoaders.LiteLoader), Nothing)
-        Dim LiteLoaderFolder = If(LiteLoaderVersion Is Nothing, Nothing, $"{TempMcFolder}versions\{Request.Components.MinecraftVersion}-LiteLoader")
         Dim FabricVersion = If(Request.Components.ModLoaderVersions.ContainsKey(ModLoaders.Fabric), Request.Components.ModLoaderVersions(ModLoaders.Fabric), Nothing)
-        Dim FabricFolder = If(FabricVersion Is Nothing, Nothing, $"{TempMcFolder}versions\fabric-loader-{FabricVersion}-{Request.Components.MinecraftVersion}")
 
-        '判断 OptiFine 是否作为 Mod 进行下载
+        Dim Layout = PCL.Download.InstallLayout.Create(New PCL.Download.InstallLayoutRequest With {
+            .TempFolder = TempMcFolder,
+            .MinecraftVersion = Request.Components.MinecraftVersion,
+            .OptiFineInstanceName = OptiFineEntry?.InstanceName,
+            .ForgeVersion = ForgeVersion,
+            .NeoForgeVersion = NeoForgeVersion,
+            .LiteLoaderVersion = LiteLoaderVersion,
+            .FabricVersion = FabricVersion,
+            .HasAnyModLoader = Request.Components.ModLoaderVersions.Any})
+
         Dim Modable = Request.Components.ModLoaderVersions.Any
-        Dim ModsTempFolder As String = $"{TempMcFolder}mods\"
-        Dim OptiFineAsMod = OptiFineEntry IsNot Nothing AndAlso Modable '选择了 OptiFine 与任意 Mod 加载器
-        If OptiFineAsMod Then
-            Logger.Info("OptiFine 将作为 Mod 进行下载")
-            If LiteLoaderVersion IsNot Nothing Then
-                OptiFineFolder = $"{ModsTempFolder}{Request.Components.MinecraftVersion}\" '#8147
-            Else
-                OptiFineFolder = ModsTempFolder
-            End If
-        End If
+        Dim ModsTempFolder As String = Layout.ModsRoot
+        Dim OptiFineFolder = Layout.OptiFineFolder
+        Dim OptiFineAsMod = Layout.OptiFineAsMod '选择了 OptiFine 与任意 Mod 加载器
+        Dim ForgeFolder = Layout.ForgeFolder
+        Dim NeoForgeFolder = Layout.NeoForgeFolder
+        Dim LiteLoaderFolder = Layout.LiteLoaderFolder
+        Dim FabricFolder = Layout.FabricFolder
+        If OptiFineAsMod Then Logger.Info("OptiFine 将作为 Mod 进行下载")
 
         '记录日志
-        If OptiFineFolder IsNot Nothing Then Logger.Info($"OptiFine 缓存：{OptiFineFolder}")
-        If ForgeFolder IsNot Nothing Then Logger.Info($"Forge 缓存：{ForgeFolder}")
-        If NeoForgeFolder IsNot Nothing Then Logger.Info($"NeoForge 缓存：{NeoForgeFolder}")
-        If FabricFolder IsNot Nothing Then Logger.Info($"Fabric 缓存：{FabricFolder}")
-        If LiteLoaderFolder IsNot Nothing Then Logger.Info($"LiteLoader 缓存：{LiteLoaderFolder}")
+        For Each CacheLine In Layout.LogLines()
+            Logger.Info(CacheLine)
+        Next
         Logger.Info($"对应的原版版本：{Request.Components.MinecraftVersion}")
 
         '重复版本检查
@@ -1678,10 +1678,11 @@ Retry:
         LoaderList.Add(ClientLoader)
         'OptiFine
         If OptiFineEntry IsNot Nothing Then
-            If OptiFineAsMod Then ManagedFileSources.Add("OptiFine", OptiFineFolder & OptiFineEntry.FileName)
+            Dim OptiFineInstallerPath = Layout.BuildOptiFineInstallerPath(OptiFineEntry.FileName)
+            If OptiFineAsMod Then ManagedFileSources.Add("OptiFine", OptiFineInstallerPath)
             LoaderList.Add(New LoaderCombo(Of String)("下载 OptiFine " & OptiFineEntry.DisplayName,
                 If(OptiFineAsMod,
-                    McDownloadOptiFineSaveLoader(OptiFineEntry, OptiFineFolder & OptiFineEntry.FileName),
+                    McDownloadOptiFineSaveLoader(OptiFineEntry, OptiFineInstallerPath),
                     McDownloadOptiFineLoader(OptiFineEntry, TempMcFolder, ClientLoader, VersionFolder))) With {
                 .ProgressWeight = If(Modable, 16, 24), .Show = False, .Block = Not Modable})
         End If
@@ -1746,16 +1747,16 @@ Retry:
             For Each Entry In ManagedFileSources
                 Dim RelativePath = Entry.Value.Substring(ModsTempFolder.Length)
                 Dim FullPath = PathUtils.ForCompare(Path.Combine(TargetFolder, "mods", RelativePath))
-                ManagedFiles.Add(New McInstallManifest.ManagedFile("mods/" & RelativePath.Replace("\", "/").ToLowerInvariant(),
+                ManagedFiles.Add(New McInstallManifest.ManagedFile(PCL.Download.InstallManifestRules.ManagedModPath(RelativePath),
                     CryptographyUtils.ComputeFileHash(FullPath, CryptographyUtils.HashMethod.Sha1), FileUtils.GetInfo(FullPath).LastWriteTimeUtc, Entry.Key))
             Next
-            '处理加载器版本信息
+            '处理加载器版本信息（剥掉 MC 前缀，规则见 PCL.Download.InstallManifestRules）
             Dim TempLoaderVersions As New Dictionary(Of ModLoaders, String)(Request.Components.ModLoaderVersions)
-            If ForgeVersion IsNot Nothing AndAlso ForgeVersion.StartsWithF("1.") AndAlso ForgeVersion.Contains("-") Then
-                TempLoaderVersions(ModLoaders.Forge) = ForgeVersion.AfterLast("-")
+            If ForgeVersion IsNot Nothing Then
+                TempLoaderVersions(ModLoaders.Forge) = PCL.Download.InstallManifestRules.NormalizeLoaderVersion(ModLoaders.Forge, ForgeVersion)
             End If
-            If NeoForgeVersion IsNot Nothing AndAlso NeoForgeVersion.StartsWithF("1.20.1-") Then
-                TempLoaderVersions(ModLoaders.NeoForge) = NeoForgeVersion.Replace("1.20.1-", "")
+            If NeoForgeVersion IsNot Nothing Then
+                TempLoaderVersions(ModLoaders.NeoForge) = PCL.Download.InstallManifestRules.NormalizeLoaderVersion(ModLoaders.NeoForge, NeoForgeVersion)
             End If
             '存储 Manifest
             Dim Target = New McComponents(Request.Components.MinecraftVersion, TempLoaderVersions,
