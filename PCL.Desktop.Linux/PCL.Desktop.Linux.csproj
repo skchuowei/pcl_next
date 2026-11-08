@@ -1,0 +1,44 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    PCL.Desktop.Linux：Linux 桌面宿主（Avalonia）。
+
+    LU1 阶段只做「宿主骨架」：验证 Avalonia 能在 linux-x64 上还原、XAML 生成期校验、
+    产物按三段树落位、两条路径/架构护栏不失效。UI 组件（主题 / PclCard / PclListItem 等）
+    属 LU2，须先由《计划-LinuxUI移植.md》§11 D1 拍板中立 UI 归属，本工程暂不自建共享 UI 库。
+
+    刻意不进 pcl-next.sln：Windows CI（build.yml）构建整个 sln，若把 net10.0 工程塞进去，
+    Windows job 会在无 -r 的情况下触发 PclRidGuard 直接报错。与内核工程「不在 sln、直接编 csproj」一致。
+  -->
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>PCL.Desktop.Linux</RootNamespace>
+    <AssemblyName>PCL.Desktop.Linux</AssemblyName>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+
+    <!--
+      产物落点：只引用 Directory.Build.props 的 $(PclTreeRoot)，禁止手写 bin-net10/... 字面量
+      （AGENTS §0.1 / §0.3.1：路径规则存在第二份副本必然漂移）。
+      PclUseTreePath=true 让 PclTreePathGuard 机械校验「代号 + 版本」两段。
+    -->
+    <OutputPath>$(PclTreeRoot)</OutputPath>
+    <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <PclUseTreePath>true</PclUseTreePath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!--
+      平台相关包只出现在宿主工程；LU2 的共享 UI 库只允许引 Avalonia + Avalonia.Themes.Fluent
+      （「一库两宿主」原则，见《计划-安卓UI移植.md》§8.7.1）。
+    -->
+    <PackageReference Include="Avalonia" Version="11.3.2" />
+    <PackageReference Include="Avalonia.Desktop" Version="11.3.2" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.2" />
+  </ItemGroup>
+
+</Project>
