@@ -193,7 +193,9 @@ P4-A 的价值是「把 VB 散落的口径收编成单一真源」。Linux 侧�
 - ❌ 不 `git merge` / `git cherry-pick` 跨仓库（无共同祖先），不把 Windows 提交推到 Linux 远端。
 - ❌ 不复制 Windows 的 `AGENTS.md` / `分支与发布规范.md`（三份各自维护），不动 `pcl_x/` 根的只读备份。
 - ❌ 不把 Windows 的口径 A 裁决、dev.6 发布说明、专项计划写成「全项目生效」或原样搬进 Linux 仓库。
-- ❌ **不照抄 Windows 的 P4-B / P6**：薄装配层与下线顺序涉及 Linux 自己的平台能力层与 VB 现状，须另行评估。
+- ❌ **不照抄 Windows 的 P4-B / P6**：Windows 已完成 P4-B 批次 1（顶层薄装配层
+  `pcl-next/Modules/Download/LoaderPlanAdapter.vb`，见收尾计划 §11），结构可参考但**不在本文交接范围**；
+  薄装配层与下线顺序涉及 Linux 自己的平台能力层与 VB 现状，须另行评估、自行裁决。
 - ❌ 不改 `LoaderBase` / `LoaderTask` / `LoaderCombo` 公开签名、不把状态机下沉进内核、不提前 T2。
 - ❌ 不改缓存格式、安装清单键名、`DownloadPolicy.ini` 键名，不借移植批量清理 CA1416 警告。
 - ❌ 不用 `pclcli selftest --suite all` 抵扣六类加载器逐类真机安装冒烟（只覆盖 B1/B2/B5），该欠账仍是 P6 验收前置。

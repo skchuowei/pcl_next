@@ -3,8 +3,10 @@
 > 依据：《AGENTS.md》§3.1/§3.2（大改动须先写专项计划）、§零（产物与构建口径）、
 > 《PCL2_CSharp下载服务迁移计划.md》§5 Phase 4/6、《计划-Phase4主体-下载数据源C化.md》§4.9、
 > 《计划-内核与GUI拆分（CLI）.md》T1/T2、《ReleaseNotes/v2.100.0.5-dev.5.md》「已知问题 / 下一阶段计划」。
-> 状态：**口径 A 已裁决（2026-11-08，用户）**；**P4-A 已完成**（本轮：内核 DTO 全集 + 单测），
-> P4-B / P6 未动工。本轮不改 VB 主工程，只改文档、`PCL.Download` 内核与 `PCL.Download.Tests`。
+> 状态：**口径 A 已裁决（2026-11-08，用户）**；**P4-A 已完成**（内核 DTO 全集 + 单测）；
+> **P4-B 批次 1 已完成**（顶层薄装配层 `LoaderPlanAdapter.vb`，见 §11）；
+> P4-B 批次 2（五个复合体逐类下沉 + 资源详情页 / VB 资源模型 UI 收尾）与 P6 未动工。
+> P4-A 只改内核与测试；P4-B 批次 1 起改动 VB 主工程，均为等价重构，不改 `LoaderBase` 公开签名。
 > 范围：**仅 Windows 线**（`PCL_NEXT_Windows`，分支 `dev.6-Windows`）；Linux / Android 线不在本文范围。
 > 本文取代《计划-Phase4主体》§4.9「后续（未动）」清单；该节已改标为「已移交本文」。
 
@@ -389,3 +391,25 @@ P4-A（DTO 全集 + 单测）──────┐
   `scripts/build-number.base`，与 `Get-BuildSmallVersion.ps1` 的 `root+base` 分支同源；
   `sh -n` 与临时消息文件实测本次提交追加 `Build: 0.70`。
 - 以上均为文档 / 脚本，内核与测试工程无新增改动；**未推送远端**。
+
+### P4-B 批次 1 完成（2026-11-08，仅 Windows 线）
+
+- **交付**：新增 `pcl-next/Modules/Download/LoaderPlanAdapter.vb`（243 行）；
+  `ModDownloadLib.vb` 首行改为 `Partial Public Module`（跨文件共享 `Private` 宿主函数），
+  `McInstallLoadersGet` 由 196 行缩到 91 行（−137 / +31），装配段整体移交 Adapter。
+- **口径 A 落地**：装配层不再有 `If 组件已选 Then` 形式的步骤判定（原 7 处归零），
+  改为遍历 `InstallTaskPlanner.Describe(Plan)`，`Select Case D.Kind.Value` 分派到 13 个具名
+  `Assemble*` 方法；名称 / 权重 / Block / Show 各 13 处一律读 DTO。
+  OptiFine 双形态由 `SubStepsSource` 分派、「是否记入安装清单」由 `Outputs` 判定，
+  「补全文件」两个副加载器读 `SubSteps`；`HasMinecraftJson` 由 VB 显式传入。
+- **护栏未破**：`LoaderBase` / `LoaderTask` / `LoaderCombo` / `LoaderDownload` 公开签名零改动；
+  执行 lambda 与 `McDownloadClientLoader` / `McDownloadForgelikeLoader` / `MergeJson` 等宿主函数原样保留；
+  内核（`PCL.Download` / `PCL.Download.Tests`）本批零改动；`Plan.GetStep` 调用从 14 处归零。
+- **验证**：`dotnet test ... -c Release` → **541 / 541 通过**；项目级入口构建
+  `dotnet build pcl-next/pcl-next.vbproj -c Release -r win-x64 --self-contained -p:PclChannel=Dev`
+  → **0 错误**（2398 条既有警告）；静态核查装配层只剩 1 处 `If`（重复版本检查，属前置校验非编排判定）。
+- **明确未完成（批次 2）**：OptiFine / Forge / NeoForge / LiteLoader / Fabric 五个复合体内部子列表
+  与 `Client` 子列表仍由 VB 宿主函数提供（`SubStepsSource` 已登记函数名，需逐类下沉）；
+  `PageDownloadCompDetail.xaml.vb` 复核、`ResourceVersion` / `ResourceProject` 只读投影收尾未动；
+  **UI 行为等价性尚未经真机回归**，六类加载器逐类安装冒烟仍是 P6 前置欠账。
+- 回滚：删除 Adapter 文件并把 `ModDownloadLib.vb` 的装配段与首行还原即可，内核与 DTO 不受影响。

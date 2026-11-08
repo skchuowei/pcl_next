@@ -1,4 +1,4 @@
-﻿Public Module ModDownloadLib
+﻿Partial Public Module ModDownloadLib
 
 #Region "Minecraft 下载"
 
@@ -1651,11 +1651,8 @@ Retry:
             Throw New OperationCanceledException
         End If
 
-        Dim LoaderList As New List(Of LoaderBase)
-        Dim ManagedFileSources As New Dictionary(Of String, String)
-
-        '（桥接层）编排决策改由 C# 产出：步骤包含 / 顺序 / 权重 / Block / Show 全部来自 InstallPlan，
-        ' 真正的 LoaderBase 构造与执行 lambda 仍在本函数。逐条等价性见 PCL.Download.Tests.InstallPlanTests。
+        '（桥接层）编排决策改由 C# 产出：步骤包含 / 顺序 / 权重 / Block / Show 全部来自 InstallPlan。
+        'P4-B：HasMinecraftJson 由 VB 显式传入，供 C# 描述 Client 的可选子步骤骨架。
         Dim Plan = PCL.Download.InstallPlanner.Build(New PCL.Download.InstallPlanRequest With {
             .MinecraftVersion = Request.Components.MinecraftVersion,
             .ForgeVersion = ForgeVersion,
@@ -1671,137 +1668,34 @@ Retry:
             .HasNeoForgeEntry = Request.NeoForgeEntry IsNot Nothing,
             .HasLiteLoaderEntry = Request.LiteLoaderEntry IsNot Nothing,
             .HasAnyModLoader = Request.Components.ModLoaderVersions.Any,
-            .IsIntermediateOutput = Request.IsIntermediateOutput})
+            .IsIntermediateOutput = Request.IsIntermediateOutput,
+            .HasMinecraftJson = Request.MinecraftJson IsNot Nothing})
 
-        '添加忽略标识
-        Dim sIgnore = Plan.GetStep(PCL.Download.InstallStepKind.IgnoreMarker)
-        LoaderList.Add(New LoaderTask(Of Integer, Integer)(sIgnore.Name, Sub() FileUtils.Write(VersionFolder & ".pclignore", "用于临时地在 PCL Next 的版本列表中屏蔽此版本。")) With {.ProgressWeight = sIgnore.ProgressWeight, .Show = sIgnore.Show, .Block = sIgnore.Block})
-        'Fabric API
-        If Request.Components.FabricApiVersion IsNot Nothing Then
-            Dim DownloadFile = Request.FabricApi.ToNetFile(ModsTempFolder, ResourceVersion.DownloadReason.Dependency, Request.Components.MinecraftVersion, ModLoaders.Fabric)
-            ManagedFileSources.Add("FabricApi", DownloadFile.LocalPath)
-            Dim s = Plan.GetStep(PCL.Download.InstallStepKind.FabricApiDownload)
-            LoaderList.Add(New LoaderDownload(s.Name, New List(Of NetFile) From {DownloadFile}) With {
-                .ProgressWeight = s.ProgressWeight, .Show = s.Show, .Block = s.Block})
-        End If
-        'OptiFabric
-        If Request.Components.OptiFabricVersion IsNot Nothing Then
-            Dim DownloadFile = Request.OptiFabric.ToNetFile(ModsTempFolder, ResourceVersion.DownloadReason.Dependency, Request.Components.MinecraftVersion, ModLoaders.Fabric)
-            ManagedFileSources.Add("OptiFabric", DownloadFile.LocalPath)
-            Dim s = Plan.GetStep(PCL.Download.InstallStepKind.OptiFabricDownload)
-            LoaderList.Add(New LoaderDownload(s.Name, New List(Of NetFile) From {DownloadFile}) With {
-                .ProgressWeight = s.ProgressWeight, .Show = s.Show, .Block = s.Block})
-        End If
-        '原版
-        Dim sClient = Plan.GetStep(PCL.Download.InstallStepKind.Client)
-        Dim ClientLoader = New LoaderCombo(Of String)(sClient.Name,
-            McDownloadClientLoader(Request.Components.MinecraftVersion, Request.MinecraftJson, VersionFolder)) With {
-            .ProgressWeight = sClient.ProgressWeight, .Show = sClient.Show, .Block = sClient.Block}
-        LoaderList.Add(ClientLoader)
-        'OptiFine
-        If OptiFineEntry IsNot Nothing Then
-            Dim OptiFineInstallerPath = Layout.BuildOptiFineInstallerPath(OptiFineEntry.FileName)
-            If OptiFineAsMod Then ManagedFileSources.Add("OptiFine", OptiFineInstallerPath)
-            Dim s = Plan.GetStep(PCL.Download.InstallStepKind.OptiFine)
-            LoaderList.Add(New LoaderCombo(Of String)(s.Name,
-                If(OptiFineAsMod,
-                    McDownloadOptiFineSaveLoader(OptiFineEntry, OptiFineInstallerPath),
-                    McDownloadOptiFineLoader(OptiFineEntry, TempMcFolder, ClientLoader, VersionFolder))) With {
-                .ProgressWeight = s.ProgressWeight, .Show = s.Show, .Block = s.Block})
-        End If
-        'Forge
-        If ForgeVersion IsNot Nothing Then
-            Dim s = Plan.GetStep(PCL.Download.InstallStepKind.Forge)
-            LoaderList.Add(New LoaderCombo(Of String)(s.Name,
-                McDownloadForgelikeLoader(False, ForgeVersion, "forge-" & ForgeVersion, Request.Components.MinecraftVersion, Request.ForgeEntry, TempMcFolder, ClientLoader, VersionFolder)) With {
-                    .ProgressWeight = s.ProgressWeight, .Show = s.Show, .Block = s.Block})
-        End If
-        'NeoForge
-        If NeoForgeVersion IsNot Nothing Then
-            Dim s = Plan.GetStep(PCL.Download.InstallStepKind.NeoForge)
-            LoaderList.Add(New LoaderCombo(Of String)(s.Name,
-                McDownloadForgelikeLoader(True, NeoForgeVersion, "neoforge-" & NeoForgeVersion, Request.Components.MinecraftVersion, Request.NeoForgeEntry, TempMcFolder, ClientLoader, VersionFolder)) With {
-                .ProgressWeight = s.ProgressWeight, .Show = s.Show, .Block = s.Block})
-        End If
-        'LiteLoader
-        If LiteLoaderVersion IsNot Nothing Then
-            Dim s = Plan.GetStep(PCL.Download.InstallStepKind.LiteLoader)
-            LoaderList.Add(New LoaderCombo(Of String)(s.Name,
-                McDownloadLiteLoaderLoader(Request.LiteLoaderEntry, TempMcFolder)) With {
-                    .ProgressWeight = s.ProgressWeight, .Show = s.Show, .Block = s.Block})
-        End If
-        'Fabric
-        If FabricVersion IsNot Nothing Then
-            Dim s = Plan.GetStep(PCL.Download.InstallStepKind.Fabric)
-            LoaderList.Add(New LoaderCombo(Of String)(s.Name,
-                McDownloadFabricLoader(FabricVersion, Request.Components.MinecraftVersion, TempMcFolder)) With {
-                .ProgressWeight = s.ProgressWeight, .Show = s.Show, .Block = s.Block})
-        End If
-        '合并安装
-        Dim MinecraftFolder = McFolderSelected
-        Dim TargetFolder As String = Nothing
-        Dim sInstall = Plan.GetStep(PCL.Download.InstallStepKind.InstallGame)
-        LoaderList.Add(New LoaderTask(Of String, String)(sInstall.Name,
-        Sub(Task As LoaderTask(Of String, String))
-            '合并 JSON：将多个版本 JSON 进行合并，如果已存在则直接覆盖
-            MergeJson(VersionFolder, OptiFineFolder, OptiFineAsMod, ForgeFolder, NeoForgeFolder, FabricFolder, LiteLoaderFolder)
-            Task.Progress = 0.2
-            '迁移文件
-            DirectoryUtils.Copy(TempMcFolder & "libraries", MinecraftFolder & "libraries")
-            Task.Progress = 0.8
-            '创建 Mod 和资源包文件夹
-            TargetFolder = If(Request.IsIntermediateOutput, VersionFolder, New McInstance(VersionFolder).PathIndie) '版本隔离信息在此时被决定
-            Dim ModsFolder = TargetFolder & "mods\"
-            If DirectoryUtils.Exists(ModsTempFolder) Then
-                DirectoryUtils.Copy(ModsTempFolder, ModsFolder)
-            ElseIf Modable Then
-                DirectoryUtils.Create(ModsFolder)
-                Logger.Info($"自动创建 Mod 文件夹：{ModsFolder}")
-            End If
-            Dim ResourcepacksFolder = TargetFolder & "resourcepacks\"
-            DirectoryUtils.Create(ResourcepacksFolder)
-            Logger.Info($"自动创建资源包文件夹：{ResourcepacksFolder}")
-        End Sub) With {.ProgressWeight = sInstall.ProgressWeight, .Block = sInstall.Block, .Show = sInstall.Show})
-        '补全文件
-        Dim LoadersLib As New List(Of LoaderBase)
-        LoadersLib.Add(New LoaderTask(Of String, List(Of NetFile))("分析游戏支持库文件（副加载器）", Sub(Task) Task.Output = McLibNetFilesFromInstance(New McInstance(VersionFolder))) With {.ProgressWeight = 1, .Show = False})
-        LoadersLib.Add(New LoaderDownload("下载游戏支持库文件（副加载器）", New List(Of NetFile)) With {.ProgressWeight = 7, .Show = False})
-        Dim sPost = Plan.GetStep(PCL.Download.InstallStepKind.PostLibraries)
-        LoaderList.Add(New LoaderCombo(Of String)(sPost.Name, LoadersLib) With {.ProgressWeight = sPost.ProgressWeight, .Block = sPost.Block, .Show = sPost.Show})
-        '记录安装清单
-        Dim sRecord = Plan.GetStep(PCL.Download.InstallStepKind.RecordManifest)
-        LoaderList.Add(New LoaderTask(Of Integer, Integer)(sRecord.Name,
-        Sub()
-            Dim ManagedFiles As New List(Of McInstallManifest.ManagedFile)
-            '记录由 PCL 管理的 Mod 信息
-            For Each Entry In ManagedFileSources
-                Dim RelativePath = Entry.Value.Substring(ModsTempFolder.Length)
-                Dim FullPath = PathUtils.ForCompare(Path.Combine(TargetFolder, "mods", RelativePath))
-                ManagedFiles.Add(New McInstallManifest.ManagedFile(PCL.Download.InstallManifestRules.ManagedModPath(RelativePath),
-                    CryptographyUtils.ComputeFileHash(FullPath, CryptographyUtils.HashMethod.Sha1), FileUtils.GetInfo(FullPath).LastWriteTimeUtc, Entry.Key))
-            Next
-            '处理加载器版本信息（剥掉 MC 前缀，规则见 PCL.Download.InstallManifestRules）
-            Dim TempLoaderVersions As New Dictionary(Of ModLoaders, String)(Request.Components.ModLoaderVersions)
-            If ForgeVersion IsNot Nothing Then
-                TempLoaderVersions(ModLoaders.Forge) = PCL.Download.InstallManifestRules.NormalizeLoaderVersion(ModLoaders.Forge, ForgeVersion)
-            End If
-            If NeoForgeVersion IsNot Nothing Then
-                TempLoaderVersions(ModLoaders.NeoForge) = PCL.Download.InstallManifestRules.NormalizeLoaderVersion(ModLoaders.NeoForge, NeoForgeVersion)
-            End If
-            '存储 Manifest
-            Dim Target = New McComponents(Request.Components.MinecraftVersion, TempLoaderVersions,
-                Request.Components.OptiFineEntry, Request.Components.FabricApiVersion, Request.Components.OptiFabricVersion)
-            Dim InstanceConfig = New McInstance(VersionFolder).Config
-            Configs.McInstallManifest.Set(New McInstallManifest(Versions.McInstallManifestVersion, Target, Date.UtcNow, ManagedFiles), InstanceConfig)
-            InstanceConfig.Save()
-        End Sub) With {.ProgressWeight = sRecord.ProgressWeight, .Block = sRecord.Block, .Show = sRecord.Show})
-        '删除忽略标识
-        If Not Request.IsIntermediateOutput Then
-            Dim sRemove = Plan.GetStep(PCL.Download.InstallStepKind.RemoveIgnoreMarker)
-            LoaderList.Add(New LoaderTask(Of Integer, Integer)(sRemove.Name, Sub() FileUtils.Delete(VersionFolder & ".pclignore")) With {.ProgressWeight = sRemove.ProgressWeight, .Block = sRemove.Block, .Show = sRemove.Show})
-        End If
-        '总加载器
-        Return LoaderList
+        '（P4-B）装配全部交给 LoaderPlanAdapter（Modules/Download/LoaderPlanAdapter.vb）：
+        ' 遍历 InstallTaskPlanner.Describe(Plan)，按 Kind 分派构造 LoaderBase，
+        ' 名称 / 权重 / Block / Show / 输出槽位一律读 DTO，此处不再内联任何业务判定。
+        Dim Ctx As New InstallLoaderContext With {
+            .Request = Request,
+            .Plan = Plan,
+            .TempMcFolder = TempMcFolder,
+            .Layout = Layout,
+            .OptiFineEntry = OptiFineEntry,
+            .ForgeVersion = ForgeVersion,
+            .NeoForgeVersion = NeoForgeVersion,
+            .LiteLoaderVersion = LiteLoaderVersion,
+            .FabricVersion = FabricVersion,
+            .VersionFolder = VersionFolder,
+            .ModsTempFolder = ModsTempFolder,
+            .OptiFineFolder = OptiFineFolder,
+            .ForgeFolder = ForgeFolder,
+            .NeoForgeFolder = NeoForgeFolder,
+            .LiteLoaderFolder = LiteLoaderFolder,
+            .FabricFolder = FabricFolder,
+            .OptiFineAsMod = OptiFineAsMod,
+            .Modable = Modable,
+            .MinecraftFolder = McFolderSelected,
+            .ManagedFileSources = New Dictionary(Of String, String)()}
+        Return LoaderPlanAssemble(Ctx)
     End Function
     ''' <summary>
     ''' 合并原版与各加载器的 json，输出为一份独立版本 json。
