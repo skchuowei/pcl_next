@@ -29,15 +29,28 @@ if grep -q '^Build: ' "$MSGFILE" 2>/dev/null; then
 fi
 
 ANCHOR=85c17f13003322a4025e09379bb1ed2d852ea63c
-if git rev-parse --verify --quiet "$ANCHOR^{commit}" > /dev/null 2>&1; then
-    COUNT=$(git rev-list --count "$ANCHOR..HEAD" 2>/dev/null || echo 0)
-else
-    # 浅克隆取不到锚点时退化，与脚本保持同一行为
-    COUNT=$(git rev-list --count HEAD 2>/dev/null || echo 0)
+
+# 独立仓库（2026-11-08 架构裁决）里锚点不可达，退化分支必须叠加继承基数，
+# 否则编号会从 0.01 重新起算，比旧线更小，违反「后提交的产物一定更大」。
+BASE=0
+ROOT=$(git rev-parse --show-toplevel 2>/dev/null)
+if [ -n "$ROOT" ] && [ -f "$ROOT/scripts/build-number.base" ]; then
+    RAW=$(tr -d ' \r\n\t' < "$ROOT/scripts/build-number.base")
+    case "$RAW" in
+        ''|*[!0-9]*) ;;
+        *) BASE=$RAW ;;
+    esac
 fi
 
-# 本次提交自身的序号
-COUNT=$((COUNT + 1))
+if git rev-parse --verify --quiet "$ANCHOR^{commit}" > /dev/null 2>&1; then
+    COUNT=$(git rev-list --count "$ANCHOR..HEAD" 2>/dev/null || echo 0)
+    # 本次提交自身的序号
+    COUNT=$((COUNT + 1))
+else
+    # 退化：首个提交继承 BASE，本次提交是 BASE + 已有提交数（与 Get-BuildSmallVersion.ps1 同源）
+    TOTAL=$(git rev-list --count HEAD 2>/dev/null || echo 0)
+    COUNT=$((BASE + TOTAL))
+fi
 MAJOR=$((COUNT / 100))
 MINOR=$((COUNT % 100))
 SMALL=$(printf '%d.%02d' "$MAJOR" "$MINOR")

@@ -18,11 +18,26 @@ REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
 CACHE="$REPO_ROOT/pcl-next/obj/pcl-build.small"
 
 ANCHOR=85c17f13003322a4025e09379bb1ed2d852ea63c
+
+# 独立仓库（2026-11-08 架构裁决）里锚点不可达：首个提交继承 scripts/build-number.base，
+# 之后每个增量提交 +1（与 Get-BuildSmallVersion.ps1 的 root+base 分支同源）。
+BASE=0
+BASE_FILE="$REPO_ROOT/scripts/build-number.base"
+if [ -f "$BASE_FILE" ]; then
+    RAW=$(tr -d ' \r\n\t' < "$BASE_FILE")
+    case "$RAW" in
+        ''|*[!0-9]*) ;;
+        *) BASE=$RAW ;;
+    esac
+fi
+
 if git rev-parse --verify --quiet "$ANCHOR^{commit}" > /dev/null 2>&1; then
     COUNT=$(git rev-list --count "$ANCHOR..HEAD" 2>/dev/null || echo 0)
 else
-    # 浅克隆取不到锚点时退化，与脚本保持同一行为
-    COUNT=$(git rev-list --count HEAD 2>/dev/null || echo 0)
+    # 退化：第 1 个提交 = BASE，第 N 个提交 = BASE + N - 1
+    TOTAL=$(git rev-list --count HEAD 2>/dev/null || echo 0)
+    COUNT=$((BASE + TOTAL - 1))
+    [ "$COUNT" -lt 0 ] && COUNT=0
 fi
 
 MAJOR=$((COUNT / 100))
