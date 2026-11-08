@@ -1,0 +1,172 @@
+name: Build
+on:
+  push:
+    # 六条代号长期分支 + 两条平台长期线（§0A android / §0B linux）触发；
+    # 短期分支（feat/*、fix/*）走 PR。
+    # 两条平台线都从 dev 吸收内核，必须同时过 Windows 主线编译门禁与 Linux 内核跨平台门禁，
+    # 否则「并行不中断 Phase 4」就没有机械保障。
+    branches:
+      - dev
+      - slush
+      - alpha
+      - beta
+      - pc
+      - snapshot
+      - android          # 平台长期线（《分支与发布规范》§0A）
+      - linux            # 平台长期线（《分支与发布规范》§0B）；push 时须过 kernel-guard.yml 的 build-linux 护栏
+    paths:
+      - 'pcl-next/**'
+      - 'PCLCS/**'
+      - 'MeloongCore/**'
+      - 'PCL.Download/**'        # 内核本体
+      - 'PCL.Download.Tests/**'  # Windows job 已跑这批单测，改测试同样要验证
+      - 'PCL.Cli/**'
+      - 'Directory.Build.props'
+      - 'scripts/**'
+      - '.github/workflows/**'
+  pull_request:
+    paths:
+      - 'pcl-next/**'
+      - 'PCLCS/**'
+      - 'MeloongCore/**'
+      - 'PCL.Download/**'        # 内核本体
+      - 'PCL.Download.Tests/**'  # Windows job 已跑这批单测，改测试同样要验证
+      - 'PCL.Cli/**'
+      - 'Directory.Build.props'
+      - 'scripts/**'
+      - '.github/workflows/**'
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: '构建代号（Dev / Slush / Alpha / Beta / Rc / Snapshot）；留空则按分支推断'
+        required: false
+        default: ''
+        type: string
+
+jobs:
+  build:
+    name: Build
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        configuration: [Debug, Release]
+
+    steps:
+
+    - name: Checkout
+      uses: actions/checkout@v6
+      with:
+        # 必须是完整历史：构建号 = 自固定锚点以来的提交数 × 0.01（§5.2.1）。
+        # 浅克隆取不到锚点，脚本会退化为「自首个提交起算」，而 fetch-depth: 1 时
+        # 只剩 1 个提交 → 构建号恒为 0.01，产物目录名与本地永远对不上。
+        fetch-depth: 0
+        submodules: true
+
+    - name: Set Describe
+      shell: bash
+      run: |
+          # §0C.3：平台 tag（linux/v*、android/v*、linux/<名称>）不得参与阶段判定与 artifact 名。
+          # 必须显式限定主阶梯命名空间，否则 git describe 会取到平台 tag，导致 §6.2 代号误判。
+          describe=`git describe --tags --always --match 'v*'`
+          echo "describe=$describe" >> $GITHUB_ENV
+
+    - name: Resolve channel
+      id: channel
+      shell: pwsh
+      run: |
+        # 代号由分支决定，而不是由构建配置决定（见《分支与发布规范》§5.6）
+        $channel = '${{ inputs.channel }}'
+        if ([string]::IsNullOrWhiteSpace($channel)) {
+          $channel = switch -Regex ('${{ github.ref_name }}') {
+            '^dev$'      { 'Dev' }
+            '^slush$'    { 'Slush' }
+            '^alpha$'    { 'Alpha' }
+            '^beta$'     { 'Beta' }
+            '^rc$'       { 'Rc' }
+            '^snapshot$' { 'Snapshot' }
+            # android / linux 都不占代号（§0A / §0B）：共享 dev 内核版本，渠道常量按 Dev 处理
+            '^android$'  { 'Dev' }
+            '^linux$'    { 'Dev' }
+            default      { 'Dev' }
+          }
+        }
+        "channel=$channel" >> $env:GITHUB_OUTPUT
+        Write-Host "构建代号：$channel（分支 ${{ github.ref_name }}）"
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '10.0.x'
+
+    - name: Update Help
+      run: |
+        Set-Location ..
+        git clone https://github.com/LTCatt/PCL2Help.git -b master --single-branch --depth 1
+        Set-Location PCL2Help
+        Remove-Item -Path *.* -Recurse -Force
+        Compress-Archive -Path .\* -DestinationPath .\Help.zip
+        Copy-Item -Path .\Help.zip -Destination "${{ GITHUB.WORKSPACE }}\pcl-next\Resources\Help.zip" -Force
+        Set-Location ..
+        Remove-Item PCL2Help -Recurse -Force
+        Set-Location ${{ GITHUB.WORKSPACE }}
+
+
+    - name: Set version info
+      shell: pwsh
+      run: |
+        # 版本常量由发布流程写入（《分支与发布规范》§2、§5.1、§5.2）
+        & "${{ GITHUB.WORKSPACE }}\scripts\Set-VersionInfo.ps1" -Channel "${{ steps.channel.outputs.channel }}" -CommitHash "${{ github.sha }}"
+
+    - name: Replace
+      run: |
+        (gc "pcl-next\Modules\ModSecret.vb") -replace 'Public OAuthClientId As String = If(Environment.GetEnvironmentVariable("PCL_MS_CLIENT_ID"), "")', 'Public OAuthClientId As String = If(Environment.GetEnvironmentVariable("PCL_MS_CLIENT_ID"), "${{ secrets.CLIENT_ID }}")' | Out-File "pcl-next\Modules\ModSecret.vb"
+        (gc "pcl-next\Modules\ModSecret.vb") -replace 'Public CurseForgeAPIKey As String = If(Environment.GetEnvironmentVariable("PCL_CURSEFORGE_API_KEY"), "")', 'Public CurseForgeAPIKey As String = If(Environment.GetEnvironmentVariable("PCL_CURSEFORGE_API_KEY"), "${{ secrets.CURSEFORGE_API_KEY }}")' | Out-File "pcl-next\Modules\ModSecret.vb"
+
+    - name: Refresh build number cache
+      shell: pwsh
+      run: |
+        # 产物目录名带构建号（bin-net10\<代号>\<版本>-<构建号>\<RID>\）。
+        # MSBuild 的属性求值阶段不能执行 git 命令，必须在构建前先把编号落盘，
+        # 否则 Directory.Build.props 读到的是旧值（或没有值 → 目录名缺构建号）。
+        & "${{ GITHUB.WORKSPACE }}\scripts\Get-BuildSmallVersion.ps1" `
+            -RepoRoot "${{ GITHUB.WORKSPACE }}" `
+            -CacheFile "${{ GITHUB.WORKSPACE }}\pcl-next\obj\pcl-build.small"
+
+    - name: Build CLI + offline selftest
+      shell: pwsh
+      run: |
+        # 内核前端（PCL.Cli）：构建即校验架构护栏（Directory.Build.props §3），
+        # 再跑不联网的 offline 套件，确认内核在无 WPF 前提下可用。
+        dotnet build "PCL.Cli\PCL.Cli.csproj" -c ${{ matrix.configuration }} -p:PclChannel=${{ steps.channel.outputs.channel }}
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+        $exe = Get-ChildItem -Path "bin-net10" -Filter "pclcli.exe" -Recurse -ErrorAction SilentlyContinue |
+               Select-Object -First 1
+        if (-not $exe) { throw "未找到 pclcli.exe，产物路径可能未落在 bin-net10 三段树内" }
+        Write-Host "CLI 产物：$($exe.FullName)"
+
+        & $exe.FullName selftest --suite offline --workdir "$env:RUNNER_TEMP\pclcli"
+        if ($LASTEXITCODE -ne 0) { throw "pclcli 离线自检失败，退出码 $LASTEXITCODE" }
+
+    - name: Unit tests (kernel)
+      # 内核单测原先只在 Linux 门禁里跑，于是「Windows job 全绿」实际只等于「能编译」。
+      # 2026-11-07 拆分 workflow 时补上这一步：Windows 侧必须自己证明逻辑正确，
+      # 否则跨平台护栏红着时，Windows 的绿会被误读成「Windows 没问题」。
+      # 只跑 Release：Debug 与 Release 是同一份测试程序集，重复跑纯浪费 runner 时间。
+      if: matrix.configuration == 'Release'
+      shell: pwsh
+      run: |
+        dotnet test "PCL.Download.Tests\PCL.Download.Tests.csproj" -c ${{ matrix.configuration }}
+        if ($LASTEXITCODE -ne 0) { throw "内核单测失败，退出码 $LASTEXITCODE" }
+
+    - name: Publish (self-contained single file)
+      run: dotnet publish "pcl-next\pcl-next.vbproj" -c ${{ matrix.configuration }} -p:PclChannel=${{ steps.channel.outputs.channel }} -p:PublishProfile=win-x64-single
+
+    - name: Upload a Build Artifact
+      uses: actions/upload-artifact@v7
+      with:
+        name: ${{ matrix.configuration }} ${{ steps.channel.outputs.channel }} ${{ env.describe }}
+        path: pcl-next\publish\win-x64\${{ steps.channel.outputs.channel }}\pcl-next.exe
+
+  # Linux 内核跨平台护栏已拆到独立 workflow（kernel-guard.yml）：
+  # Windows 线不再等 Linux 跑完，两条线各自出结论、各自重跑。

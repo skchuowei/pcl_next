@@ -1,0 +1,49 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>pclcli</AssemblyName>
+    <RootNamespace>PCL.Cli</RootNamespace>
+    <Configurations>Debug;Release;Snapshot</Configurations>
+    <Deterministic>true</Deterministic>
+    <LangVersion>13.0</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+
+    <!-- 控制台入口，不做 WPF/程序集特性生成 -->
+    <UseWPF>false</UseWPF>
+    <UseWindowsForms>false</UseWindowsForms>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+
+    <!--
+      架构护栏（Directory.Build.props §3）：CLI 是内核的第二个前端，
+      引用闭包内只允许出现 PCL.Download，不得出现 WPF 或 GUI 宿主程序集。
+    -->
+    <PclIsGuiFree>true</PclIsGuiFree>
+  </PropertyGroup>
+
+  <!--
+    产物落在三段树内的 cli/ 子层（AGENTS §0.1 / 计划 §4 / 计划-Linux长期分支 §5.5）。
+    无条件赋值：原写法带 Condition="'$(OutputPath)' == ''"，等于给外部 -p:OutputPath
+    留了第二处真相源，一旦被外部覆盖就会绕过 PclTreePathGuard 的校验语义。
+
+    跨平台约束（2026-11-07）：路径分隔符一律用正斜杠。此前写 `cli\`，在 Windows 上
+    与 `cli/` 等价；但在 Linux 上反斜杠不是路径分隔符，会产出名为 `cli\` 的目录，
+    破坏 §0.1 的 cli/ 子层。Directory.Build.props 已同步改为正斜杠，此处必须同源。
+    ProjectReference 同理改用 `/`，避免依赖 MSBuild 的路径规范化兜底。
+  -->
+  <PropertyGroup>
+    <OutputPath>$(PclTreeRoot)cli/</OutputPath>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
+    <PclUseTreePath>true</PclUseTreePath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- 唯一的工程引用：CLI 不得直接引用 pcl-next / PCLCS / MeloongCore -->
+    <ProjectReference Include="../PCL.Download/PCL.Download.csproj" />
+  </ItemGroup>
+
+</Project>
