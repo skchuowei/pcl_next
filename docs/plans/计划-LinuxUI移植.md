@@ -105,6 +105,7 @@
 | **R12** | `MyIconButton` 主题色映射：WPF 源码散落在动画分支中，本轮取 `Color→#1370f3` / `White→白` / `Black→#343d4a` / `Red→#ff4c4c` | 图标颜色 | 图标尺寸（`Margin 5`、`Stretch Uniform`）、圆角 1000、按下 0.8 缩放不变 |
 | **R13** | 运行期缺陷：`MyComboBox` 在 WSLg 下**未渲染**（收起态无边框、无选中文案、无箭头），编译期无报错。**根因已查明**：`MyComboBox : ComboBox` 未覆写 `StyleKeyOverride`，Avalonia Fluent 的 ControlTheme 按派生类型查不到 → 无 `Template` → 控件不渲染。**已修（2026-11-08）**，分两步：① 补 `StyleKeyOverride => typeof(ComboBox)` 让控件先可见；② 按本计划 §2.2 主题基线，改为**自绘 `ControlTheme`**（照抄 `pcl-next/Application.xaml` L336–L469 的 ComboBox / ToggleButton / ComboBoxItem 三个模板），不再依赖 Fluent 默认绘制。~~「Windows 端 `MyComboBox.vb` 同样没有自定义模板（纯继承 + 属性/动画改造）」~~ **此论断错误（2026-11-08 复核更正）**：Windows 端模板不在 `Controls/MyComboBox.xaml`（该文件确实不存在），而是写在 `pcl-next/Application.xaml` L336–L405 的 `Style TargetType="local:MyComboBox"`（`OverridesDefaultStyle=True` + 普通态/`IsEditable` 两套 `ControlTemplate`）；`MyComboBox.vb` 只负责 `RefreshColor` 配色与弹出层宽度/透明度。 | 不视为允许差异（属缺陷，已修复） | 收起态可见性与弹出层外观仍需统一验收目视确认（V1；`HasItems=false → 高 26` 等边角触发器暂未复刻，并入 R6） |
 | **R14** | ~~窗口/页面底色为纯白~~ **已修（2026-11-08）**：宿主窗口底色改为 `ColorBrush1` `#343d4a`，与 Windows 端窗口底色一致，`MyCard` 的 `#F5FFFFFF` 卡底与 `0 0 6 #12343d4a` 阴影因此可见 | **照抄**，不是允许差异：色值取自 Windows 端 `ColorBrush1`，未做任何近似。实现方式上的差别仅在于 Windows `Window` 本身是 `AllowsTransparency=True` + `Background={x:Null}`（底色由内容层提供），Linux 直接铺在 `Window` 根层——视觉结果一致 | 卡片圆角 5、`Margin -3,-4,-3,-3`、标题 15,12 等尺寸不得改 |
+| **R15** | `ScrollViewer` 变体与横向滚动条：本轮只落 `MyScrollViewer`（滚动条贴边无 `Margin`）；Windows 端另有 `ScrollViewerFullMargin`（滚动条 `Margin 2,1,1,1`）与 `ScrollViewerNoMargin` 两个变体，用到它们的页面再按原模板补；横向滚动条未自绘（Windows 端 `HorizontalScrollBarVisibility` 全部为 `Disabled`，界面不应出现横向条） | 未用到的变体缺省不影响当前页面；一旦某页用到对应变体，必须在开工该页前补齐，不得带着差异上线 | 已用页面（`PageSetupLink`）用 `MyScrollViewer` 变体，滚动条宽度 8、贴边、拇指配色不受影响 |
 
 ---
 
@@ -135,9 +136,9 @@
 | 2 | `Label` | 81–98 | 无 Avalonia `Label`，用 `TextBlock` 等价 |
 | 3 | `MyTextButton` | 99–117 | 用 `TextBlock` / `Button` 自绘等价 |
 | 4 | `TextBlock`（默认 + `BasedOnTextBlock`） | 120–133 | 全局 `Style`（字号 13 / `ColorBrush1` / 省略号 / 字族）✅ 已落 |
-| 5 | `MyScrollBar` | 148–181 | **自绘**：宽 8、圆角 2、`ColorBrushSemiTransparent` 底 + 前景色拇指（圆角 3 / `Margin 2`）、仅鼠标悬停可拖 |
-| 6 | `MyScrollViewer` | 182–197 | **自绘**：无横向、右置 8px 竖条 |
-| 7 | `ScrollViewer`（`ScrollViewerFullMargin` / `ScrollViewerNoMargin`） | 199–238 | 同上，两个变体按 `Padding` 差异区分 |
+| 5 | `MyScrollBar` | 148–181 | **自绘** ✅ 本轮已落：宽 8、圆角 2、`ColorBrushSemiTransparent` 底 + 前景色拇指（圆角 3 / `Margin 2`）、`IsDirectionReversed`、翻页热区不可见、仅鼠标悬停可翻页 |
+| 6 | `MyScrollViewer` | 182–197 | **自绘** ✅ 本轮已落：无横向、右置贴边 8px 竖条 |
+| 7 | `ScrollViewer`（`ScrollViewerFullMargin` / `ScrollViewerNoMargin`） | 199–238 | **自绘**（`MyScrollViewer` 变体已落；`FullMargin` 的滚动条 `Margin 2,1,1,1` 与 `NoMargin` 变体在用到它们的页面再补，登记 R15） |
 | 8 | `MyTextBox` | 241–324 | **自绘**（现有为精简等价模板，需按原模板补全） |
 | 9 | `MyComboBox` | 336–405 | **自绘** ✅ 本轮已落 |
 | 10 | `ToggleButton`（ComboBox 箭头） | 406–446 | **自绘** ✅ 本轮已落（15px V 形、0.2s 旋转 180°） |
@@ -561,6 +562,24 @@ dotnet build PCL.Desktop.Linux/PCL.Desktop.Linux.csproj -c Release -r linux-x64
 **⑤ 未复刻项（转 R6 / 统一验收）**：`HasItems=false → dropDownBorder 高 26` 触发器、
 弹层透明度跟随主窗口（`PanPopup.Opacity = FrmMain.Opacity`，需外壳提供不透明度）、
 `IsEditable` 分支（本轮页面未用可编辑 ComboBox）、弹出层滚动条（等 `ScrollBar`/`ScrollViewer` 自绘后统一）。
+
+### 13.6 ScrollBar / ScrollViewer 自绘（2026-11-08，只做编译验证、不弹窗）
+
+| 自绘主题 | 对照来源 | 照抄的关键取值 | Avalonia 侧的必要调整 |
+|---|---|---|---|
+| `MyScrollBarThumbTheme` | Application.xaml L136–L147（`MyThumb`） | 外层底 `ColorBrushSemiTransparent`；内层 `Background = 前景色`、`CornerRadius 3`、`Margin 2` | 无（`Thumb` 直接给模板） |
+| `MyScrollBarTheme` | Application.xaml L148–L181（`MyScrollBar`） | `MinWidth/Width 8`、外层 `CornerRadius 2`、`Track IsDirectionReversed=True`、翻页按钮不可见（原 `Opacity=0`）、拇指取前景色、**仅鼠标悬停可翻页**（原 `Track.IsEnabled = IsMouseOver`） | ① 翻页按钮改用全透明模板（Avalonia 的 `Opacity=0` 在部分后端仍会命中，透明模板更贴近原意）；② 上/下翻页按钮必须沿用 Fluent 的部件名 `PART_PageUpButton` / `PART_PageDownButton`（Avalonia 的 `ScrollBar` 按这两个名字接线）；③ `Track` 在原版**无 `Name`**，这里同样不命名；④ `IsEnabled` 绑 `IsPointerOver`，`Track` 的 `Minimum/Maximum/Value/ViewportSize/Orientation` 全部照 Fluent 的绑法接上 |
+| `MyScrollViewerTheme` | Application.xaml L182–L197（`MyScrollViewer`） | 无横向、右置贴边 8px 竖条、内容 `Padding = TemplateBinding Padding` | ① 部件名沿用 Avalonia 约定 `PART_ContentPresenter` / `PART_VerticalScrollBar`；② 保留 `ScrollGestureRecognizer`（滚轮/触控惯性）；③ 滚动条的 `Minimum/Maximum/Value/ViewportSize/Visibility` 由 `ScrollViewer` 类内部接线，模板不必重复绑定 |
+
+**应用方式**：`ScrollBar` / `ScrollViewer` 用**全局**样式 `<Setter Property="Theme">` 切到自绘主题，
+这样连 Fluent 模板内部创建的滚动条（如 ComboBox 弹层里的 `ScrollViewer`）也一并换掉，不留 Fluent 残留。
+
+**验证**（未起窗口）：`dotnet build PCL.Desktop.Linux/PCL.Desktop.Linux.csproj -c Release -r linux-x64`
+→ 0 警告 / 0 错误（产物 `bin-net10/Dev/2.100.0.4-0.83/linux-x64/`）。
+
+**未覆盖（登记 R15）**：`ScrollViewerFullMargin`（滚动条 `Margin 2,1,1,1`）与 `ScrollViewerNoMargin` 变体按页面补；
+横向滚动条未自绘（Windows 端全部 `Disabled`）。**需统一验收目视**（并入 V3）：滚动条贴边、拇指配色、
+翻页是否只在悬停时可用。
 
 ## 14. 待统一验收清单（UI 全部成型后一次性执行）
 

@@ -117,7 +117,107 @@
                 </ControlTemplate>
             </Setter>
         </ControlTheme>
+        <!-- ===== ScrollBar 拇指（对照 Application.xaml L136–L147 MyThumb）
+             外层 ColorBrushSemiTransparent 底 + 内层前景色滑块，圆角 3、Margin 2 ===== -->
+        <ControlTheme x:Key="MyScrollBarThumbTheme" TargetType="Thumb">
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <Border Background="{DynamicResource ColorBrushSemiTransparent}">
+                        <Border Background="{TemplateBinding Foreground}" CornerRadius="3" Margin="2" />
+                    </Border>
+                </ControlTemplate>
+            </Setter>
+        </ControlTheme>
+
+        <!-- 翻页热区：Windows 用 Opacity=0 的 RepeatButton，这里用全透明模板达到同样效果（可见但无绘制） -->
+        <ControlTheme x:Key="MyInvisibleButtonTheme" TargetType="RepeatButton">
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <Border Background="Transparent" />
+                </ControlTemplate>
+            </Setter>
+        </ControlTheme>
+
+        <!-- ===== ScrollBar（对照 Application.xaml L148–L181 MyScrollBar）
+             宽 8、外层圆角 2、IsDirectionReversed、翻页按钮不可见、拇指取前景色；
+             只在鼠标悬停时允许翻页（Windows 端 Track IsEnabled=IsMouseOver） ===== -->
+        <ControlTheme x:Key="MyScrollBarTheme" TargetType="ScrollBar">
+            <Setter Property="AllowAutoHide" Value="False" />
+            <Setter Property="MinWidth" Value="8" />
+            <Setter Property="Width" Value="8" />
+            <Style Selector="^:vertical">
+                <Setter Property="Template">
+                    <ControlTemplate>
+                        <Border CornerRadius="2">
+                            <Track Minimum="{TemplateBinding Minimum}"
+                                   Maximum="{TemplateBinding Maximum}"
+                                   Value="{TemplateBinding Value, Mode=TwoWay}"
+                                   ViewportSize="{TemplateBinding ViewportSize}"
+                                   Orientation="{TemplateBinding Orientation}"
+                                   IsDirectionReversed="True"
+                                   IsEnabled="{TemplateBinding IsPointerOver}">
+                                <Track.DecreaseButton>
+                                    <RepeatButton Name="PART_PageUpButton"
+                                                  Theme="{StaticResource MyInvisibleButtonTheme}"
+                                                  Focusable="False"
+                                                  IsTabStop="False" />
+                                </Track.DecreaseButton>
+                                <Track.IncreaseButton>
+                                    <RepeatButton Name="PART_PageDownButton"
+                                                  Theme="{StaticResource MyInvisibleButtonTheme}"
+                                                  Focusable="False"
+                                                  IsTabStop="False" />
+                                </Track.IncreaseButton>
+                                <Track.Thumb>
+                                    <Thumb Theme="{StaticResource MyScrollBarThumbTheme}"
+                                           Foreground="{TemplateBinding Foreground}" />
+                                </Track.Thumb>
+                            </Track>
+                        </Border>
+                    </ControlTemplate>
+                </Setter>
+            </Style>
+        </ControlTheme>
+
+        <!-- ===== ScrollViewer（对照 Application.xaml L182–L197 MyScrollViewer）
+             只做竖排、滚动条右置且贴边（Windows MyScrollViewer 不加 Margin；FullMargin 变体的 2,1,1,1
+             等用到该变体的页面再补一套主题） ===== -->
+        <ControlTheme x:Key="MyScrollViewerTheme" TargetType="ScrollViewer">
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <Grid ColumnDefinitions="*,Auto">
+                        <ScrollContentPresenter Name="PART_ContentPresenter"
+                                                Grid.Column="0"
+                                                Background="{TemplateBinding Background}"
+                                                Padding="{TemplateBinding Padding}"
+                                                HorizontalSnapPointsType="{TemplateBinding HorizontalSnapPointsType}"
+                                                VerticalSnapPointsType="{TemplateBinding VerticalSnapPointsType}"
+                                                HorizontalSnapPointsAlignment="{TemplateBinding HorizontalSnapPointsAlignment}"
+                                                VerticalSnapPointsAlignment="{TemplateBinding VerticalSnapPointsAlignment}"
+                                                ScrollViewer.IsScrollInertiaEnabled="{TemplateBinding IsScrollInertiaEnabled}">
+                            <ScrollContentPresenter.GestureRecognizers>
+                                <ScrollGestureRecognizer CanHorizontallyScroll="{Binding CanHorizontallyScroll, ElementName=PART_ContentPresenter}"
+                                                         CanVerticallyScroll="{Binding CanVerticallyScroll, ElementName=PART_ContentPresenter}"
+                                                         IsScrollInertiaEnabled="{Binding (ScrollViewer.IsScrollInertiaEnabled), ElementName=PART_ContentPresenter}" />
+                            </ScrollContentPresenter.GestureRecognizers>
+                        </ScrollContentPresenter>
+                        <ScrollBar Name="PART_VerticalScrollBar"
+                                   Orientation="Vertical"
+                                   Grid.Column="1"
+                                   Theme="{StaticResource MyScrollBarTheme}" />
+                    </Grid>
+                </ControlTemplate>
+            </Setter>
+        </ControlTheme>
     </Styles.Resources>
+
+    <!-- ===== 全局：所有 ScrollBar / ScrollViewer（含 Fluent 模板内部创建的实例）一律切到自绘主题 ===== -->
+    <Style Selector="ScrollBar">
+        <Setter Property="Theme" Value="{StaticResource MyScrollBarTheme}" />
+    </Style>
+    <Style Selector="ScrollViewer">
+        <Setter Property="Theme" Value="{StaticResource MyScrollViewerTheme}" />
+    </Style>
 
     <!-- ===== TextBlock：字号 13、ColorBrush1、字符省略号、PCL 字族 ===== -->
     <Style Selector="TextBlock">
