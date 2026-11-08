@@ -85,13 +85,17 @@ function Invoke-Git {
 # 重算成 0.0x，导致「后提交的产物编号反而更小」。每份仓库根的
 # scripts\build-number.base 记录它从旧线继承的编号（锚点以来的提交数）：
 #   PCL_NEXT_Windows = 65 (dev@463a558) / Linux = 71 (linux@439d516) / Android = 60 (android@a9c1643)
-# 仅在退化分支生效：基线提交继承该编号，之后每个增量提交 +1；
-# 锚点可达（旧仓库 / 完整历史克隆）时保持原语义，不叠加基数。
+# 该文件存在即代表「独立新仓库」，一律按 root + 继承基数计，不再检查硬编码锚点是否可达：
+# CI 用 fetch-depth:0 会把远端旧 tag 及其历史一并拉下，锚点 85c17f13 在 CI 里意外可达，
+# 于是走锚点分支把编号算成 0.1x，而本地对象库没有旧 tag 走退化分支算成 0.7x，
+# 同一 commit 的 CI 制品与本地归档编号对不上（2026-11-08 dev.6 首次发布实测）。
+# 旧仓库没有这个文件，仍保持原锚点语义。
 $BaseCount = 0
+$hasBase = $false
 $baseFile = Join-Path $RepoRoot 'scripts\build-number.base'
 if (Test-Path -LiteralPath $baseFile) {
     $rawBase = (Get-Content -LiteralPath $baseFile -Raw).Trim()
-    if ($rawBase -match '^\d+$') { $BaseCount = [int]$rawBase }
+    if ($rawBase -match '^\d+$') { $BaseCount = [int]$rawBase; $hasBase = $true }
 }
 $anchorMode = 'anchor'
 
@@ -108,7 +112,8 @@ else {
     # 都取不到锚点，退化为「自首个提交起算 + 继承基数」。
     # 退化仍是严格单调递增，且不会让新仓库的编号低于它所继承的旧线编号。
     $resolvedAnchor = Invoke-Git @('rev-parse', '--verify', '--quiet', "$AnchorSha^{commit}")
-    if ([string]::IsNullOrWhiteSpace($resolvedAnchor)) {
+    # hasBase 优先：独立新仓库即便因旧 tag 而能解析到锚点，也必须走继承基数口径
+    if ($hasBase -or [string]::IsNullOrWhiteSpace($resolvedAnchor)) {
         $anchor = 'root'
         $anchorMode = 'root+base'
         $rootCount = [int](Invoke-Git @('rev-list', '--count', 'HEAD'))
