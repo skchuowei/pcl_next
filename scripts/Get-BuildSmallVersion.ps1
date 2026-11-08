@@ -11,6 +11,10 @@
     后提交的产物反而比先提交的小，追溯就失去意义。改用固定锚点后，
     编号随提交数单调递增，**任何后提交的产物编号一定大于先提交的产物**。
 
+    2026-11-08 起三条平台线改为各自 `git init` 的独立仓库，旧锚点 SHA 在新历史里不可达。
+    这类仓库由 `scripts\build-number.base` 提供「继承基数」：基线提交继承旧线编号，
+    之后每个提交 +1；锚点可达的旧仓库不叠加基数。详见《分支与发布规范》§5.2.1。
+
     需要注意：M.mm 是显示形式，`10.00` 在字符串上小于 `2.00`，比较大小必须用
     BuildSmallNumber（等于提交数本身），不要直接比较字符串。
 
@@ -76,6 +80,21 @@ function Invoke-Git {
     return (($output | Out-String).Trim())
 }
 
+# ---- 独立仓库的编号继承基数（2026-11-08 架构裁决）----
+# 三条平台线各自 git init 后，硬编码锚点 SHA 在新历史里不可达，退化分支会把编号
+# 重算成 0.0x，导致「后提交的产物编号反而更小」。每份仓库根的
+# scripts\build-number.base 记录它从旧线继承的编号（锚点以来的提交数）：
+#   PCL_NEXT_Windows = 65 (dev@463a558) / Linux = 71 (linux@439d516) / Android = 60 (android@a9c1643)
+# 仅在退化分支生效：基线提交继承该编号，之后每个增量提交 +1；
+# 锚点可达（旧仓库 / 完整历史克隆）时保持原语义，不叠加基数。
+$BaseCount = 0
+$baseFile = Join-Path $RepoRoot 'scripts\build-number.base'
+if (Test-Path -LiteralPath $baseFile) {
+    $rawBase = (Get-Content -LiteralPath $baseFile -Raw).Trim()
+    if ($rawBase -match '^\d+$') { $BaseCount = [int]$rawBase }
+}
+$anchorMode = 'anchor'
+
 # ---- 采集 git 信息（任何一步失败都退化为「无 git」的保守值，不阻断构建）----
 $isRepo = (Invoke-Git @('rev-parse', '--is-inside-work-tree'))
 if ($isRepo -ne 'true') {
@@ -85,12 +104,16 @@ if ($isRepo -ne 'true') {
     $dirty = $true
 }
 else {
-    # 锚点必须在当前历史里可达；浅克隆或镜像裁剪掉锚点时退化为「自首个提交起算」。
-    # 退化会让编号跳变（基数变大），但仍是单调递增，不会出现「后提交更小」。
+    # 锚点必须在当前历史里可达；浅克隆、镜像裁剪、或 2026-11-08 后的独立新仓库
+    # 都取不到锚点，退化为「自首个提交起算 + 继承基数」。
+    # 退化仍是严格单调递增，且不会让新仓库的编号低于它所继承的旧线编号。
     $resolvedAnchor = Invoke-Git @('rev-parse', '--verify', '--quiet', "$AnchorSha^{commit}")
     if ([string]::IsNullOrWhiteSpace($resolvedAnchor)) {
         $anchor = 'root'
-        $commits = [int](Invoke-Git @('rev-list', '--count', 'HEAD'))
+        $anchorMode = 'root+base'
+        $rootCount = [int](Invoke-Git @('rev-list', '--count', 'HEAD'))
+        # 首个提交（代码基线快照）继承旧线编号，之后的增量提交每个 +1
+        $commits = $BaseCount + [math]::Max(0, $rootCount - 1)
     }
     else {
         $anchor = $resolvedAnchor.Substring(0, 7)
@@ -135,6 +158,8 @@ if ($Json) {
         BuildSmallNumber = $commits
         Commits         = $commits
         Anchor          = $anchor
+        AnchorMode      = $anchorMode
+        BaseCount       = $BaseCount
         Commit          = $commit
         Dirty           = [bool]$dirty
         Token           = $token
