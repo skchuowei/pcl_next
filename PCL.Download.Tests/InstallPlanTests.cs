@@ -248,4 +248,58 @@ public class InstallPlanTests
         // LiteLoader 因 Fabric 已选 => Block = False
         Assert.False(Step(plan, InstallStepKind.LiteLoader).Block);
     }
+
+    [Fact]
+    public void 装配描述符随请求上下文分流OptiFine()
+    {
+        // 口径 A：C# 连「复合体内部由哪个宿主函数提供」都决定好，VB 只装配
+        var asMod = Build(r =>
+        {
+            r.HasAnyModLoader = true;
+            r.FabricVersion = "0.15.0";
+            r.HasOptiFineEntry = true;
+            r.OptiFineAsMod = true;
+        });
+        Assert.Equal("McDownloadOptiFineSaveLoader", Step(asMod, InstallStepKind.OptiFine).Task.SubStepsSource);
+        Assert.Equal(InstallCancelSemantics.Cooperative, Step(asMod, InstallStepKind.OptiFine).Task.Cancel);
+
+        var asInstaller = Build(r => r.HasOptiFineEntry = true);
+        Assert.Equal("McDownloadOptiFineLoader", Step(asInstaller, InstallStepKind.OptiFine).Task.SubStepsSource);
+        Assert.Equal(InstallCancelSemantics.WaitForClient, Step(asInstaller, InstallStepKind.OptiFine).Task.Cancel);
+    }
+
+    [Fact]
+    public void 装配描述符的输入产出与下载清单随步骤种类固定()
+    {
+        var plan = Build();
+        var client = Step(plan, InstallStepKind.Client).Task;
+        Assert.Equal(InstallLoaderKind.Combo, client.LoaderKind);
+        Assert.Contains(NetFileDescriptorKind.VanillaJson, client.DownloadKinds);
+        Assert.Contains("ClientLoader", client.Outputs);
+
+        Assert.Equal(InstallLoaderKind.Task, Step(plan, InstallStepKind.InstallGame).Task.LoaderKind);
+        Assert.True(Step(plan, InstallStepKind.InstallGame).Task.ReportsProgress);
+        Assert.Contains("TargetFolder", Step(plan, InstallStepKind.InstallGame).Task.Outputs);
+    }
+
+    [Fact]
+    public void 提供原版Json地址会改变客户端子步骤数()
+    {
+        Assert.Equal(5, Step(Build(), InstallStepKind.Client).Task.SubSteps.Count);
+        Assert.Equal(4, Step(Build(r => r.HasMinecraftJson = true), InstallStepKind.Client).Task.SubSteps.Count);
+    }
+
+    [Fact]
+    public void Describe返回的规格与步骤逐一对应()
+    {
+        var plan = Build(r =>
+        {
+            r.HasFabricApi = true;
+            r.FabricVersion = "0.15.0";
+        });
+        var descriptors = PCL.Download.InstallTaskPlanner.Describe(plan);
+        Assert.Equal(plan.Steps.Count, descriptors.Count);
+        Assert.All(descriptors, d => Assert.NotNull(d.Kind));
+        Assert.All(descriptors, d => Assert.False(string.IsNullOrEmpty(d.Name)));
+    }
 }
