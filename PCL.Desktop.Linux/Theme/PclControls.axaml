@@ -536,26 +536,37 @@
         </Setter>
     </Style>
 
-    <!-- ===== MyListItem（1:1 对齐 MyListItem.xaml） ===== -->
+    <!-- ===== MyListItem（1:1 对齐 MyListItem.xaml(.vb)）=====
+         RectBack / RectCheck / Logo / 标题 / 按钮由控件代码按 WPF 顺序创建，此处只按 Name 命中配色。 -->
     <Style Selector="c|MyListItem">
         <Setter Property="Height" Value="42" />
         <Setter Property="Background" Value="{DynamicResource ColorBrushSemiTransparent}" />
         <Setter Property="FontSize" Value="13" />
-        <Setter Property="FontFamily" Value="{DynamicResource PclFont}" />
         <Setter Property="Foreground" Value="{DynamicResource ColorBrush1}" />
         <Setter Property="Cursor" Value="Hand" />
-        <Setter Property="Template">
-            <ControlTemplate>
-                <Grid Name="PanBack" Height="42" Background="{TemplateBinding Background}"
-                      ColumnDefinitions="2,0,4,*,4" RowDefinitions="*,Auto,Auto,*">
-                    <TextBlock Name="PART_LabTitle" Grid.Row="1" Grid.Column="3"
-                               Text="{TemplateBinding Title}" Margin="4,0,0,0"
-                               FontSize="{TemplateBinding FontSize}" FontFamily="{TemplateBinding FontFamily}"
-                               Foreground="{TemplateBinding Foreground}" HorizontalAlignment="Left"
-                               TextTrimming="CharacterEllipsis" />
-                </Grid>
-            </ControlTemplate>
-        </Setter>
+    </Style>
+    <Style Selector="c|MyListItem:checked">
+        <Setter Property="Foreground" Value="{DynamicResource ColorBrush2}" />
+    </Style>
+    <!-- 高 &lt; 40 的紧凑档选中用 ColorBrush3（MyListItem.vb 中的分支） -->
+    <Style Selector="c|MyListItem:checked:small">
+        <Setter Property="Foreground" Value="{DynamicResource ColorBrush3}" />
+    </Style>
+    <Style Selector="c|MyListItem TextBlock">
+        <Setter Property="FontFamily" Value="{DynamicResource PclFont}" />
+    </Style>
+    <Style Selector="c|MyListItem > Border#PART_RectBack">
+        <Setter Property="Background" Value="{DynamicResource ColorBrush7}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource ColorBrush6}" />
+    </Style>
+    <Style Selector="c|MyListItem:pointerover > Border#PART_RectBack">
+        <Setter Property="Background" Value="{DynamicResource ColorBrushBg1}" />
+    </Style>
+    <Style Selector="c|MyListItem:down > Border#PART_RectBack">
+        <Setter Property="Background" Value="{DynamicResource ColorBrush6}" />
+    </Style>
+    <Style Selector="c|MyListItem > Border#PART_RectCheck">
+        <Setter Property="Background" Value="{DynamicResource ColorBrush3}" />
     </Style>
 
     <!-- ===== MyLoading（1:1 对齐 MyLoading.xaml；镐子摆动改为循环旋转近似，R10） ===== -->

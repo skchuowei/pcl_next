@@ -106,11 +106,12 @@
 | **R13** | 运行期缺陷：`MyComboBox` 在 WSLg 下**未渲染**（收起态无边框、无选中文案、无箭头），编译期无报错。**根因已查明**：`MyComboBox : ComboBox` 未覆写 `StyleKeyOverride`，Avalonia Fluent 的 ControlTheme 按派生类型查不到 → 无 `Template` → 控件不渲染。**已修（2026-11-08）**，分两步：① 补 `StyleKeyOverride => typeof(ComboBox)` 让控件先可见；② 按本计划 §2.2 主题基线，改为**自绘 `ControlTheme`**（照抄 `pcl-next/Application.xaml` L336–L469 的 ComboBox / ToggleButton / ComboBoxItem 三个模板），不再依赖 Fluent 默认绘制。~~「Windows 端 `MyComboBox.vb` 同样没有自定义模板（纯继承 + 属性/动画改造）」~~ **此论断错误（2026-11-08 复核更正）**：Windows 端模板不在 `Controls/MyComboBox.xaml`（该文件确实不存在），而是写在 `pcl-next/Application.xaml` L336–L405 的 `Style TargetType="local:MyComboBox"`（`OverridesDefaultStyle=True` + 普通态/`IsEditable` 两套 `ControlTemplate`）；`MyComboBox.vb` 只负责 `RefreshColor` 配色与弹出层宽度/透明度。 | 不视为允许差异（属缺陷，已修复） | 收起态可见性与弹出层外观仍需统一验收目视确认（V1；`HasItems=false → 高 26` 等边角触发器暂未复刻，并入 R6） |
 | **R14** | ~~窗口/页面底色为纯白~~ **已修（2026-11-08）**：宿主窗口底色改为 `ColorBrush1` `#343d4a`，与 Windows 端窗口底色一致，`MyCard` 的 `#F5FFFFFF` 卡底与 `0 0 6 #12343d4a` 阴影因此可见 | **照抄**，不是允许差异：色值取自 Windows 端 `ColorBrush1`，未做任何近似。实现方式上的差别仅在于 Windows `Window` 本身是 `AllowsTransparency=True` + `Background={x:Null}`（底色由内容层提供），Linux 直接铺在 `Window` 根层——视觉结果一致 | 卡片圆角 5、`Margin -3,-4,-3,-3`、标题 15,12 等尺寸不得改 |
 | **R15** | `ScrollViewer` 变体与横向滚动条：本轮只落 `MyScrollViewer`（滚动条贴边无 `Margin`）；Windows 端另有 `ScrollViewerFullMargin`（滚动条 `Margin 2,1,1,1`）与 `ScrollViewerNoMargin` 两个变体，用到它们的页面再按原模板补；横向滚动条未自绘（Windows 端 `HorizontalScrollBarVisibility` 全部为 `Disabled`，界面不应出现横向条） | 未用到的变体缺省不影响当前页面；一旦某页用到对应变体，必须在开工该页前补齐，不得带着差异上线 | 已用页面（`PageSetupLink`）用 `MyScrollViewer` 变体，滚动条宽度 8、贴边、拇指配色不受影响 |
-| **R16** | 调色板取 `Application.xaml` 的**静态色值**（`#343d4a` / `#0b5bcb` …），未复刻 `ModSecret.vb` `ThemeRefresh` 的 HSL 重算：两者逐通道差 ≤2（实测 `Color1`：静态 `(52,61,74)` vs 重算 `(51,62,72)`，`Color8`：`(234,242,254)` vs `(238,246,254)`） | 仅允许 ≤2/255 的单通道偏差，肉眼不可分辨 | 不得因此改任何**布局**数值；一旦接入设置页主题色，必须改成与 Windows 同一份 HSL 计算（届时 R16 关闭） |
-| **R17** | 标题栏渐变与主页面背景**已在 Linux 侧按同一 HSL 算法、同一取整算**（`Theme/PclTheme.cs`：`FromHSL2` / `FromHSL` / `Hue` 逐行移植自 `ModBase.vb` L360–L409），但主题参数写死为 Windows 默认值 `ColorHue=210`、`ColorSat=85`、`ColorLightAdjust=0`、`ColorHueTopbarDelta=0`（`ModSecret.vb` L66、`UiLauncherTheme=0`）；设置页换主题色、`UiBackgroundColorful` 开关尚未接入 | 仅默认主题下的外观允许缺省 | 算法与取整不得改成近似值；接入设置页后必须删掉这组常量 |
+| **R16** | 调色板**资源**（`PclColors.axaml` 的 `ColorBrush1..8`）仍取 `Application.xaml` 的静态色值（`#343d4a` / `#0b5bcb` …），而标题栏/页面背景已改为运行期 HSL 重算（R17）：两者逐通道差 ≤2（实测 `Color1`：静态 `(52,61,74)` vs 重算 `(51,62,72)`，`Color8`：`(234,242,254)` vs `(238,246,254)`） | 仅允许 ≤2/255 的单通道偏差，肉眼不可分辨 | 不得因此改任何**布局**数值；因本 fork 皮肤不改变主题参数（§13.8），静态资源与运行期重算不存在分叉风险；若后续把 `ColorBrush*` 也改为运行期写入，则 R16 关闭 |
+| **R17** | 标题栏渐变与主页面背景**已在 Linux 侧按同一 HSL 算法、同一取整算**（`Theme/PclTheme.cs`：`FromHSL2` / `FromHSL` / `Hue` 逐行移植自 `ModBase.vb` L360–L409），主题参数已由 `const` 改为**皮肤参数字段 + `Refresh(theme)` 早退语义**（同 `ModSecret.vb` L69–L110），默认值 `ColorHue=210`、`ColorSat=85`、`ColorLightAdjust=0`、`ColorHueTopbarDelta=0`（`ModSecret.vb` L66）。**核实结论（§13.8）：Windows 端本 fork 不存在「皮肤编号 → 参数」的映射表，四个参数全程无赋值点，故参数恒为默认值、配色恒为 PCL 蓝**；`UiBackgroundColorful` 开关与设置页联动待设置页接入 | 参数恒定本身与 Windows 端一致，不算降级 | 算法与取整不得改成近似值；不得自行发明映射表；取得映射数据后在 `PclTheme.Refresh` 单点接入 |
 | **R18** | 标题栏 logo 只接入 `UiLogoType=1`（默认档：文字 `PCL Next`、17 号白字、`Margin 18,0,0,0`）；其余三档（`0` 形状 / `2` 自定义文本 / `3` 图片）与 `UiLogoLeft`、`UiLogoText`、`ImgTitle` 背景图未接入 | 未接入档不影响默认外观 | 默认档的位置/字号/色值不得改；接入时按 vb L820–L869 的分支补齐 |
 | **R19** | 窗口壳的行为近似：① 开场/关闭动画缓动由 `AniEaseOutBack` 改 `BackEaseOut`（时长 600/500ms 照抄）；② `IsMouseDirectlyOver` 无等价物，标题栏拖拽改为「向上找 `MyIconButton`/`MyRadioButton` 祖先」；③ Avalonia 11 无 `CanMinimize` 属性，最小化走 `WindowState.Minimized`；④ `Topmost` 启动瞬间、`UiOpacity` 窗口不透明度、窗口尺寸/位置记忆（`Settings`）未接入 | 只允许实现手段差异 | 标题栏高度 48、按钮 28×28 与边距 12/44、缩放热区 8/13px 不得改 |
-| **R20** | 页面栈与外壳其余部件：5 个栈里只有「联机」有页面（`PageSetupLink`），**初始选中因此改为「联机」**（Windows 默认「启动」，vb L1438–L1471），其余四栈宿主置空；`ImgBack` 背景图（`UiBackgroundOpacity` / `Blur` / `Suit`）、`PanTitleInner`、`PanHint`、`BtnExtra*`、`RectLeftBackground` 宽度动画（`PageChangeLeft` 驱动）未接入 | 页面栈缺页面、初始栈偏移属临时状态 | 「联机」页与外壳几何不得因此改动；每移植完一个栈必须把初始选中改回「启动」并删掉占位 |
+| **R20** | **【临时状态】**页面栈与外壳其余部件：5 个栈里只有「联机」有页面（`PageSetupLink`）、「设置」有左导航（`PageSetupLeft`），**初始选中因此临时改为「联机」**（Windows 端默认「启动」，vb L1438–L1471），其余栈宿主置空；`ImgBack` 背景图（`UiBackgroundOpacity` / `Blur` / `Suit`）、`PanTitleInner`、`PanHint`、`BtnExtra*` 未接入；设置左导航的重置按钮点击为空操作（设置子页未移植） | **临时状态不算允许差异**：页面补齐后必须把初始选中恢复成 Windows 端的「启动」，并逐步删掉这段降级；不得以「Linux 默认联机」沉淀成既定行为 | 「联机」页与外壳几何不得因此改动；每移植完一个栈就必须回收对应降级项并在本节留痕 |
+| **R21** | 左竖条（`RectLeftBackground`）宽度动画的触发时机：Windows 由 `PanMainLeft.SizeChanged` 驱动；Linux 改为「切换栈并完成布局后取 `PanMainLeft.Bounds.Width` 驱动一次」。因左列为 `Auto`、内容固定，窗口缩放不改变该宽度，实际表现一致 | 仅触发时机 | 目标宽度值、180ms 时长、阴影淡出条件不得改；若后续左页宽度随内容变化，必须补回尺寸监听 |
 
 ---
 
@@ -175,6 +176,30 @@
 
 → 1:1 口径下只有 A 能达标，因此本条**不需要用户拍板**，已按 A 执行；实施顺序是「先补当前页面与外壳用到的控件模板，
 再铺页面」，即 `ComboBox`（本轮已落）→ `ScrollBar`/`ScrollViewer` → 外壳 → `TextBox` 补全 → 其余按页面开工顺序。
+
+### 2.3 合规约束：默认锁蓝（条约）+ 皮肤可自由切换（功能一致）
+
+**条约原文**（`PCL_NEXT_Linux/LICENCE` L36–L39，第 5 条）：
+
+> 5、软件在 Windows 系统上运行时，不应有与 PCL 的赞助解锁功能类似的功能或表现。例如：界面的主要色相必须为蓝色（即使没有修改功能，改为其他色相也和需要赞助解锁的主题功能类似）。
+
+**执行口径**（经用户 2026-11-08 两次修正后的最新口径，后者覆盖前者）：
+
+| 层 | 要求 | 落地方式 |
+|---|---|---|
+| **默认基线（条约约束）** | 出厂默认必须是 PCL 蓝：`ColorBrush3 = #1370f3` 体系（`ColorHue=210`、`ColorSat=85`、`ColorLightAdjust=0`），不得因平台不同而改默认配色 | `Theme/PclColors.axaml` 色值与 `pcl-next/Application.xaml` 一致；`Theme/PclTheme.cs` 主题参数默认值与 `ModSecret.vb` L66 逐项一致 |
+| **主题 / 皮肤切换（功能一致）** | **允许且必须按 Windows 端 1:1 还原**：设置项存在、入口可见、不置灰、不屏蔽、可持久化；不得自行加锁或删入口 | 按 Windows 端实际行为实现（见 §13.8 核实结论），不在此额外施加条约限制 |
+
+**核实结论（关键）**：本 fork（pcl-next）的皮肤机制**没有**「皮肤编号 → 色相 / 饱和 / 亮度 / 顶栏色相差」的映射表（详见 §13.8）；
+`ThemeRefresh(NewTheme)` 只记录 `ThemeNow` 用于早退，调色板恒由 `ColorHue / ColorSat / ColorLightAdjust / ColorHueTopbarDelta`
+四个固定参数算出。因此 Linux 侧 1:1 的形态是「**入口与持久化同 Windows、配色恒为默认蓝**」，
+而不是「不实现皮肤」；`PclTheme.Refresh(int theme)` 已按 Windows 语义落成唯一切换入口，
+一旦取得上游映射数据，只在该入口一处推导，不改其他任何地方。
+
+**不得做的事**：
+- 不得因为「条约要求蓝色」而禁用、置灰或隐藏设置页的皮肤列表（用户已明确纠正）。
+- 不得自行发明皮肤编号与 HSL 参数的对应关系（Windows 端无此数据，编造即偏离 1:1）。
+- 不得把默认参数调离 PCL 蓝（`ColorBrush3 #1370f3` 体系）。
 
 ## 3. 目标与可验证标准
 
@@ -608,8 +633,52 @@ dotnet build PCL.Desktop.Linux/PCL.Desktop.Linux.csproj -c Release -r linux-x64
 **验证**（未起窗口）：`dotnet build PCL.Desktop.Linux/PCL.Desktop.Linux.csproj -c Release -r linux-x64`
 → 0 警告 / 0 错误（产物 `bin-net10/Dev/2.100.0.4-0.84/linux-x64/`）。
 
-**未接入项转登记**：R17（主题色联动）、R18（logo 其余三档 / 标题栏图片）、R19（壳行为近似）、R20（页面栈与外壳其余部件）。
+**未接入项转登记**：R17（皮肤参数接入点已就位、映射数据待上游）、R18（logo 其余三档 / 标题栏图片）、R19（壳行为近似）、R20（页面栈其余栈与外壳其余部件）、R21（左竖条动画触发时机）。
 **需统一验收目视**（新增 V8 / V9）：无边框拖拽与 8 向缩放、圆角裁剪、标题栏渐变与 logo 位置、5 个 Tab 的选中/悬停/按下配色与互斥。
+
+### 13.8 Windows 端皮肤机制核实（2026-11-08，只做静态核实、不弹窗）
+
+**结论：本 fork 的皮肤 / 主题切换是「入口存在、配色不变」的半桩化实现，不存在内置皮肤色表。**
+
+| 核实点 | 位置 | 事实 |
+|---|---|---|
+| 主题参数 | `Modules/ModSecret.vb` L66 | `ColorHue=210`、`ColorSat=85`、`ColorLightAdjust=0`、`ColorHueTopbarDelta=0`；全库 grep 仅此一处声明，**无任何赋值语句** |
+| 刷新入口 | `ModSecret.vb` L69–L110 `ThemeRefresh(Optional NewTheme)` | 只做 `If ThemeNow = NewTheme AndAlso NewTheme >= 0 Then Return` 与 `ThemeNow = NewTheme`，**不按 NewTheme 推导任何参数** |
+| 解锁机制 | `ModSecret.vb` L136–L143 | `ThemeCheckAll` 空方法、`ThemeCheckOne` 恒 `True`、`ThemeUnlock` 恒 `False` → 赞助解锁主题在本 fork 已移除 |
+| 设置项 | `Pages/PageSetup/Settings.vb` L140–L149 | `UiLauncherTheme=0`（`OnChanged:=ThemeRefresh`）、`UiLauncherHue=180` / `Sat=80` / `Delta=90` / `Light=20`（自定义滑块，**全库无读取点**）、`UiLauncherThemeHide` / `Hide2`（注册表 + 加密，默认 `"0|1|2|3|4"`）、`UiBackgroundColorful=True`（`OnChanged:=Sub() ThemeRefresh()`） |
+| 皮肤列表 | `Pages/PageSetup/PageSetupUI.xaml` L41–L92 | 15 个 `MyRadioBox`（0 龙猫蓝 / 1 甜柠青 / 2 小草绿 / 3 菠萝黄 / 4 橡木棕 可用；5 玄素黑、6 铁杆粉、7 神秘紫、8 秋仪金、9 活跃橙、10 跳票红、11 极客蓝、12 滑稽彩、13 欧皇彩、14 自定义 全部 `IsEnabled=False`） |
+| 自定义皮肤 | `PageSetupUI.xaml.vb` L388–L415 | 选中 14 只切换 4 个滑块的可见性；`HSL_Change` 调 `ThemeRefresh()`，但参数未被任何代码消费 |
+| 周期重算 | `Modules/ModMain.vb` L997、L1007 | `ThemeDontClick=2` 每 50ms、`ThemeNow=12` 每 250ms 重算；因参数恒定，重算结果不变 |
+
+**对 Linux 侧的处置**（对应 §2.3 合规约束）：
+1. 不删入口、不置灰：设置页皮肤列表 1:1 复刻，`UiLauncherTheme` 可切换并持久化。
+2. `PclTheme.Refresh(int theme)` 按原语义实现（早退 + 重算 + 触发调用方套用画刷），参数恒为默认值，配色恒为 PCL 蓝。
+3. **不自行发明**「皮肤编号 → HSL」映射表；若要求皮肤真正改变颜色，须先由用户提供上游 PCL2 的映射数据，再在该单点接入。
+
+### 13.9 设置栈左导航（LU3.1，2026-11-08）
+
+**对照来源**：`pcl-next/Pages/PageSetup/PageSetupLeft.xaml`（全部）；
+`pcl-next/Controls/MyListItem.xaml(.vb)`（列宽 / 选中竖条 / 悬停配色 / 按钮栏）；
+`pcl-next/Controls/MyPageLeft.vb`（`AnimatedControl` 逐个进入 / 退出动画）；
+`FormMain.xaml.vb` `PanMainLeft_Resize` / `PanLeft_Resize`（`RectLeftBackground` 宽度动画）。
+**Linux 实现**：`PCL.Desktop.Linux/Views/PageSetupLeftView.axaml(.cs)` + `Controls/MyControls.cs`（`MyListItem` / `MyPageLeft`）+ `MainWindow.axaml.cs`（`ShowStack` / `UpdateLeftBackgroundWidth`）。
+
+| 项 | Windows 取值 | Linux 实现 | 结论 |
+|---|---|---|---|
+| 容器 | `MyPageLeft`，`AnimatedControl="PanItem"`，内含 `StackPanel Margin=0,12,0,0` | 同 | 一致 |
+| 四项 | `MyListItem`，高 36、`Type=RadioBox`、`MinPaddingRight=35`、`IsScaleAnimationEnabled=False`、`VerticalAlignment=Top`、`Tag` 0–3 | 同；`Tag` 换成 `Index` 属性（Avalonia 无等价 `Tag` 语义） | 一致（仅数据载体不同） |
+| Logo `Geometry` | 四条路径 | **原样逐字节搬运** | 一致 |
+| `LogoScale` | 0.8 / 0.77 / 0.9 / 0.8 | 同 | 一致 |
+| 默认选中 | `ItemLaunch`（启动）`Checked=True` | 同 | 一致（临时降级 R20 只影响标题栏栈，不影响本页） |
+| 列宽 / 边距 | 勾选列 6（`RadioBox`）、Logo 列 34（高<40 不再 +4）、标题列 `1*`、右列 `MinPaddingRight`；标题 `Margin 4,0,0,0`；Logo `Margin 6,8,4,8` | 同（`MyListItem.RefreshMetrics`） | 一致 |
+| 选中竖条 | 5 宽、`ColorBrush3`、圆角 2、`Margin -1,6,0,6`、跨 4 行 | 同（`PART_RectCheck`） | 一致 |
+| 悬停 / 按下 | `RectBack` 120ms 淡入（`ColorBrush7` → `ColorBrushBg1`，按下 `ColorBrush6`）；按钮栏 84/48ms 淡入淡出；淡出 180ms | 同（`Transitions` 近似） | R4 / R10 |
+| 重置按钮 | 每项 1 个 `MyIconButton`（25×25、`LogoScale 0.9`、ToolTip「初始化本页设置」），点击弹确认框重置本页 | 按钮形态已还原；点击无操作（设置子页未移植） | R20 |
+| 左竖条宽度 | `PanMainLeft.SizeChanged` → `RectLeftBackground.Width` 180ms 到新宽度；收窄到 0 时阴影 180ms 淡出 | 同目标值与时长；触发时机改为「切栈并完成布局后取宽度」 | R21 |
+| 逐个进入 | 每项 0→1 淡入 100ms、-25 位移 500ms（原为 +5/+20 两段）、错峰 `max(15-id,7)*2` ms | 位移合并为一段 500ms、`BackEaseOut` | R4 / R10 |
+| 逐个退出 | 0 淡出 50ms + -6 位移 50ms，错峰 `70/N*i` ms | 同 | 一致 |
+
+**未验证项**：悬停配色、勾选竖条、逐个进入/退出动画、左竖条宽度动画均需 Linux 显示环境（统一验收 V 项）。
 
 ## 14. 待统一验收清单（UI 全部成型后一次性执行）
 

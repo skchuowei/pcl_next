@@ -1,3 +1,4 @@
+using System;
 using Avalonia;
 using Avalonia.Media;
 
@@ -55,9 +56,9 @@ internal static class PclColorMath
         l = 2 * l - s;
         return Color.FromArgb(
             255,
-            ClampToByte(255 * Hue(l, s, h + 1 / 3)),
+            ClampToByte(255 * Hue(l, s, h + 1.0 / 3.0)),
             ClampToByte(255 * Hue(l, s, h)),
-            ClampToByte(255 * Hue(l, s, h - 1 / 3)));
+            ClampToByte(255 * Hue(l, s, h - 1.0 / 3.0)));
     }
 
     private static double Hue(double v1, double v2, double vH)
@@ -80,31 +81,49 @@ internal static class PclColorMath
 
 /// <summary>
 /// 外壳与页面底色，照抄 `pcl-next/Modules/ModSecret.vb` L111–L135（`ThemeRefreshMain`）。
-/// 主题参数取 Windows 端默认值（`ModSecret.vb` L66：`ColorHue=210`、`ColorSat=85`、
-/// `ColorLightAdjust=0`、`ColorHueTopbarDelta=0`，`UiLauncherTheme` 默认 0 见 `Settings.vb` L144），
-/// 主题色自定义未接入（登记 R17）。
+/// 主题参数与 `ModSecret.vb` L66 的四个字段一一对应（`ColorHue=210`、`ColorSat=85`、
+/// `ColorLightAdjust=0`、`ColorHueTopbarDelta=0`）。
+/// 核实结论（计划 §13.8）：Windows 端本 fork 不存在「皮肤编号 → 参数」的映射表，这四个参数
+/// 全程无赋值点，`ThemeRefresh(NewTheme)` 只记录 `ThemeNow` 用于早退。故此处同样只保留参数
+/// 与早退语义，不自行发明映射；一旦取得映射数据，只需在 <see cref="Refresh"/> 内推导。
 /// </summary>
 internal static class PclTheme
 {
-    private const int ColorHue = 210;
-    private const int ColorSat = 85;
-    private const int ColorLightAdjust = 0;
-    private const int ColorHueTopbarDelta = 0;
+    private static int _colorHue = 210;
+    private static int _colorSat = 85;
+    private static int _colorLightAdjust = 0;
+    private static int _colorHueTopbarDelta = 0;
+    private static int _themeNow = -1;
+
+    /// <summary>主题重算后触发，调用方据此重新套用 `PanTitle` / `PanForm` 背景。</summary>
+    public static event Action? Changed;
+
+    /// <summary>
+    /// `ModSecret.vb` L69–L73 的切换入口与早退语义：同一主题且非负则不再重算。
+    /// 返回是否真的重算。
+    /// </summary>
+    public static bool Refresh(int newTheme = -1)
+    {
+        if (_themeNow == newTheme && newTheme >= 0) return false;
+        if (newTheme >= 0) _themeNow = newTheme;
+        Changed?.Invoke();
+        return true;
+    }
 
     /// <summary>顶部条背景：水平三段渐变，48 / 54 / 48 亮度（`ModSecret.vb` L116–L121）。</summary>
     public static IBrush CreateTitleBarBrush()
     {
-        var deltas = ColorHueTopbarDelta == 0
+        var deltas = _colorHueTopbarDelta == 0
             ? new[] { 0, 0, 0 }
-            : new[] { -ColorHueTopbarDelta, 0, ColorHueTopbarDelta };
+            : new[] { -_colorHueTopbarDelta, 0, _colorHueTopbarDelta };
         var brush = new LinearGradientBrush
         {
             StartPoint = new RelativePoint(0, 0, RelativeUnit.Relative),
             EndPoint = new RelativePoint(1, 0, RelativeUnit.Relative)
         };
-        brush.GradientStops.Add(new GradientStop(PclColorMath.FromHsl2(ColorHue + deltas[0], ColorSat, 48 + ColorLightAdjust), 0));
-        brush.GradientStops.Add(new GradientStop(PclColorMath.FromHsl2(ColorHue + deltas[1], ColorSat, 54 + ColorLightAdjust), 0.5));
-        brush.GradientStops.Add(new GradientStop(PclColorMath.FromHsl2(ColorHue + deltas[2], ColorSat, 48 + ColorLightAdjust), 1));
+        brush.GradientStops.Add(new GradientStop(PclColorMath.FromHsl2(_colorHue + deltas[0], _colorSat, 48 + _colorLightAdjust), 0));
+        brush.GradientStops.Add(new GradientStop(PclColorMath.FromHsl2(_colorHue + deltas[1], _colorSat, 54 + _colorLightAdjust), 0.5));
+        brush.GradientStops.Add(new GradientStop(PclColorMath.FromHsl2(_colorHue + deltas[2], _colorSat, 48 + _colorLightAdjust), 1));
         return brush;
     }
 
@@ -118,9 +137,9 @@ internal static class PclTheme
             StartPoint = new RelativePoint(0.9, 0, RelativeUnit.Relative),
             EndPoint = new RelativePoint(0.1, 1, RelativeUnit.Relative)
         };
-        brush.GradientStops.Add(new GradientStop(PclColorMath.FromHsl2(ColorHue - 15, ColorSat * 0.8, 91), -0.1));
-        brush.GradientStops.Add(new GradientStop(PclColorMath.FromHsl2(ColorHue, ColorSat * 0.8, 91), 0.4));
-        brush.GradientStops.Add(new GradientStop(PclColorMath.FromHsl2(ColorHue + 15, ColorSat * 0.8, 91), 1.1));
+        brush.GradientStops.Add(new GradientStop(PclColorMath.FromHsl2(_colorHue - 15, _colorSat * 0.8, 91), -0.1));
+        brush.GradientStops.Add(new GradientStop(PclColorMath.FromHsl2(_colorHue, _colorSat * 0.8, 91), 0.4));
+        brush.GradientStops.Add(new GradientStop(PclColorMath.FromHsl2(_colorHue + 15, _colorSat * 0.8, 91), 1.1));
         return brush;
     }
 }

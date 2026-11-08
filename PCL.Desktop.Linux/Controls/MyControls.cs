@@ -1,8 +1,16 @@
+using System.Collections.Specialized;
 using Avalonia;
+using Avalonia.Animation;
+using Avalonia.Animation.Easings;
+using Avalonia.Collections;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Input;
+using Avalonia.Layout;
 using Avalonia.Media;
+using Avalonia.Media.Transformation;
+using Avalonia.Threading;
+using Shapes = Avalonia.Controls.Shapes;
 
 namespace PCL.Desktop.Linux.Controls;
 
@@ -338,30 +346,429 @@ public class MyHint : TemplatedControl
     }
 }
 
+/// <summary>列表项的勾选形态，对应 `MyListItem.CheckType`。</summary>
+public enum MyListItemCheckType
+{
+    None,
+    Clickable,
+    RadioBox,
+    CheckBox
+}
+
+/// <summary>列表项 `Check` 事件参数（对应 `RouteEventArgs` 的 `User` / `Handled`）。</summary>
+public sealed class MyListItemCheckEventArgs : EventArgs
+{
+    public bool User { get; init; }
+    public bool Handled { get; set; }
+}
+
 /// <summary>
-/// 列表项，1:1 对齐 `pcl-next/Controls/MyListItem.xaml`：
-/// 高 42；列 2 / 0 / 4 / 1* / 4；行 1* / Auto / Auto / 1*；
-/// 标题位于第 2 个 Auto 行、第 4 列（1*），左边距 4，字号与前景色跟随控件自身，超出省略。
-/// WPF 版选中背景 RectBack、副文本 LabInfo 在源文件中均被注释，此处同样不还原。
+/// 列表项，1:1 对齐 `pcl-next/Controls/MyListItem.xaml(.vb)`：
+/// 列 2 / 0 / 4 / 1* / 4 与行 1* / Auto / Auto / 1*（列值随 `Type`、是否有 Logo、高度 &lt; 40 变化）；
+/// 标题在第 2 个 Auto 行第 4 列（左边距 4，超出省略，字号/前景色跟随自身）；
+/// 勾选竖条 5 宽、ColorBrush3、圆角 2、Margin -1,6,0,6、跨 4 行；右侧按钮 25×25、默认不透明度 0、悬停淡入；
+/// 悬停背景 RectBack（ColorBrush7 → ColorBrushBg1、1px ColorBrush6 边框、圆角由 `IsScaleAnimationEnabled`/高度决定）。
+/// WPF 的 Ani 逐帧动画改为 Avalonia `Transitions` / `Animation` 近似（登记 R4 / R10）。
 /// </summary>
-public class MyListItem : TemplatedControl
+public class MyListItem : Grid
 {
     public static readonly StyledProperty<string?> TitleProperty =
         AvaloniaProperty.Register<MyListItem, string?>(nameof(Title));
 
-    public string? Title
-    {
-        get => GetValue(TitleProperty);
-        set => SetValue(TitleProperty, value);
-    }
+    public static readonly StyledProperty<double> FontSizeProperty =
+        AvaloniaProperty.Register<MyListItem, double>(nameof(FontSize), 14d);
+
+    public static readonly StyledProperty<IBrush?> ForegroundProperty =
+        AvaloniaProperty.Register<MyListItem, IBrush?>(nameof(Foreground));
+
+    public static readonly StyledProperty<string?> LogoProperty =
+        AvaloniaProperty.Register<MyListItem, string?>(nameof(Logo));
+
+    public static readonly StyledProperty<double> LogoScaleProperty =
+        AvaloniaProperty.Register<MyListItem, double>(nameof(LogoScale), 1d);
+
+    public static readonly StyledProperty<int> MinPaddingRightProperty =
+        AvaloniaProperty.Register<MyListItem, int>(nameof(MinPaddingRight), 4);
+
+    /// <summary>导航项编号（对应 WPF 的 `Tag`，`PageSetupLeft` 用它区分四个子页）。</summary>
+    public static readonly StyledProperty<int> IndexProperty =
+        AvaloniaProperty.Register<MyListItem, int>(nameof(Index));
+
+    public static readonly StyledProperty<MyListItemCheckType> TypeProperty =
+        AvaloniaProperty.Register<MyListItem, MyListItemCheckType>(nameof(Type));
+
+    public static readonly StyledProperty<bool> CheckedProperty =
+        AvaloniaProperty.Register<MyListItem, bool>(nameof(Checked));
+
+    public static readonly StyledProperty<bool> IsScaleAnimationEnabledProperty =
+        AvaloniaProperty.Register<MyListItem, bool>(nameof(IsScaleAnimationEnabled), true);
+
+    public string? Title { get => GetValue(TitleProperty); set => SetValue(TitleProperty, value); }
+    public double FontSize { get => GetValue(FontSizeProperty); set => SetValue(FontSizeProperty, value); }
+    public IBrush? Foreground { get => GetValue(ForegroundProperty); set => SetValue(ForegroundProperty, value); }
+    public string? Logo { get => GetValue(LogoProperty); set => SetValue(LogoProperty, value); }
+    public double LogoScale { get => GetValue(LogoScaleProperty); set => SetValue(LogoScaleProperty, value); }
+    public int MinPaddingRight { get => GetValue(MinPaddingRightProperty); set => SetValue(MinPaddingRightProperty, value); }
+    public int Index { get => GetValue(IndexProperty); set => SetValue(IndexProperty, value); }
+    public MyListItemCheckType Type { get => GetValue(TypeProperty); set => SetValue(TypeProperty, value); }
+    public bool Checked { get => GetValue(CheckedProperty); set => SetValue(CheckedProperty, value); }
+    public bool IsScaleAnimationEnabled { get => GetValue(IsScaleAnimationEnabledProperty); set => SetValue(IsScaleAnimationEnabledProperty, value); }
 
     public event EventHandler<PointerReleasedEventArgs>? Click;
+    public event EventHandler<MyListItemCheckEventArgs>? Check;
 
-    protected override void OnPointerReleased(PointerReleasedEventArgs e)
+    /// <summary>逐个进入/退出动画期间由 `MyPageLeft` 临时关闭悬停配色（对应 WPF 同名字段）。</summary>
+    public bool IsMouseOverAnimationEnabled = true;
+
+    private readonly TextBlock _labTitle;
+    private readonly AvaloniaList<MyIconButton> _buttons = new();
+    private Border? _rectBack;
+    private Border? _rectCheck;
+    private Shapes.Path? _pathLogo;
+    private bool _isDown;
+    private bool _suppressCheckedSync;
+
+    /// <summary>右侧按钮栏（XAML 中以集合子元素提供，对应 WPF 的 `Buttons`）。</summary>
+    public AvaloniaList<MyIconButton> Buttons => _buttons;
+
+    public MyListItem()
     {
-        base.OnPointerReleased(e);
-        if (!IsEnabled || e.InitialPressMouseButton != MouseButton.Left) return;
+        ColumnDefinitions = new ColumnDefinitions("2,0,4,*,4");
+        RowDefinitions = new RowDefinitions("*,Auto,Auto,*");
+
+        _labTitle = new TextBlock
+        {
+            HorizontalAlignment = HorizontalAlignment.Left,
+            TextTrimming = TextTrimming.CharacterEllipsis,
+            Margin = new Thickness(4, 0, 0, 0)
+        };
+        Grid.SetRow(_labTitle, 1);
+        Grid.SetColumn(_labTitle, 3);
+        _labTitle.Bind(TextBlock.TextProperty, this.GetObservable(TitleProperty));
+        _labTitle.Bind(TextBlock.FontSizeProperty, this.GetObservable(FontSizeProperty));
+        _labTitle.Bind(TextBlock.ForegroundProperty, this.GetObservable(ForegroundProperty));
+        Children.Add(_labTitle);
+
+        _buttons.CollectionChanged += (_, _) => AttachButtons();
+
+        PointerEntered += (_, _) => RefreshColor();
+        PointerExited += (_, _) =>
+        {
+            _isDown = false;
+            PseudoClasses.Set(":down", false);
+            RefreshColor();
+        };
+        PointerPressed += (_, e) =>
+        {
+            if (e.GetCurrentPoint(this).Properties.IsLeftButtonPressed && Type != MyListItemCheckType.None)
+            {
+                _isDown = true;
+                PseudoClasses.Set(":down", true);
+            }
+        };
+        PointerReleased += OnPointerReleased;
+
+        RefreshMetrics();
+    }
+
+    protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
+    {
+        base.OnPropertyChanged(change);
+        if (change.Property == LogoProperty) RefreshLogo();
+        else if (change.Property == LogoScaleProperty)
+        {
+            if (_pathLogo is not null) _pathLogo.RenderTransform = new ScaleTransform(LogoScale, LogoScale);
+        }
+        else if (change.Property == TypeProperty) RefreshType();
+        else if (change.Property == MinPaddingRightProperty) RefreshMetrics();
+        else if (change.Property == HeightProperty) RefreshMetrics();
+        else if (change.Property == CheckedProperty && !_suppressCheckedSync) ApplyCheckedState(animate: false);
+    }
+
+    /// <summary>勾选状态（对应 `MyListItem.SetChecked(value, user, anime)`）。</summary>
+    public void SetChecked(bool value, bool user)
+    {
+        if (value == Checked && Type != MyListItemCheckType.RadioBox) return;
+
+        _suppressCheckedSync = true;
+        Checked = value;
+        _suppressCheckedSync = false;
+
+        if (value)
+        {
+            var args = new MyListItemCheckEventArgs { User = user };
+            Check?.Invoke(this, args);
+            if (args.Handled) return;
+        }
+
+        EnforceRadioGroup();
+        ApplyCheckedState(animate: true);
+    }
+
+    private void OnPointerReleased(object? sender, PointerReleasedEventArgs e)
+    {
+        if (e.InitialPressMouseButton != MouseButton.Left) return;
+        var wasDown = _isDown;
+        _isDown = false;
+        PseudoClasses.Set(":down", false);
+        RefreshColor();
+        if (!wasDown) return;
+
         Click?.Invoke(this, e);
+        if (e.Handled) return;
+
+        if (Type == MyListItemCheckType.RadioBox)
+        {
+            if (!Checked) SetChecked(true, true);
+        }
+        else if (Type == MyListItemCheckType.CheckBox)
+        {
+            SetChecked(!Checked, true);
+        }
+    }
+
+    /// <summary>同 `MyListItem.vb` L394–L432：同一父容器内只允许一个 RadioBox 选中。</summary>
+    private void EnforceRadioGroup()
+    {
+        if (Type != MyListItemCheckType.RadioBox || Parent is not Panel panel) return;
+
+        var group = new List<MyListItem>();
+        foreach (var child in panel.Children)
+        {
+            if (child is MyListItem item && item.Type == MyListItemCheckType.RadioBox) group.Add(item);
+        }
+        if (group.Count == 0) return;
+
+        var checkedCount = group.Count(i => i.Checked);
+        if (checkedCount == 0)
+        {
+            group[0].Checked = true;
+        }
+        else if (checkedCount > 1)
+        {
+            if (Checked)
+            {
+                foreach (var item in group)
+                {
+                    if (item.Checked && item != this) item.Checked = false;
+                }
+            }
+            else
+            {
+                var first = true;
+                foreach (var item in group)
+                {
+                    if (!item.Checked) continue;
+                    if (first) first = false;
+                    else item.Checked = false;
+                }
+            }
+        }
+    }
+
+    private void ApplyCheckedState(bool animate)
+    {
+        PseudoClasses.Set(":checked", Checked);
+
+        if (_rectCheck is null) return;
+        if (Checked)
+        {
+            _rectCheck.VerticalAlignment = VerticalAlignment.Stretch;
+            _rectCheck.Margin = new Thickness(-1, 6, 0, 6);
+            _rectCheck.Height = double.NaN;
+            if (animate) AnimateOpacity(_rectCheck, 1, 30);
+            else _rectCheck.Opacity = 1;
+        }
+        else
+        {
+            _rectCheck.VerticalAlignment = VerticalAlignment.Center;
+            _rectCheck.Margin = new Thickness(-1, 0, 0, 0);
+            _rectCheck.Height = 0;
+            if (animate) AnimateOpacity(_rectCheck, 0, 70);
+            else _rectCheck.Opacity = 0;
+        }
+    }
+
+    private void RefreshType()
+    {
+        if (Type is MyListItemCheckType.None or MyListItemCheckType.Clickable)
+        {
+            if (_rectCheck is not null)
+            {
+                Children.Remove(_rectCheck);
+                _rectCheck = null;
+            }
+            RefreshMetrics();
+            return;
+        }
+
+        if (_rectCheck is null)
+        {
+            _rectCheck = new Border
+            {
+                Name = "PART_RectCheck",
+                Width = 5,
+                CornerRadius = new CornerRadius(2),
+                HorizontalAlignment = HorizontalAlignment.Left,
+                IsHitTestVisible = false
+            };
+            Grid.SetRowSpan(_rectCheck, 4);
+            Children.Insert(Children.IndexOf(_labTitle), _rectCheck);
+        }
+        RefreshMetrics();
+        ApplyCheckedState(animate: false);
+    }
+
+    private void RefreshLogo()
+    {
+        if (_pathLogo is not null)
+        {
+            Children.Remove(_pathLogo);
+            _pathLogo = null;
+        }
+
+        var logo = Logo;
+        if (string.IsNullOrEmpty(logo))
+        {
+            RefreshMetrics();
+            return;
+        }
+
+        var path = new Shapes.Path
+        {
+            Stretch = Stretch.Uniform,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center,
+            IsHitTestVisible = false,
+            RenderTransformOrigin = RelativePoint.Center,
+            RenderTransform = new ScaleTransform(LogoScale, LogoScale)
+        };
+        path.Data = Geometry.Parse(logo);
+        path.Bind(Shapes.Shape.FillProperty, this.GetObservable(ForegroundProperty));
+        Grid.SetColumn(path, 2);
+        Grid.SetRowSpan(path, 4);
+        Children.Add(path);
+        _pathLogo = path;
+        RefreshMetrics();
+    }
+
+    private void AttachButtons()
+    {
+        foreach (var button in _buttons)
+        {
+            if (Children.Contains(button)) continue;
+            if (double.IsNaN(button.Width)) button.Width = 25;
+            if (double.IsNaN(button.Height)) button.Height = 25;
+            button.Margin = new Thickness(0, 0, 5, 0);
+            button.Opacity = 0;
+            button.HorizontalAlignment = HorizontalAlignment.Right;
+            button.VerticalAlignment = VerticalAlignment.Center;
+            Grid.SetColumnSpan(button, 10);
+            Grid.SetRowSpan(button, 10);
+            Children.Add(button);
+        }
+    }
+
+    /// <summary>列宽/边距随 `Type`、Logo、高度变化（同 `MyListItem.vb` L329–L340）。</summary>
+    private void RefreshMetrics()
+    {
+        var height = Height;
+        var small = !double.IsNaN(height) && height < 40;
+
+        ColumnDefinitions[0].Width = new GridLength(
+            Type is MyListItemCheckType.None or MyListItemCheckType.Clickable ? (small ? 4 : 2) : 6);
+        ColumnDefinitions[2].Width = new GridLength(string.IsNullOrEmpty(Logo) ? 0 : 34 + (small ? 0 : 4));
+        ColumnDefinitions[4].Width = new GridLength(MinPaddingRight);
+        _labTitle.Margin = new Thickness(4, 0, 0, small ? 0 : 2);
+        if (_pathLogo is not null) _pathLogo.Margin = new Thickness(small ? 6 : 8, 8, small ? 4 : 6, 8);
+
+        PseudoClasses.Set(":small", small);
+    }
+
+    private void RefreshColor()
+    {
+        var hover = IsPointerOver && IsMouseOverAnimationEnabled;
+
+        if (hover) ShowButtons(true);
+        else ShowButtons(false);
+
+        if (hover)
+        {
+            var rect = EnsureRectBack();
+            rect.Transitions = new Transitions
+            {
+                new DoubleTransition
+                {
+                    Property = OpacityProperty,
+                    Duration = TimeSpan.FromMilliseconds(120),
+                    Easing = new CubicEaseOut()
+                }
+            };
+            rect.Opacity = 1;
+        }
+        else if (_rectBack is not null)
+        {
+            _rectBack.Transitions = new Transitions
+            {
+                new DoubleTransition
+                {
+                    Property = OpacityProperty,
+                    Duration = TimeSpan.FromMilliseconds(180),
+                    Easing = new CubicEaseOut()
+                }
+            };
+            _rectBack.Opacity = 0;
+        }
+    }
+
+    private Border EnsureRectBack()
+    {
+        if (_rectBack is not null) return _rectBack;
+
+        var height = Height;
+        _rectBack = new Border
+        {
+            Name = "PART_RectBack",
+            CornerRadius = new CornerRadius(IsScaleAnimationEnabled || (!double.IsNaN(height) && height > 40) ? 6 : 0),
+            BorderThickness = new Thickness(1),
+            IsHitTestVisible = false,
+            Opacity = 0
+        };
+        Grid.SetColumnSpan(_rectBack, 10);
+        Grid.SetRowSpan(_rectBack, 10);
+        Children.Insert(0, _rectBack);
+        return _rectBack;
+    }
+
+    private void ShowButtons(bool show)
+    {
+        foreach (var button in _buttons)
+        {
+            button.Transitions = new Transitions
+            {
+                new DoubleTransition
+                {
+                    Property = OpacityProperty,
+                    Duration = TimeSpan.FromMilliseconds(show ? 84 : 48),
+                    Easing = new CubicEaseOut()
+                }
+            };
+            button.Opacity = show ? 1 : 0;
+        }
+    }
+
+    private static void AnimateOpacity(Visual visual, double to, int ms)
+    {
+        visual.Transitions = new Transitions
+        {
+            new DoubleTransition
+            {
+                Property = OpacityProperty,
+                Duration = TimeSpan.FromMilliseconds(ms),
+                Easing = new CubicEaseOut()
+            }
+        };
+        visual.Opacity = to;
     }
 }
 
@@ -648,5 +1055,177 @@ public class MyRadioButton : TemplatedControl
         if (!IsEnabled) return;
         if (e.InitialPressMouseButton != MouseButton.Left) return;
         if (!Checked) Checked = true;
+    }
+}
+
+/// <summary>
+/// 左侧页基类，1:1 对齐 `pcl-next/Controls/MyPageLeft.vb`：
+/// `AnimatedControl` 指向容器时，对其中每个元素逐个做「下移 -25 → 100ms 淡入 + 500ms 位移」的错峰进入动画；
+/// 置空时退化为整页 0.96 → 1 缩放 + 淡入。退出方向为「-6 位移 + 50ms 淡出」，错峰间隔 70/N。
+/// WPF 的两段位移（先 +5 再 +20）与工作日缓动改为 Avalonia 单段 `Transitions` 近似（登记 R4 / R10）。
+/// </summary>
+public class MyPageLeft : Grid
+{
+    public static readonly StyledProperty<string?> AnimatedControlProperty =
+        AvaloniaProperty.Register<MyPageLeft, string?>(nameof(AnimatedControl));
+
+    public string? AnimatedControl
+    {
+        get => GetValue(AnimatedControlProperty);
+        set => SetValue(AnimatedControlProperty, value);
+    }
+
+    public void TriggerShowAnimation()
+    {
+        var items = GetAnimatedItems();
+        if (AnimatedControl is null || items.Count == 0)
+        {
+            ShowWithScale();
+            return;
+        }
+
+        double delay = 0;
+        var id = 0;
+        foreach (var item in items)
+        {
+            var element = (Control)item;
+            if (!element.IsVisible)
+            {
+                element.Opacity = 1;
+                element.RenderTransform = null;
+                delay += Math.Max(15 - id, 7) * 2;
+                id++;
+                continue;
+            }
+
+            element.Opacity = 0;
+            element.RenderTransformOrigin = RelativePoint.Center;
+            element.RenderTransform = TransformOperations.Parse("translate(-25px,0px)");
+            element.Transitions = new Transitions
+            {
+                new DoubleTransition
+                {
+                    Property = OpacityProperty,
+                    Duration = TimeSpan.FromMilliseconds(100),
+                    Delay = TimeSpan.FromMilliseconds(delay),
+                    Easing = new CubicEaseOut()
+                },
+                new TransformOperationsTransition
+                {
+                    Property = RenderTransformProperty,
+                    Duration = TimeSpan.FromMilliseconds(500),
+                    Delay = TimeSpan.FromMilliseconds(delay),
+                    Easing = new BackEaseOut()
+                }
+            };
+            element.Opacity = element is TextBlock ? 0.6 : 1;
+            element.RenderTransform = TransformOperations.Identity;
+            delay += Math.Max(15 - id, 7) * 2;
+            id++;
+        }
+    }
+
+    public void TriggerHideAnimation()
+    {
+        var items = GetAnimatedItems();
+        if (AnimatedControl is null || items.Count == 0)
+        {
+            HideWithScale();
+            return;
+        }
+
+        var count = items.Count;
+        var id = 0;
+        foreach (var item in items)
+        {
+            item.Transitions = new Transitions
+            {
+                new DoubleTransition
+                {
+                    Property = OpacityProperty,
+                    Duration = TimeSpan.FromMilliseconds(50),
+                    Delay = TimeSpan.FromMilliseconds(70d * id / count),
+                    Easing = new CubicEaseOut()
+                },
+                new TransformOperationsTransition
+                {
+                    Property = RenderTransformProperty,
+                    Duration = TimeSpan.FromMilliseconds(50),
+                    Delay = TimeSpan.FromMilliseconds(70d * id / count),
+                    Easing = new CubicEaseOut()
+                }
+            };
+            item.Opacity = 0;
+            item.RenderTransform = TransformOperations.Parse("translate(-6px,0px)");
+            id++;
+        }
+    }
+
+    private void ShowWithScale()
+    {
+        Opacity = 0;
+        RenderTransformOrigin = RelativePoint.Center;
+        RenderTransform = TransformOperations.Parse("scale(0.96)");
+        Transitions = new Transitions
+        {
+            new DoubleTransition
+            {
+                Property = OpacityProperty,
+                Duration = TimeSpan.FromMilliseconds(100),
+                Easing = new CubicEaseOut()
+            },
+            new TransformOperationsTransition
+            {
+                Property = RenderTransformProperty,
+                Duration = TimeSpan.FromMilliseconds(400),
+                Easing = new BackEaseOut()
+            }
+        };
+        Opacity = 1;
+        RenderTransform = TransformOperations.Identity;
+    }
+
+    private void HideWithScale()
+    {
+        Transitions = new Transitions
+        {
+            new DoubleTransition
+            {
+                Property = OpacityProperty,
+                Duration = TimeSpan.FromMilliseconds(400),
+                Easing = new CubicEaseOut()
+            },
+            new TransformOperationsTransition
+            {
+                Property = RenderTransformProperty,
+                Duration = TimeSpan.FromMilliseconds(400),
+                Easing = new BackEaseOut()
+            }
+        };
+        Opacity = 0;
+        RenderTransform = TransformOperations.Parse("scale(0.95)");
+    }
+
+    private List<Visual> GetAnimatedItems()
+    {
+        var list = new List<Visual>();
+        if (string.IsNullOrEmpty(AnimatedControl)) return list;
+
+        var root = this.FindControl<Control>(AnimatedControl);
+        if (root is null) return list;
+
+        Collect(root, list);
+        return list;
+    }
+
+    /// <summary>同 `MyPageLeft.vb` 的 `GetAnimatedControls`：面板递归到叶子，其余元素各自参与动画。</summary>
+    private static void Collect(Visual visual, List<Visual> list)
+    {
+        if (visual is Panel panel)
+        {
+            foreach (var child in panel.Children) Collect(child, list);
+            return;
+        }
+        list.Add(visual);
     }
 }
