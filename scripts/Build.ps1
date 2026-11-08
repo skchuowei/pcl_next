@@ -75,6 +75,13 @@ if (-not $Version) {
     $Version = $line.Matches[0].Groups[1].Value
 }
 
+# --- 1.2 清理 RID 继承缓存（2026-11-08） ------------------------------------
+# Directory.Build.props 的 PclRidWriteCache 会在入口工程 BeforeBuild 写入本轮 RID，
+# 供被 ProjectReference 移除 RuntimeIdentifier 的依赖工程继承。
+# 每轮构建开头必须清掉，否则不带 -r 的独立编译会误继承上一轮 RID、绕过 PclRidGuard。
+$RidCacheFile = Join-Path $RepoRoot 'obj\pcl-build.rid'
+if (Test-Path -LiteralPath $RidCacheFile) { Remove-Item -LiteralPath $RidCacheFile -Force }
+
 # --- 1.5 刷新构建号缓存 ------------------------------------------------------
 # 目录名里带构建号（bin-net10\<代号>\<版本>-<构建号>\<RID>\），而 MSBuild 求值期
 # 不能跑 git，所以必须**在这里**先把编号落到缓存文件，再让第 2 步去查 OutputPath。
