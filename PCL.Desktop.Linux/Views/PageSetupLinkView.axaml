@@ -1,0 +1,74 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="using:PCL.Desktop.Linux.Controls"
+             x:Class="PCL.Desktop.Linux.Views.PageSetupLinkView">
+
+    <!--
+      1:1 对照基准：pcl-next/Pages/PageSetup/PageSetupLink.xaml（全文 54 行）
+      布局逐项照抄：外层 MyScrollViewer(Vertical=Auto, Horizontal=Disabled) → StackPanel Margin 25,10；
+      两张 MyCard（Margin 0,15 / 0,0,0,15；标题「连接选项」「高级设置」）；
+      卡片内 Grid 的列宽（Auto[SharedSizeGroup=Name] / 1* / 60）、行高（28）、
+      文本边距（0,0,25,0）、卡片内容边距（25,40,25,20 与 25,40,25,22）、
+      按钮 MinWidth 140 / Padding 13,5 / 间距 20。
+      差异：卡片 2 的折叠（CanSwap/IsSwapped）尚未接入（登记项 R5）；文案与 ToolTip 原文保留。
+    -->
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Margin="25,10">
+
+            <c:MyCard Margin="0,15" Title="连接选项">
+                <StackPanel Margin="25,40,25,20">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" SharedSizeGroup="Name" />
+                            <ColumnDefinition Width="1*" />
+                            <ColumnDefinition Width="60" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="28" />
+                        </Grid.RowDefinitions>
+                        <TextBlock Grid.Row="0" Grid.Column="0"
+                                   VerticalAlignment="Center" HorizontalAlignment="Left"
+                                   Text="模式" Margin="0,0,25,0" />
+                        <c:MyComboBox Grid.Row="0" Grid.Column="1" Grid.ColumnSpan="2"
+                                      SelectedIndex="0"
+                                      ToolTip.Tip="联机中转模式">
+                            <c:MyComboBoxItem Content="优先直连"
+                                              ToolTip.Tip="尽量不进行中转，而是 P2P 直连。" />
+                            <c:MyComboBoxItem Content="优先低延迟"
+                                              ToolTip.Tip="如果使用中转节点能降低延迟，就不进行直连。&#xa;不过，这会增加社区节点的负载……" />
+                        </c:MyComboBox>
+                    </Grid>
+                </StackPanel>
+            </c:MyCard>
+
+            <c:MyCard Margin="0,0,0,15" Title="高级设置">
+                <Grid Margin="25,40,25,22">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="1*" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="28" />
+                        <RowDefinition Height="15" />
+                        <RowDefinition Height="35" />
+                    </Grid.RowDefinitions>
+                    <TextBlock Grid.Row="0" Grid.Column="0"
+                               VerticalAlignment="Center" HorizontalAlignment="Left"
+                               Text="自定义节点" Margin="0,0,25,0" />
+                    <c:MyTextBox Grid.Row="0" Grid.Column="1" MaxHeight="28"
+                                 ToolTip.Tip="覆盖 PCL 所选择的节点，仅连接此处填写的节点。&#xa;如果你自己搭建了 EasyTier 节点，你可以用这个设置让 PCL 连接它。&#xa;&#xa;使用逗号分隔多个节点，例如：&#xa;tcp://public.easytier.cn:11010,tcp://public2.easytier.cn:54321&#xa;&#xa;房主和加入者必须连接到至少一个相同节点，才能互相连上。" />
+                    <StackPanel Grid.Row="2" Grid.ColumnSpan="2" Orientation="Horizontal" HorizontalAlignment="Left">
+                        <c:MyButton MinWidth="140" Padding="13,5" Margin="0,0,20,0" HorizontalAlignment="Left"
+                                    Text=" 光荣地贡献节点！" ColorType="Highlight"
+                                    ToolTip.Tip="联机功能全靠社区的各位无私贡献的节点才能存在！&#xa;如果你有空闲的高带宽服务器，欢迎搭建一个共享节点，人人为我，我为人人嘛……" />
+                        <c:MyButton MinWidth="140" Padding="13,5" Margin="0,0,20,0" HorizontalAlignment="Left"
+                                    Text="节点状态"
+                                    ToolTip.Tip="https://uptime.easytier.cn/" />
+                    </StackPanel>
+                </Grid>
+            </c:MyCard>
+
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

@@ -1,0 +1,49 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!--
+      色值逐项取自 pcl-next/Application.xaml L22–L66（Windows 端 Lite 主题唯一基准）。
+      计算口径：直接用原十六进制字符串，不做色彩空间转换，保证 1:1。
+    -->
+
+    <!-- 主色 -->
+    <SolidColorBrush x:Key="ColorBrush1" Color="#343d4a" />
+    <SolidColorBrush x:Key="ColorBrush2" Color="#0b5bcb" />
+    <SolidColorBrush x:Key="ColorBrush3" Color="#1370f3" />
+    <SolidColorBrush x:Key="ColorBrush4" Color="#4890f5" />
+    <SolidColorBrush x:Key="ColorBrush5" Color="#96c0f9" />
+    <SolidColorBrush x:Key="ColorBrush6" Color="#d5e6fd" />
+    <SolidColorBrush x:Key="ColorBrush7" Color="#e0eafd" />
+    <SolidColorBrush x:Key="ColorBrush8" Color="#eaf2fe" />
+    <SolidColorBrush x:Key="ColorBrushBg0" Color="#96c0f9" />
+    <SolidColorBrush x:Key="ColorBrushBg1" Color="#bee0eafd" />
+
+    <!-- 灰阶 -->
+    <SolidColorBrush x:Key="ColorBrushGray1" Color="#404040" />
+    <SolidColorBrush x:Key="ColorBrushGray2" Color="#737373" />
+    <SolidColorBrush x:Key="ColorBrushGray3" Color="#8c8c8c" />
+    <SolidColorBrush x:Key="ColorBrushGray4" Color="#a6a6a6" />
+    <SolidColorBrush x:Key="ColorBrushGray5" Color="#cccccc" />
+    <SolidColorBrush x:Key="ColorBrushGray6" Color="#ebebeb" />
+    <SolidColorBrush x:Key="ColorBrushGray7" Color="#f0f0f0" />
+    <SolidColorBrush x:Key="ColorBrushGray8" Color="#f5f5f5" />
+
+    <!-- 红 / 白 / 透明 -->
+    <SolidColorBrush x:Key="ColorBrushRedBack" Color="#80fbdddd" />
+    <SolidColorBrush x:Key="ColorBrushRedLight" Color="#ff4c4c" />
+    <SolidColorBrush x:Key="ColorBrushRedDark" Color="#ce2111" />
+    <SolidColorBrush x:Key="ColorBrushHalfWhite" Color="#55ffffff" />
+    <SolidColorBrush x:Key="ColorBrushSemiWhite" Color="#bbffffff" />
+    <SolidColorBrush x:Key="ColorBrushWhite" Color="#ffffff" />
+    <SolidColorBrush x:Key="ColorBrushTransparent" Color="Transparent" />
+    <SolidColorBrush x:Key="ColorBrushSemiTransparent" Color="#01eaf2fe" />
+    <SolidColorBrush x:Key="ColorBrushBackgroundTransparentSidebar" Color="#F1FFFFFF" />
+
+    <!--
+      字族：Windows 端写死 `Resources/#PCL English, Microsoft YaHei UI`（内嵌 PCL English + 系统雅黑）。
+      Linux 渲染层差异（登记项 R1）：内嵌 PCL English 尚未接入，先按「系统无衬线 + CJK 回退」，
+      字形宽度会与 Windows 有细微差别，但不改变字号（13）与布局尺寸。
+    -->
+    <FontFamily x:Key="PclFont">Noto Sans CJK SC, Source Han Sans SC, Microsoft YaHei UI, sans-serif</FontFamily>
+
+</ResourceDictionary>

@@ -1,0 +1,190 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:c="using:PCL.Desktop.Linux.Controls">
+
+    <!--
+      控件样式，逐项对照 Windows 端：
+        · TextBlock          → pcl-next/Application.xaml L120–L133
+        · MyCard             → pcl-next/Controls/MyCard.vb L64–L103、L138–L162
+        · MyButton           → pcl-next/Controls/MyButton.xaml + .xaml.vb L74–L174
+        · MyTextBox          → pcl-next/Application.xaml L241–L282（模板为精简等价版）
+        · MyComboBox         → pcl-next/Application.xaml L336–L405（弹出层模板待补齐，R6）
+      尺寸单位与原生一致（WPF 与 Avalonia 均为 DIP）。
+    -->
+
+    <!-- ===== TextBlock：字号 13、ColorBrush1、字符省略号、PCL 字族 ===== -->
+    <Style Selector="TextBlock">
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="Foreground" Value="{DynamicResource ColorBrush1}" />
+        <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+        <Setter Property="FontFamily" Value="{DynamicResource PclFont}" />
+    </Style>
+
+    <!-- ===== MyCard ===== -->
+    <Style Selector="c|MyCard">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate>
+                    <Grid>
+                        <!-- 外圈阴影：Margin(-3,-4,-3,-3)、圆角 5、静止不透明度 0.07 -->
+                        <Border Name="PART_Chrome"
+                                Margin="-3,-4,-3,-3"
+                                CornerRadius="5"
+                                BoxShadow="0 0 6 0 #12343d4a"
+                                IsHitTestVisible="False" />
+                        <!-- 卡片底：白 245/255、圆角 5 -->
+                        <Border Name="PART_Bg"
+                                CornerRadius="5"
+                                Background="#F5FFFFFF"
+                                IsHitTestVisible="False" />
+                        <Grid>
+                            <TextBlock Name="PART_Title"
+                                       Text="{TemplateBinding Title}"
+                                       Margin="15,12,0,0"
+                                       FontSize="13"
+                                       FontWeight="Bold"
+                                       HorizontalAlignment="Left"
+                                       VerticalAlignment="Top"
+                                       IsHitTestVisible="False">
+                                <TextBlock.Transitions>
+                                    <Transitions>
+                                        <BrushTransition Property="Foreground" Duration="0:0:0.09" />
+                                    </Transitions>
+                                </TextBlock.Transitions>
+                            </TextBlock>
+                            <ContentPresenter Name="PART_Content"
+                                              Content="{TemplateBinding Content}"
+                                              ContentTemplate="{TemplateBinding ContentTemplate}" />
+                        </Grid>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style Selector="c|MyCard:pointerover /template/ Border#PART_Chrome">
+        <Setter Property="BoxShadow" Value="0 0 6 0 #66343d4a" />
+    </Style>
+    <Style Selector="c|MyCard:pointerover /template/ TextBlock#PART_Title">
+        <Setter Property="Foreground" Value="{DynamicResource ColorBrush2}" />
+    </Style>
+
+    <!-- ===== MyButton ===== -->
+    <Style Selector="c|MyButton">
+        <Setter Property="Background" Value="{DynamicResource ColorBrushHalfWhite}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource ColorBrush1}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="RenderTransformOrigin" Value="0.5,0.5" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate>
+                    <Border Background="{DynamicResource ColorBrushSemiTransparent}">
+                        <Border Name="PART_Fore"
+                                CornerRadius="3"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                Background="{TemplateBinding Background}"
+                                Padding="{TemplateBinding Padding}"
+                                RenderTransformOrigin="0.5,0.5">
+                            <Border.Transitions>
+                                <Transitions>
+                                    <BrushTransition Property="BorderBrush" Duration="0:0:0.2" />
+                                    <BrushTransition Property="Background" Duration="0:0:0.2" />
+                                </Transitions>
+                            </Border.Transitions>
+                            <TextBlock Text="{TemplateBinding Text}"
+                                       Foreground="{TemplateBinding BorderBrush}"
+                                       FontSize="13"
+                                       TextTrimming="None"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"
+                                       IsHitTestVisible="False" />
+                        </Border>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style Selector="c|MyButton.highlight">
+        <Setter Property="BorderBrush" Value="{DynamicResource ColorBrush2}" />
+    </Style>
+    <Style Selector="c|MyButton.red">
+        <Setter Property="BorderBrush" Value="{DynamicResource ColorBrushRedDark}" />
+    </Style>
+    <Style Selector="c|MyButton:pointerover">
+        <Setter Property="BorderBrush" Value="{DynamicResource ColorBrush3}" />
+        <Setter Property="Background" Value="{DynamicResource ColorBrush7}" />
+    </Style>
+    <Style Selector="c|MyButton.red:pointerover">
+        <Setter Property="BorderBrush" Value="{DynamicResource ColorBrushRedLight}" />
+        <Setter Property="Background" Value="{DynamicResource ColorBrushRedBack}" />
+    </Style>
+    <Style Selector="c|MyButton:disabled">
+        <Setter Property="BorderBrush" Value="{DynamicResource ColorBrushGray4}" />
+    </Style>
+    <Style Selector="c|MyButton:pressed">
+        <Setter Property="RenderTransform" Value="scale(0.955)" />
+    </Style>
+
+    <!-- ===== MyTextBox（模板精简等价版：边框 + 内容宿主） ===== -->
+    <Style Selector="c|MyTextBox">
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="BorderBrush" Value="{DynamicResource ColorBrushBg0}" />
+        <Setter Property="Background" Value="{DynamicResource ColorBrushHalfWhite}" />
+        <Setter Property="CornerRadius" Value="3" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="FontFamily" Value="{DynamicResource PclFont}" />
+        <Setter Property="Foreground" Value="{DynamicResource ColorBrush1}" />
+        <Setter Property="Padding" Value="5,0,0,0" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate>
+                    <Border Name="PART_Border"
+                            CornerRadius="{TemplateBinding CornerRadius}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            Background="{TemplateBinding Background}">
+                        <Panel Margin="{TemplateBinding Padding}">
+                            <ScrollViewer Name="PART_ContentHost">
+                                <TextPresenter Name="PART_TextPresenter"
+                                               Text="{TemplateBinding Text, Mode=TwoWay}"
+                                               CaretIndex="{TemplateBinding CaretIndex, Mode=TwoWay}"
+                                               SelectionStart="{TemplateBinding SelectionStart, Mode=TwoWay}"
+                                               SelectionEnd="{TemplateBinding SelectionEnd, Mode=TwoWay}"
+                                               PasswordChar="{TemplateBinding PasswordChar}"
+                                               TextWrapping="{TemplateBinding TextWrapping}"
+                                               TextAlignment="{TemplateBinding TextAlignment}"
+                                               VerticalAlignment="Center" />
+                            </ScrollViewer>
+                        </Panel>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- ===== MyComboBox（属性级对齐；弹出层模板待补齐） ===== -->
+    <Style Selector="c|MyComboBox">
+        <Setter Property="Background" Value="{DynamicResource ColorBrushHalfWhite}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource ColorBrushBg0}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="3" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="FontFamily" Value="{DynamicResource PclFont}" />
+        <Setter Property="Foreground" Value="{DynamicResource ColorBrush1}" />
+        <Setter Property="MaxDropDownHeight" Value="320" />
+        <Setter Property="MinHeight" Value="26" />
+        <Setter Property="Padding" Value="8,0,8,0" />
+    </Style>
+
+    <Style Selector="c|MyComboBoxItem">
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="MinHeight" Value="26" />
+        <Setter Property="Padding" Value="6,4" />
+    </Style>
+
+</Styles>

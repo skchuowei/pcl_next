@@ -1,17 +1,13 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:views="using:PCL.Desktop.Linux.Views"
         x:Class="PCL.Desktop.Linux.MainWindow"
         Title="pcl-next · Linux"
         Width="960"
         Height="640">
     <!--
-      LU1 骨架：只验证「能起窗口」，不画任何 PCL 页面。
-      LU2 起主题与控件落位后，这里才会换成承载 P0 视图的宿主。
+      LU2 起：窗口承载第一个 1:1 页面（设置·联机），对照 pcl-next/Pages/PageSetup/PageSetupLink.xaml。
+      左侧导航与 FormMain 外壳属后续阶段，这里先验证「页面容器 + 主题 + 控件」这一条链路。
     -->
-    <StackPanel Margin="24" Spacing="8" VerticalAlignment="Center">
-        <TextBlock Text="pcl-next · Linux 宿主骨架（LU1）"
-                   FontSize="20" />
-        <TextBlock Text="Avalonia + linux-x64；UI 组件尚未落位（见 docs/plans/计划-LinuxUI移植.md §11 D1）。"
-                   FontSize="13" />
-    </StackPanel>
+    <views:PageSetupLinkView />
 </Window>
