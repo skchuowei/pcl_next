@@ -33,6 +33,16 @@ Public Module ModDevNotes
     Public ReadOnly Property DevStageNotice As String
         Get
             Select Case VersionCode
+                Case 5005 ' dev 2.100.0.6
+                    Return "你正在使用 PCL Next 的开发版（dev）。本版完成下载功能的修复与真机回归：" &
+                           "NeoForge / Forge 安装器参数、安装器所需 Java 版本、Modrinth 版本列表、资源搜索与版本图标加载均已修复；" &
+                           "安装编排的步骤、权重、Block 与下载清单改由 C# 描述符决定，VB 只做无逻辑装配。" & vbCrLf & vbCrLf &
+                           "本版本已知限制：" & vbCrLf &
+                           "- 下载 UI 的编排外壳（加载器树生成、任务列表与进度）仍是 VB；五个安装复合体的内部子列表尚未下沉（P4-B 批次 2）；" & vbCrLf &
+                           "- 六类加载器列表仍未逐类真机安装冒烟；" & vbCrLf &
+                           "- 未配置 PCL_CURSEFORGE_API_KEY 时 OptiFabric 会跳过 CurseForge 直查、返回空列表；" & vbCrLf &
+                           "- C# 完整重写尚未完成，Phase 6（下线 VB 下载模块）未开始；" & vbCrLf &
+                           "- 配置与存档结构可能在后续版本调整，建议定期备份；遇到异常请附 PCL/Log1.txt。"
                 Case 5004 ' dev 2.100.0.5
                     Return "你正在使用 PCL Next 的开发版（dev）。本版把安装流程里的纯逻辑搬进了 C# —— " &
                            "版本合并、Forge/NeoForge/OptiFine 安装器的参数推导、OptiFine 与 LiteLoader 的版本 json、" &
@@ -82,6 +92,23 @@ Public Module ModDevNotes
     Public ReadOnly Property DevChangelog As String
         Get
             Select Case VersionCode
+                Case 5005 ' dev 2.100.0.6
+                    Return "· 重写：口径 A 落地——InstallTaskDescriptor / InstallTaskPlanner.Describe 输出全部编排决策与任务描述符，" &
+                           "InstallPlanStep 挂 Task/Inputs/Outputs/SubSteps/DownloadKinds/Cancel/ReportsProgress/SubStepsSource；" &
+                           "NetFileDescriptorKind 扩到 13 类，收编 VB FileChecker 的逐类校验口径。" & vbCrLf &
+                           "· 重写：LoaderPlanAdapter.vb 薄装配层——McInstallLoadersGet 196 行降至 91 行，" &
+                           "7 处 If 组件已选 与 14 处 Plan.GetStep 归零，名称/权重/Block/Show 一律读 DTO，执行 lambda 不变。" & vbCrLf &
+                           "· 修复：InstallerArguments.QuoteDirectory 统一去路径尾斜杠——RequestTaskTempFolder 返回尾 \，" &
+                           "包进命令行引号后，尾斜杠吞掉了转义，gameDir 参数末尾多出一个字面引号，安装器拿到不存在的目录；盘符根 C:\ 在引号内写 \\。" & vbCrLf &
+                           "· 修复：JavaRequirement.ReadRequiredJavaMajor 读原版 json 的 javaVersion.majorVersion（兼容旧 java_version），" &
+                           "≥22 时先精确匹配该主版本，本机没有才放宽为 AtLeast；旧口径按 JavaList 顺序取首个通过者，26.3 需 25 却选到 21。" & vbCrLf &
+                           "· 修复：Settings.vb 补注册 SystemPendingUpdateLogFrom——未注册导致每次启动抛 KeyNotFoundException，" &
+                           "连带跳过 ServerLoader.Start() 与临时目录清理。" & vbCrLf &
+                           "· 修复：ResourceVersion.FromPlatformJson 的 Modrinth Id 改取 data[""id""]（回退 project_id）——" &
+                           "旧口径让 DistinctBy(a => a.Id) 把同一项目的 1221 个版本压成 1 条。" & vbCrLf &
+                           "· 降级：无 PCL_CURSEFORGE_API_KEY 时 DlOptiFabricLoader 跳过 CF 项目 322385 直查、返回空列表并记日志（Modrinth 无 optifabric 项目）。" & vbCrLf &
+                           "· 修复：MyBitmap 归一化旧程序集名 pack URI（Plain Craft Launcher 2;component/Images/...）。" & vbCrLf &
+                           "· 测试：568 例全绿；InstallerArguments 26 例、描述符 60 例、多版本不折叠守门用例各含变异反证。"
                 Case 5004 ' dev 2.100.0.5
                     Return "· 重写：安装编排的纯逻辑入 PCL.Download——VersionMerger（版本 json 合并）、" &
                            "ForgelikeInstaller（Forge/NeoForge 安装器参数与进度）、OptiFineInstaller（参数与 Java 版本探测）、" &

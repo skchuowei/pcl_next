@@ -84,7 +84,10 @@ $VersionName = $null
 $Sequence = 1
 
 if ($Tag) {
-    $m = [regex]::Match($Tag, '^(?:v)?(?<major>\d+)\.(?<minor>\d+)\.(?<patch>\d+)\.(?<build>\d+)(?:-(?<chan>dev|slush|alpha|beta|rc|sp|snapshot)\.?(?<seq>\d+)?)?$')
+    # 2026-11-08 用户裁决：Windows 线发布标签带 -Windows 平台后缀，为后续 Linux / Android
+    # 独立发布预留标签命名空间。平台后缀不参与版本名 / 版本号推导，只做语法兼容；
+    # 远端 dev 分支仍沿用旧命名（= Windows 通道），不随标签加后缀。
+    $m = [regex]::Match($Tag, '^(?:v)?(?<major>\d+)\.(?<minor>\d+)\.(?<patch>\d+)\.(?<build>\d+)(?:-(?<chan>dev|slush|alpha|beta|rc|sp|snapshot)\.?(?<seq>\d+)?)?(?:-(?<platform>Windows|Linux|Android))?$')
     if (-not $m.Success) { throw "无法解析版本标签：$Tag" }
     $VersionName = "$($m.Groups['major'].Value).$($m.Groups['minor'].Value).$($m.Groups['patch'].Value).$($m.Groups['build'].Value)"
     $cycle = [int]$m.Groups['minor'].Value - $FirstCycleMinor
