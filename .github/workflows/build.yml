@@ -137,7 +137,8 @@ jobs:
       run: |
         # 内核前端（PCL.Cli）：构建即校验架构护栏（Directory.Build.props §3），
         # 再跑不联网的 offline 套件，确认内核在无 WPF 前提下可用。
-        dotnet build "PCL.Cli\PCL.Cli.csproj" -c ${{ matrix.configuration }} -p:PclChannel=${{ steps.channel.outputs.channel }}
+        # PCL.Cli 是入口工程，PclRidGuard 要求命令行显式带真实 RID（AGENTS §0.1）
+        dotnet build "PCL.Cli\PCL.Cli.csproj" -c ${{ matrix.configuration }} -r win-x64 -p:PclChannel=${{ steps.channel.outputs.channel }}
         if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
         $exe = Get-ChildItem -Path "bin-net10" -Filter "pclcli.exe" -Recurse -ErrorAction SilentlyContinue |
@@ -160,7 +161,9 @@ jobs:
         if ($LASTEXITCODE -ne 0) { throw "内核单测失败，退出码 $LASTEXITCODE" }
 
     - name: Publish (self-contained single file)
-      run: dotnet publish "pcl-next\pcl-next.vbproj" -c ${{ matrix.configuration }} -p:PclChannel=${{ steps.channel.outputs.channel }} -p:PublishProfile=win-x64-single
+      # 同 release.yml：pubxml 内的 RuntimeIdentifier 不能被 PclRidGuard 在求值期读到，
+      # 必须显式传 -r win-x64，否则发布流水线在 restore 后直接报 RID 护栏错误。
+      run: dotnet publish "pcl-next\pcl-next.vbproj" -c ${{ matrix.configuration }} -r win-x64 -p:PclChannel=${{ steps.channel.outputs.channel }} -p:PublishProfile=win-x64-single
 
     - name: Upload a Build Artifact
       uses: actions/upload-artifact@v7

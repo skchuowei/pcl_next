@@ -93,7 +93,10 @@ jobs:
             -CacheFile "${{ GITHUB.WORKSPACE }}\pcl-next\obj\pcl-build.small"
 
     - name: Publish (self-contained single file)
-      run: dotnet publish "pcl-next\pcl-next.vbproj" -c Release -p:PclChannel=${{ steps.channel.outputs.channel }} -p:PublishProfile=win-x64-single
+      # 入口工程必须显式带 -r：pubxml 内的 RuntimeIdentifier 是后期属性，
+      # Directory.Build.props 的 PclRidGuard 在求值期读不到，会直接报「未指定真实 RID」。
+      # 详见 AGENTS §0.1 /《经验与踩坑》⑦。
+      run: dotnet publish "pcl-next\pcl-next.vbproj" -c Release -r win-x64 -p:PclChannel=${{ steps.channel.outputs.channel }} -p:PublishProfile=win-x64-single
 
     - name: Prepare artifacts (exe + ini as separate files, not bundled)
       id: pack
