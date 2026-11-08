@@ -109,10 +109,16 @@ public static class ForgelikeInstaller
     /// <param name="javaMajor">所选 Java 的主版本号。</param>
     /// <param name="installerPath">安装器 jar 的本地路径。</param>
     /// <param name="targetJar">被注入的 Forge jar（作为 classpath 的一部分）。</param>
-    /// <param name="mcFolder">.minecraft 目录，安装器把库与版本写到这里。</param>
+    /// <param name="mcFolder">.minecraft 目录，安装器把库与版本写到这里；允许带尾斜杠。</param>
     /// <param name="javaWrapperPath">JavaWrapper.jar 的路径，仅在 <paramref name="useJavaWrapper"/> 为真时使用。</param>
-    /// <param name="javaWrapperTempDir">JavaWrapper 的临时目录（<c>oolloo.jlw.tmpdir</c>）。</param>
+    /// <param name="javaWrapperTempDir">JavaWrapper 的临时目录（<c>oolloo.jlw.tmpdir</c>）；允许带尾斜杠。</param>
     /// <param name="useJavaWrapper">是否经 JavaWrapper 启动。</param>
+    /// <remarks>
+    /// 目录参数一律经 <see cref="InstallerArguments.QuoteDirectory"/> 包装：调用方传进来的
+    /// <c>mcFolder</c> 常是 <c>RequestTaskTempFolder()</c> 的返回值（以 <c>\</c> 结尾），
+    /// 直接写成 <c>"{mcFolder}"</c> 会拼出 <c>\"</c>，被命令行解析器当成转义引号，
+    /// 安装器拿到的 gameDir 末尾混入字面 <c>"</c> 而 <c>exists() = false</c>。
+    /// </remarks>
     public static string BuildArguments(int javaMajor, string installerPath, string targetJar, string mcFolder,
         string? javaWrapperPath = null, string? javaWrapperTempDir = null, bool useJavaWrapper = false)
     {
@@ -120,15 +126,17 @@ public static class ForgelikeInstaller
         ArgumentException.ThrowIfNullOrWhiteSpace(mcFolder);
 
         var classPath = $"\"{installerPath};{targetJar}\"";
+        var quotedMcFolder = InstallerArguments.QuoteDirectory(mcFolder);
         string arguments;
         if (useJavaWrapper && !string.IsNullOrWhiteSpace(javaWrapperPath))
         {
-            arguments = $"-Doolloo.jlw.tmpdir=\"{javaWrapperTempDir}\" -cp {classPath} -jar \"{javaWrapperPath}\""
-                + $" com.bangbang93.ForgeInstaller \"{mcFolder}\"";
+            arguments = $"-Doolloo.jlw.tmpdir={InstallerArguments.QuoteDirectory(javaWrapperTempDir)}"
+                + $" -cp {classPath} -jar \"{javaWrapperPath}\""
+                + $" com.bangbang93.ForgeInstaller {quotedMcFolder}";
         }
         else
         {
-            arguments = $"-cp {classPath} com.bangbang93.ForgeInstaller \"{mcFolder}\"";
+            arguments = $"-cp {classPath} com.bangbang93.ForgeInstaller {quotedMcFolder}";
         }
 
         // Java 9 起模块系统默认不导出内部包，安装器要用 bootstraplauncher 的内部类，必须显式开缺口。

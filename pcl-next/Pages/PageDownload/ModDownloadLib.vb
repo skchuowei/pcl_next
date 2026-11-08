@@ -871,9 +871,26 @@ Retry:
         End Try
     End Sub
 
-    Private Sub ForgelikeInjector(Target As String, Task As LoaderTask(Of Boolean, Boolean), McFolder As String, UseJavaWrapper As Boolean, IsNeoForge As Boolean)
-        '选择 Java
-        Dim Java As Java = SelectOrDownloadJava(ValueRange(Of Version).AtLeast(New Version(8, 0, 60)), True, Task.CreateCancellationToken, Task.CreateSyncProgressProvider(0, 0.2))
+    Private Sub ForgelikeInjector(Target As String, Task As LoaderTask(Of Boolean, Boolean), McFolder As String, UseJavaWrapper As Boolean, IsNeoForge As Boolean, RequiredJavaMajor As Integer?)
+        '选择 Java：原版 26+ 在版本 json 写明 javaVersion.majorVersion（26.3 要求 25）。
+        '旧口径「≥8 且按 JavaList 顺序取首个」会抓到列表靠前的 Java 21，
+        '目录问题修好后 processor 阶段仍会失败。这里先精确匹配该主版本，
+        '本机没有恰好这一版时才放宽为「不低于要求」，绝不回退到更低的 Java。
+        Dim Java As Java = Nothing
+        Dim Token = Task.CreateCancellationToken
+        If RequiredJavaMajor.HasValue AndAlso RequiredJavaMajor.Value >= 22 Then
+            Dim Major As Integer = RequiredJavaMajor.Value
+            Dim ExactRange = ValueRange(Of Version).ClosedOpen(New Version(Major, 0), New Version(Major + 1, 0))
+            Java = SelectOrDownloadJava(ExactRange, False, Token, Task.CreateSyncProgressProvider(0, 0.2))
+            If Java Is Nothing AndAlso Not Task.IsCanceled Then
+                Logger.Info($"本机没有 Java {Major}，放宽为 Java {Major} 或更高版本")
+                Java = SelectOrDownloadJava(ValueRange(Of Version).AtLeast(New Version(Major, 0)), True, Token,
+                                            Task.CreateSyncProgressProvider(0, 0.2))
+            End If
+        Else
+            Java = SelectOrDownloadJava(ValueRange(Of Version).AtLeast(New Version(8, 0, 60)), True, Token,
+                                        Task.CreateSyncProgressProvider(0, 0.2))
+        End If
         If Task.IsCanceled Then Return
         If Java Is Nothing Then Throw New OperationCanceledException
         '添加 Java Wrapper 作为主 Jar
@@ -1138,13 +1155,25 @@ Retry:
                     Task.Progress = 0.05
                     '运行 Forge 安装器
                     Dim UseJavaWrapper As Boolean = True
+                    '读取原版 json 的 Java 版本要求（26+ 由 Mojang 写在 javaVersion.majorVersion）。
+                    '解析交给无 GUI 内核；读不到就回退旧的 Java 8+ 口径，保证老版本行为不变。
+                    Dim RequiredJavaMajor As Integer? = Nothing
+                    Try
+                        Dim VanillaJsonPath As String = McFolder & "versions\" & Inherit & "\" & Inherit & ".json"
+                        If System.IO.File.Exists(VanillaJsonPath) Then
+                            RequiredJavaMajor = PCL.Download.JavaRequirement.ReadRequiredJavaMajor(
+                                System.IO.File.ReadAllText(VanillaJsonPath))
+                        End If
+                    Catch ex As Exception
+                        Logger.Warn(ex, "读取原版 json 的 Java 版本要求失败，安装器回退到 Java 8+")
+                    End Try
 Retry:
                     Try
                         '释放 Forge 注入器
                         ExtractResources(PathTemp & "Cache\forge_installer.jar", "ForgeInstaller")
                         Task.Progress = 0.06
                         '运行注入器
-                        ForgelikeInjector(InstallerAddress, Task, McFolder, UseJavaWrapper, IsNeoForge)
+                        ForgelikeInjector(InstallerAddress, Task, McFolder, UseJavaWrapper, IsNeoForge, RequiredJavaMajor)
                         Task.Progress = 0.97
                     Catch ex As Exception
                         If UseJavaWrapper Then

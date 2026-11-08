@@ -104,7 +104,7 @@ public static class OptiFineInstaller
     /// </summary>
     /// <param name="javaMajor">所选 Java 的主版本号。</param>
     /// <param name="installerPath">安装器 jar 的本地路径。</param>
-    /// <param name="mcFolder">.minecraft 目录，安装器把库与版本写到这里。</param>
+    /// <param name="mcFolder">.minecraft 目录，安装器把库与版本写到这里；允许带尾斜杠。</param>
     /// <param name="javaWrapperPath">JavaWrapper.jar 的路径，仅在 <paramref name="useJavaWrapper"/> 为真时使用。</param>
     /// <param name="javaWrapperTempDir">JavaWrapper 的临时目录（<c>oolloo.jlw.tmpdir</c>）。</param>
     /// <param name="useJavaWrapper">是否经 JavaWrapper 启动。</param>
@@ -123,15 +123,18 @@ public static class OptiFineInstaller
         ArgumentException.ThrowIfNullOrWhiteSpace(mcFolder);
 
         // 两个 -D 都带引号：.minecraft 路径常含空格（「我的世界」「Minecraft Launcher」）。
+        // 目录参数统一经 InstallerArguments.QuoteDirectory 去尾斜杠，避免 "<dir>\" 把闭合引号转义掉。
+        var quotedMcFolder = InstallerArguments.QuoteDirectory(mcFolder);
         string arguments;
         if (useJavaWrapper && !string.IsNullOrWhiteSpace(javaWrapperPath))
         {
-            arguments = $"-Doolloo.jlw.tmpdir=\"{javaWrapperTempDir}\" -Duser.home=\"{mcFolder}\""
+            arguments = $"-Doolloo.jlw.tmpdir={InstallerArguments.QuoteDirectory(javaWrapperTempDir)}"
+                + $" -Duser.home={quotedMcFolder}"
                 + $" -cp \"{installerPath}\" -jar \"{javaWrapperPath}\" optifine.Installer";
         }
         else
         {
-            arguments = $"-Duser.home=\"{mcFolder}\" -cp \"{installerPath}\" optifine.Installer";
+            arguments = $"-Duser.home={quotedMcFolder} -cp \"{installerPath}\" optifine.Installer";
         }
 
         // Java 9 起模块系统默认不导出内部包，安装器要用 bootstraplauncher 的内部类，必须显式开缺口。

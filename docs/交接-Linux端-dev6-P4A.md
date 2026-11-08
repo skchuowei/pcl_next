@@ -202,6 +202,20 @@ P4-A 的价值是「把 VB 散落的口径收编成单一真源」。Linux 侧�
 
 ---
 
+## 9.1 后续 Windows 增量（不属于 P4-A 移植范围，供 Linux 侧自行裁决）
+
+P4-A 提交之后，Windows 线另修了一个与编排 DTO 无关的真机缺陷（NeoForge 26.3.0.101
+安装器报 `no minecraft installation`）：新增 `InstallerArguments.cs`、`JavaRequirement.cs`，
+改动 `ForgelikeInstaller.cs`、`OptiFineInstaller.cs`、`ModDownloadLib.vb`，
+并新增 `PCL.Download.Tests/InstallerArgumentRegressionTests.cs`（26 例）。
+
+- 本文 §2 的「5 个文件可直接覆盖式移植」结论**只适用于 P4-A 那批文件**，不含这一增量。
+- Linux 侧若复现同类报错，参照 `PCL_NEXT_Windows/docs/经验与踩坑.md` ④ 自行移植；
+  三条线互不合并，Windows 提交不会自动带过去。
+- 该缺陷在三线起点相同，Linux / Android 目前**仍未修复**。
+
+---
+
 ## 10. 依据文件索引
 
 | 文件 | 用途 |
