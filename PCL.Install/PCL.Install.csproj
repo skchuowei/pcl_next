@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <OutputType>Library</OutputType>
+    <RootNamespace>PCL.Install</RootNamespace>
+    <Configurations>Debug;Release;Snapshot</Configurations>
+    <Deterministic>true</Deterministic>
+    <LangVersion>13.0</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+
+    <!--
+      架构护栏（Directory.Build.props §3）：装配层属「无 GUI 内核」，
+      引用闭包内不得出现 WPF/WinForms、pcl-next、PCLCS、MeloongCore。
+      Linux 线没有 VB 编译器，装配层必须保持纯 C# + 纯 BCL。
+    -->
+    <PclIsGuiFree>true</PclIsGuiFree>
+
+    <!-- 产物落三段树（AGENTS §0.1），由 Directory.Build.props 的 PclTreeRoot 推出，不手写字面量。 -->
+    <PclUseTreePath>true</PclUseTreePath>
+    <OutputPath>$(PclTreeRoot)</OutputPath>
+    <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+  </PropertyGroup>
+
+  <!--
+    依赖方向单向：PCL.Install → PCL.Download。
+    PCL.Download 不得反向引用本工程（装配层不是内核的一部分）。
+  -->
+  <ItemGroup>
+    <ProjectReference Include="..\PCL.Download\PCL.Download.csproj" />
+  </ItemGroup>
+
+</Project>
