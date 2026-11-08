@@ -1,0 +1,96 @@
+name: Kernel Guard
+
+# ── 为什么单独一条 workflow ──────────────────────────────────────────────
+# 2026-11-07：原先 Linux 内核门禁与 Windows 主线编译挤在同一个 build.yml 里。
+# 后果是 Ubuntu runner 慢半拍就把整次 run 的结论拖住——Windows 那边包已经打好、
+# artifact 已经上传，界面上却还是「进行中」；Windows 失败时 Linux 又白跑一遍。
+# 拆开后两条线各自触发、各自出结论、各自重跑，互不阻塞。
+#
+# 判据不变（《分支与发布规范》§0A.2 / §0B.3）：只验证「无 GUI 内核」在 Linux 上
+# 可编译、可测试、可离线自检，不产出任何对外制品，不参与代号发布。
+# 护栏只做一份：android / linux 两条平台线都从 dev 吸收内核，共用同一套判据，
+# 各写一份 CI 迟早漂移（AGENTS §0.3.1 的教训）。
+
+on:
+  push:
+    # 六条代号长期分支 + 两条平台长期线（§0A android / §0B linux）
+    branches:
+      - dev
+      - slush
+      - alpha
+      - beta
+      - pc
+      - snapshot
+      - android
+      - linux
+    # 只有会影响「内核能否跨平台」的路径才触发。pcl-next 是 WPF 外壳，本身
+    # 就不跨平台，它怎么改都不会改变内核判据，故不列入。
+    paths:
+      - 'PCL.Download/**'
+      - 'PCL.Download.Tests/**'
+      - 'PCL.Cli/**'
+      - 'Directory.Build.props'
+      - 'scripts/**'
+      - '.github/workflows/**'
+  pull_request:
+    paths:
+      - 'PCL.Download/**'
+      - 'PCL.Download.Tests/**'
+      - 'PCL.Cli/**'
+      - 'Directory.Build.props'
+      - 'scripts/**'
+      - '.github/workflows/**'
+  workflow_dispatch:
+
+# Ubuntu runner 慢，而这条线不产制品、结论可重算：重复推送时取消进行中的旧 run，
+# 避免「改一行推三次」把 runner 名额占满。Windows 线不这么做，那边产物要留。
+concurrency:
+  group: kernel-guard-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-linux:
+    name: Kernel cross-platform guard (Linux)
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v6
+      with:
+        # 构建号按固定锚点以来的提交数推导，浅克隆会让锚点不可达（§5.2.1）
+        fetch-depth: 0
+        submodules: true
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '10.0.x'
+
+    - name: Refresh build number cache
+      shell: bash
+      run: |
+        # 与 Windows job 同源：PclTreePathGuard 要求版本段含构建号，
+        # 而 MSBuild 求值期不能跑 git，故先由脚本落盘。
+        pwsh -File scripts/Get-BuildSmallVersion.ps1 \
+          -RepoRoot "$GITHUB_WORKSPACE" \
+          -CacheFile "$GITHUB_WORKSPACE/pcl-next/obj/pcl-build.small"
+
+    - name: Build download engine
+      run: dotnet build PCL.Download/PCL.Download.csproj -c Release -r linux-x64
+
+    - name: Build CLI (architecture + output path guards)
+      run: dotnet build PCL.Cli/PCL.Cli.csproj -c Release -r linux-x64
+
+    - name: Unit tests
+      run: dotnet test PCL.Download.Tests/PCL.Download.Tests.csproj -c Release
+
+    - name: CLI offline selftest
+      shell: bash
+      run: |
+        dll=$(find bin-net10 -name 'pclcli.dll' -print -quit)
+        if [ -z "$dll" ]; then
+          echo "未找到 pclcli.dll：产物可能未落在 bin-net10 三段树内"
+          exit 1
+        fi
+        echo "CLI 产物：$dll"
+        dotnet "$dll" selftest --suite offline --workdir "$RUNNER_TEMP/pclcli"

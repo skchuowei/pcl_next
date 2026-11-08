@@ -1,0 +1,184 @@
+<Project>
+
+  <!--
+    仓库级公共属性（《AGENTS.md》§0.1 / §0.3 / 《计划-内核与GUI拆分（CLI）》§5.5）。
+
+    本文件只做三件事，**不得**在此处做任何与具体工程业务相关的设置：
+      1. 提供渠道 / 版本 / 运行环境三个路径片段，供各工程拼出自己的三段树；
+      2. 为各工程提供三段树根（PclTreeRoot / PclGuiTreeRoot）与路径护栏（PclUseTreePath）；
+      3. 为「无 GUI 内核工程」提供可 CI 校验的架构护栏（PclIsGuiFree）。
+
+    ⚠ 2026-11-01 事故记录：此前本文件只提供 PclTreeRoot（仓库根三段树），主工程
+    pcl-next.vbproj 却在工程体内手写 `<OutputPath>bin-net10\$(PclChannel)\</OutputPath>`。
+    按 MSBuild 求值顺序，工程体晚于本文件，于是**只有代号一段**的路径覆盖掉了三段树，
+    版本层整个丢失；`<运行环境>` 那一段则是 SDK 的 AppendRuntimeIdentifierToOutputPath
+    顺手补的，纯属巧合。后果：
+      - 直接 `dotnet build`（无 -r）→ bin-net10\Dev\        连 RID 都没有
+      - 带 `-r win-x64`            → bin-net10\Dev\win-x64\ 缺版本层
+      - 走 scripts\Build.ps1       → bin-net10\Dev\2.100.0.3\win-x64\（靠外部 -p:OutputPath 硬灌）
+    两套目录并存，IDE 编译与脚本编译的产物互不可见，表现成「改了代码没生效」。
+    根因是**路径规则存在第二处手写副本**，现已删掉，统一由本文件的变量推出。
+  -->
+
+  <!-- ── 1. 渠道与版本默认值 ─────────────────────────────────────────────── -->
+
+  <PropertyGroup>
+    <!-- 与 pcl-next.vbproj 的 PclChannel 大小写规则保持一致（Dev / Slush / Alpha / Beta / Rc / Snapshot） -->
+    <PclChannel Condition="'$(PclChannel)' == '' AND '$(Configuration)' == 'Snapshot'">Snapshot</PclChannel>
+    <PclChannel Condition="'$(PclChannel)' == ''">Dev</PclChannel>
+
+    <!--
+      版本名直接取自 ModBase.vb 的 VersionBaseName，避免各处手抄版本导致漂移。
+      求值期用属性函数读取并正则抽取。
+    -->
+    <!-- 路径片段一律用正斜杠：MSBuild 在 Windows / Linux 都接受 / 作为分隔符，
+         而反斜杠在 Linux 上只是普通字符，会让 Exists() 判定为 false，进而 PclVersion 为空。
+         （2026-11-07 跨平台护栏实测发现，见 .workbuddy/memory/2026-11-07.md） -->
+    <PclModBaseFile>$(MSBuildThisFileDirectory)pcl-next/Modules/Base/ModBase.vb</PclModBaseFile>
+    <PclVersion Condition="'$(PclVersion)' == '' AND Exists('$(PclModBaseFile)')">$([System.Text.RegularExpressions.Regex]::Match($([System.IO.File]::ReadAllText('$(PclModBaseFile)')), 'VersionBaseName[^&quot;]*&quot;([0-9][0-9.]*)&quot;').Groups[1].Value)</PclVersion>
+
+    <!--
+      构建小版本（0.20 这种），存在缓存文件里而不是现场跑 git。
+      原因：属性求值发生在所有 Target 之前，那个阶段只能调用白名单内属性函数，
+      **不能执行 git 命令**，提交数算不出来。所以由 scripts\Get-BuildSmallVersion.ps1
+      把运行期算好的值落盘，求值期只读文件。
+
+      刷新时机（三处，见脚本 .PARAMETER CacheFile）：
+        · scripts\Build.ps1 构建前       —— 本地验证构建
+        · CI workflow 构建前             —— 保证发布构建的目录名精确
+        · post-commit 钩子               —— 提交后立即正确，IDE 里直接编译也准
+      缓存缺失（如新克隆仓库）时 PclBuildSmall 为空，目录名退化为纯版本名；
+      下一次任一路径刷新后自动补上，不会长期缺段。
+    -->
+    <PclBuildCacheFile>$(MSBuildThisFileDirectory)pcl-next/obj/pcl-build.small</PclBuildCacheFile>
+    <PclBuildSmall Condition="'$(PclBuildSmall)' == '' AND Exists('$(PclBuildCacheFile)')">$([System.IO.File]::ReadAllText('$(PclBuildCacheFile)').Trim())</PclBuildSmall>
+
+    <!--
+      产物目录里使用的版本段：版本名 + 构建号，形如 2.100.0.3-0.20。
+      加构建号的目的：同名版本的不同提交编出来的目录不再互相覆盖，
+      看目录名就能判断里面是第几个提交编的（构建号单调递增，见 §5.2.1）。
+      无缓存时不带后缀，退化为 2.100.0.3。
+    -->
+    <PclVersionDir>$(PclVersion)</PclVersionDir>
+    <PclVersionDir Condition="'$(PclBuildSmall)' != ''">$(PclVersion)-$(PclBuildSmall)</PclVersionDir>
+  </PropertyGroup>
+
+  <!-- ── 2. 三段树路径片段（供各工程自行拼 OutputPath，见 AGENTS §0.1） ──── -->
+
+  <PropertyGroup>
+    <!--
+      2026-11-08 用户裁决：三段树的 <运行环境> 段必须是真实 RID，禁止 any 占位。
+      没带 -r / -p:RuntimeIdentifier 的编译一律由 PclRidGuard 直接报错，不再静默退化成 any\。
+      已实测：命令行 -r / -p:RuntimeIdentifier= 属于全局属性，在本文件求值期即可读到；
+      仅 pubxml 内部设定 RID 的场景仍需命令行显式再传一次 -r（AGENTS §0.1）。
+    -->
+    <PclRidSegment>$(RuntimeIdentifier)</PclRidSegment>
+
+    <!--
+      两处树根，对应 AGENTS §0.1 的两条落点（不要合并成一个）：
+        PclTreeRoot    → <仓库根>\bin-net10\<代号>\<版本>-<构建号>\<RID>\   供无 GUI 内核工程（PCL.Download / PCL.Cli …）
+        PclGuiTreeRoot → pcl-next\bin-net10\<代号>\<版本>-<构建号>\<RID>\   供 GUI 主工程（位于 pcl-next 项目树下）
+      各工程只允许引用这两个变量，**禁止**再手写 bin-net10\... 字面量。
+    -->
+    <!--
+      分隔符统一用正斜杠：MSBuild 在 Windows / Linux 都能正确解析 /，
+      反斜杠在 Linux 上则只是普通字符，会生成名字里含字面 \ 的目录。
+      配套：scripts\Build.ps1 的防漂移断言在比较前把 / 规范化成 \（见该脚本第 3 步）。
+    -->
+    <PclTreeRoot>$(MSBuildThisFileDirectory)bin-net10/$(PclChannel)/$(PclVersionDir)/$(PclRidSegment)/</PclTreeRoot>
+    <PclGuiTreeRoot>$(MSBuildThisFileDirectory)pcl-next/bin-net10/$(PclChannel)/$(PclVersionDir)/$(PclRidSegment)/</PclGuiTreeRoot>
+  </PropertyGroup>
+
+  <!-- ── 2.4 运行环境护栏：每次编译都必须带真实 RID，禁止 any（2026-11-08 用户裁决） ── -->
+
+  <!--
+    与 PclTreePathGuard 的分工：后者只检查「代号 + 版本」两段，且只对声明 PclUseTreePath
+    的工程生效；本护栏无条件检查「运行环境」段，对所有工程（含测试工程）生效。
+    「没指定 RID 就直接报错」是硬要求，不允许静默落到 any\ 或空段。
+  -->
+  <Target Name="PclRidGuard" BeforeTargets="BeforeBuild;BeforePublish"
+          Condition="'$(PclRidSegment)' == '' OR '$(PclRidSegment)' == 'any'">
+    <Error Text="运行环境护栏：本次编译未指定真实 RID（RuntimeIdentifier 为空或为 any），三段树的 &lt;运行环境&gt; 段禁止 any 占位。请显式传 -r &lt;RID&gt;（如 -r win-x64 / -r linux-x64 / -r android-arm64）或 -p:RuntimeIdentifier=&lt;RID&gt; 后重试。详见 AGENTS §0.1。" />
+  </Target>
+
+  <!-- ── 2.5 路径护栏：声明 PclUseTreePath 的工程，OutputPath 必须落三段树 ── -->
+
+  <!--
+    这是三段树规则唯一的机械保障。没有它，OutputPath 只要被谁手写一次就会静默劣化——
+    构建日志毫无异常，只有产物位置变了，极难察觉（2026-11-01 实际发生过）。
+
+    校验方式：编译前检查 $(OutDir) 是否同时含「代号」与「版本段」两段。
+    版本段用的是 $(PclVersionDir)（含构建号，如 2.100.0.3-0.20），
+    因此手写成纯版本名 2.100.0.3 也会被判不通过——构建号漏掉同样属于落错目录。
+    只对显式声明 <PclUseTreePath>true</PclUseTreePath> 的工程生效，避免误伤测试工程
+    （PCL.Download.Tests 等只需普通 bin\ 即可）。
+  -->
+  <Target Name="PclTreePathGuard" BeforeTargets="BeforeBuild"
+          Condition="'$(PclUseTreePath)' == 'true'">
+
+    <PropertyGroup>
+      <_PclOutDirNorm>$(OutDir.Replace('\', '/'))</_PclOutDirNorm>
+      <_PclHasChannel>$([System.String]::Copy('$(_PclOutDirNorm)').Contains('/$(PclChannel)/'))</_PclHasChannel>
+      <_PclHasVersion>$([System.String]::Copy('$(_PclOutDirNorm)').Contains('/$(PclVersionDir)/'))</_PclHasVersion>
+    </PropertyGroup>
+
+    <Error Condition="'$(_PclHasChannel)' != 'true' OR '$(_PclHasVersion)' != 'true'"
+           Text="产物路径护栏：工程「$(MSBuildProjectName)」声明了 PclUseTreePath=true，但 OutputPath 求值为「$(OutputPath)」，未落在三段树 bin-net10\$(PclChannel)\$(PclVersionDir)\$(PclRidSegment)\ 内（缺少 $(PclChannel) 或 $(PclVersionDir) 段）。禁止在工程体内手写 OutputPath，请改用 $(PclGuiTreeRoot) / $(PclTreeRoot)，详见 AGENTS §0.1。" />
+
+    <Message Importance="normal"
+             Text="产物路径护栏通过：$(MSBuildProjectName) → $(OutDir)" />
+  </Target>
+
+  <!-- ── 3. 架构护栏：内核工程的引用闭包不得出现 WPF 与主工程程序集 ───────── -->
+
+  <!--
+    护栏生效条件：工程体内显式声明 <PclIsGuiFree>true</PclIsGuiFree>。
+    目前只有 PCL.Download 与 PCL.Cli 声明；新增 C# 内核工程请一律声明，
+    这是 T2 正式拆壳之前唯一能阻止架构腐化的机械手段。
+
+    注意：本开关**不能**放进「Condition="'$(PclIsGuiFree)'=='true'" 的 PropertyGroup」里——
+    Directory.Build.props 在工程体之前求值，那时 PclIsGuiFree 还是空，开关永远设为 false，
+    整条护栏会静默失效。
+  -->
+  <PropertyGroup>
+    <PclArchGuardEnabled Condition="'$(PclArchGuardEnabled)' == ''">true</PclArchGuardEnabled>
+  </PropertyGroup>
+
+  <Target Name="PclGuiFreeArchGuard"
+          AfterTargets="ResolveReferences"
+          Condition="'$(PclIsGuiFree)' == 'true' AND '$(PclArchGuardEnabled)' == 'true'">
+
+    <ItemGroup>
+      <!--
+        先只取程序集短名，再用 WithMetadataValue 精确筛。
+        不用「ItemGroup 里写 %() 条件」的写法：那种批处理在 Target 内不可靠，
+        曾实测漏判（护栏静默失效比没有护栏更糟）。
+        另外**故意不含 WindowsBase**：它在 Microsoft.NETCore.App 引用包里人人都有，
+        拿它当 WPF 证据会 100% 误报。
+      -->
+      <_PclRefName Include="@(ReferencePath->'%(Filename)')" />
+
+      <_PclForbiddenWpfRef Include="@(_PclRefName->WithMetadataValue('Identity', 'PresentationFramework'))" />
+      <_PclForbiddenWpfRef Include="@(_PclRefName->WithMetadataValue('Identity', 'PresentationCore'))" />
+      <_PclForbiddenWpfRef Include="@(_PclRefName->WithMetadataValue('Identity', 'System.Windows.Forms'))" />
+      <_PclForbiddenWpfRef Include="@(_PclRefName->WithMetadataValue('Identity', 'System.Xaml'))" />
+      <_PclForbiddenWpfRef Include="@(_PclRefName->WithMetadataValue('Identity', 'ReachFramework'))" />
+
+      <!-- GUI 宿主与上位工程：内核不得反向依赖 -->
+      <_PclForbiddenHostRef Include="@(_PclRefName->WithMetadataValue('Identity', 'pcl-next'))" />
+      <_PclForbiddenHostRef Include="@(_PclRefName->WithMetadataValue('Identity', 'PCLCS'))" />
+      <_PclForbiddenHostRef Include="@(_PclRefName->WithMetadataValue('Identity', 'MeloongCore'))" />
+      <_PclForbiddenHostRef Include="@(_PclRefName->WithMetadataValue('Identity', 'MeloongCore.Wpf'))" />
+    </ItemGroup>
+
+    <Error Condition="'@(_PclForbiddenWpfRef)' != ''"
+           Text="架构护栏：工程「$(MSBuildProjectName)」声明了 PclIsGuiFree=true，但引用闭包内出现 WPF/GUI 程序集：@(_PclForbiddenWpfRef, ', ')。内核工程不得依赖 GUI 框架，详见 docs/plans/计划-内核与GUI拆分（CLI）.md §5.5。" />
+
+    <Error Condition="'@(_PclForbiddenHostRef)' != ''"
+           Text="架构护栏：工程「$(MSBuildProjectName)」声明了 PclIsGuiFree=true，但引用闭包内出现 GUI 宿主程序集：@(_PclForbiddenHostRef, ', ')。内核不得反向依赖 pcl-next / PCLCS / MeloongCore，详见 docs/plans/计划-内核与GUI拆分（CLI）.md §5.5。" />
+
+    <Message Importance="normal"
+             Text="架构护栏通过：$(MSBuildProjectName) 引用闭包内无 WPF / GUI 宿主程序集（共 @(_PclRefName->Count()) 个引用）。" />
+  </Target>
+
+</Project>
