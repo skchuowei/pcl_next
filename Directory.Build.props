@@ -72,7 +72,14 @@
       已实测：命令行 -r / -p:RuntimeIdentifier= 属于全局属性，在本文件求值期即可读到；
       仅 pubxml 内部设定 RID 的场景仍需命令行显式再传一次 -r（AGENTS §0.1）。
     -->
-    <PclRidSegment>$(RuntimeIdentifier)</PclRidSegment>
+    <PclRidSegment Condition="'$(RuntimeIdentifier)' != ''">$(RuntimeIdentifier)</PclRidSegment>
+    <!--
+      .NET SDK 在 ProjectReference 上会移除 RuntimeIdentifier（避免影响引用工程的 restore），
+      被引用工程求值期因此读不到 -r。由入口工程的 PclRidWriteCache 把 RID 落到仓库级缓存，
+      引用工程求值期从缓存继承，保证整棵依赖树的 <运行环境> 段都是同一个真实 RID。
+      严禁回退成 any：读不到 RID 就由 PclRidGuard 报错。
+    -->
+    <PclRidSegment Condition="'$(PclRidSegment)' == '' AND Exists('$(MSBuildThisFileDirectory)obj/pcl-build.rid')">$([System.IO.File]::ReadAllText('$(MSBuildThisFileDirectory)obj/pcl-build.rid').Trim())</PclRidSegment>
 
     <!--
       两处树根，对应 AGENTS §0.1 的两条落点（不要合并成一个）：
@@ -96,8 +103,20 @@
     的工程生效；本护栏无条件检查「运行环境」段，对所有工程（含测试工程）生效。
     「没指定 RID 就直接报错」是硬要求，不允许静默落到 any\ 或空段。
   -->
+  <!--
+    入口工程（命令行带了 -r 的那个）在 BeforeBuild 阶段先把 RID 写入缓存；
+    ResolveProjectReferences 阶段才轮到被引用工程求值，此时它们能从缓存继承同一个 RID。
+    scripts\Build.ps1 每次构建开头会清掉缓存，避免上一轮的 RID 被误继承。
+  -->
+  <Target Name="PclRidWriteCache" BeforeTargets="BeforeBuild"
+          Condition="'$(RuntimeIdentifier)' != ''">
+    <MakeDir Directories="$(MSBuildThisFileDirectory)obj" />
+    <WriteLinesToFile File="$(MSBuildThisFileDirectory)obj/pcl-build.rid"
+                      Lines="$(RuntimeIdentifier)" Overwrite="true" />
+  </Target>
+
   <Target Name="PclRidGuard" BeforeTargets="BeforeBuild;BeforePublish"
-          Condition="'$(PclRidSegment)' == '' OR '$(PclRidSegment)' == 'any'">
+          Condition="'$(PclRidSegment)' == '' OR '$(PclRidSegment)' == 'any' OR (('$(MSBuildProjectName)' == 'pcl-next' OR '$(MSBuildProjectName)' == 'PCL.Cli') AND '$(RuntimeIdentifier)' == '')">
     <Error Text="运行环境护栏：本次编译未指定真实 RID（RuntimeIdentifier 为空或为 any），三段树的 &lt;运行环境&gt; 段禁止 any 占位。请显式传 -r &lt;RID&gt;（如 -r win-x64 / -r linux-x64 / -r android-arm64）或 -p:RuntimeIdentifier=&lt;RID&gt; 后重试。详见 AGENTS §0.1。" />
   </Target>
 
