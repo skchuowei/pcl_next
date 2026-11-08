@@ -176,9 +176,13 @@ LiteLoader 的版本 json 是一段 30 行的字符串拼接，Fabric 的 `∞ �
   `FileUtils.Delete(…, True)` 的回收站语义与重试。净 −9 行（+16 / −25）。
 - `PCL.Download.Tests/InstallCommitPlanTests.cs`（新增，15 例）。
 
-### 4.9 后续（未动）
+### 4.9 后续（已移交《计划-Phase4收尾与Phase6下线》）
 
 - `pcl-next/Pages/PageDownload/ModDownloadLib.vb`：安装编排的 `LoaderBase` 生成改为 C# 输出。
+  **口径已裁决（2026-11-08，用户）**：按字面执行会撞 `PclIsGuiFree` 护栏（`LoaderBase` 定义在 VB 主工程且带 UI 事件），
+  故采纳《计划-Phase4收尾与Phase6下线》§0 的**口径 A** —— C# 输出全部编排决策与任务描述符 DTO，
+  VB 只做「DTO → `LoaderBase` 树」的无逻辑装配；`LoaderBase` 状态机不下沉，T2 仍排在 Phase 6 之后。
+  Phase 4 完成判据以该文 §0.1 的正式文本为准，本节不再作为待办清单。
 - `pcl-next/Pages/PageDownload/Resource/PageDownloadCompDetail.xaml.vb`：资源详情版本列表改由 Provider 提供（已通过 `ResourceVersion.FromProjectId` 转发完成）。
 - `pcl-next/Modules/Resource/ResourceVersion.vb` / `ResourceProject.vb`：逐步退化为 C# DTO 的只读投影（已开始）。
 

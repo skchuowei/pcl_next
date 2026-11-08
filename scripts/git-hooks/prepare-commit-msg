@@ -1,11 +1,14 @@
 #!/bin/sh
-# 提交前自动追加「构建小版本」到提交信息末尾（《分支与发布规范》§5.2.1）。
+# 提交前自动追加「构建小版本」到提交信息末尾（《分支与发布规范》§5.2.1 / AGENTS §五.6）。
 #
-# 值 = 自固定锚点以来的提交数 × 0.01，写成 M.mm（与 scripts/Get-BuildSmallVersion.ps1 同源）。
-# 锚点是 v2.100.0.1-dev.1 的提交，硬编码且永不移动——用「最近发布标签」会让编号在打新标签后归零，
-# 后提交的版本反而比先提交的小。
-# 本次提交是第 N+1 个，因此追加的是它自己对应的编号——
-# 与编译期脚本在提交后算出的值一致。
+# 2026-11-08 三仓库架构裁决后，三条线各自 git init 全新基线，固定锚点 85c17f13
+# 在新历史里不可达。锚点不可达时改用 scripts/build-number.base 的继承基数
+# （Windows 65 / Linux 71 / Android 60），与 scripts/Get-BuildSmallVersion.ps1
+# 的「root+base」退化分支同源：
+#   当前编号   = base + max(0, rev-list --count HEAD - 1)
+#   本次提交编号 = base + rev-list --count HEAD   （HEAD 是提交前的计数）
+# 锚点可达（旧仓库 / 完整克隆）时保持原语义，不叠加基数。
+# 本次提交自身的序号与编译期脚本在提交后算出的值一致。
 #
 # 由 scripts/Install-GitHooks.ps1 安装到 .git/hooks/prepare-commit-msg。
 
@@ -30,14 +33,24 @@ fi
 
 ANCHOR=85c17f13003322a4025e09379bb1ed2d852ea63c
 if git rev-parse --verify --quiet "$ANCHOR^{commit}" > /dev/null 2>&1; then
-    COUNT=$(git rev-list --count "$ANCHOR..HEAD" 2>/dev/null || echo 0)
+    BASECOUNT=$(git rev-list --count "$ANCHOR..HEAD" 2>/dev/null || echo 0)
+    # 本次提交自身的序号
+    COUNT=$((BASECOUNT + 1))
 else
-    # 浅克隆取不到锚点时退化，与脚本保持同一行为
-    COUNT=$(git rev-list --count HEAD 2>/dev/null || echo 0)
+    # 独立新仓库：读取本线继承基数，与脚本的 root+base 分支保持一致
+    TOP=$(git rev-parse --show-toplevel 2>/dev/null)
+    BASE=0
+    if [ -n "$TOP" ] && [ -f "$TOP/scripts/build-number.base" ]; then
+        RAW=$(tr -d '[:space:]' < "$TOP/scripts/build-number.base")
+        case "$RAW" in
+            ''|*[!0-9]*) BASE=0 ;;
+            *) BASE=$RAW ;;
+        esac
+    fi
+    ROOTCOUNT=$(git rev-list --count HEAD 2>/dev/null || echo 0)
+    COUNT=$((BASE + ROOTCOUNT))
 fi
 
-# 本次提交自身的序号
-COUNT=$((COUNT + 1))
 MAJOR=$((COUNT / 100))
 MINOR=$((COUNT % 100))
 SMALL=$(printf '%d.%02d' "$MAJOR" "$MINOR")

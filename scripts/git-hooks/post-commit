@@ -9,8 +9,11 @@
 #   没有它，提交后第一次在 IDE 里直接编译会沿用上一次的编号（目录名少一版）。
 #
 # 这里用纯 sh 计算而不是调用 PowerShell：钩子每次提交都跑，PowerShell 启动开销
-# 与 sh 相差一个数量级；且算法只有三行，与 Get-BuildSmallVersion.ps1 完全同源
-# （固定锚点 + 提交数 × 0.01 + 满百进位），不会漂。
+# 与 sh 相差一个数量级；且算法与 Get-BuildSmallVersion.ps1 完全同源，不会漂。
+# 2026-11-08 三仓库架构裁决后，固定锚点 85c17f13 在新历史里不可达，
+# 退化分支改用 scripts/build-number.base 的继承基数（Windows 65 / Linux 71 / Android 60）：
+#   编号 = base + max(0, rev-list --count HEAD - 1)
+# 与 prepare-commit-msg 追加到本次提交信息里的编号一致。
 #
 # 由 scripts/Install-GitHooks.ps1 安装到 .git/hooks/post-commit。
 
@@ -21,8 +24,19 @@ ANCHOR=85c17f13003322a4025e09379bb1ed2d852ea63c
 if git rev-parse --verify --quiet "$ANCHOR^{commit}" > /dev/null 2>&1; then
     COUNT=$(git rev-list --count "$ANCHOR..HEAD" 2>/dev/null || echo 0)
 else
-    # 浅克隆取不到锚点时退化，与脚本保持同一行为
-    COUNT=$(git rev-list --count HEAD 2>/dev/null || echo 0)
+    BASE=0
+    if [ -f "$REPO_ROOT/scripts/build-number.base" ]; then
+        RAW=$(tr -d '[:space:]' < "$REPO_ROOT/scripts/build-number.base")
+        case "$RAW" in
+            ''|*[!0-9]*) BASE=0 ;;
+            *) BASE=$RAW ;;
+        esac
+    fi
+    ROOTCOUNT=$(git rev-list --count HEAD 2>/dev/null || echo 0)
+    if [ "$ROOTCOUNT" -gt 0 ]; then
+        ROOTCOUNT=$((ROOTCOUNT - 1))
+    fi
+    COUNT=$((BASE + ROOTCOUNT))
 fi
 
 MAJOR=$((COUNT / 100))

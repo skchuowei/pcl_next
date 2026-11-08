@@ -53,9 +53,16 @@ public enum InstallStepKind
 
 /// <summary>
 /// 合并安装顶层步骤的只读投影：仅携带编排所需的纯数据，不含任何执行逻辑。
+/// <para>
+/// 口径 A 裁决后，每个步骤还挂一份 <see cref="InstallTaskDescriptor"/> 装配规格。
+/// 装配规格由 <see cref="InstallPlan.AttachDescriptors"/> 在 <c>Build</c> 末尾统一附加，
+/// 这样本构造函数与 dev.6 已有的 VB 调用方零改动。
+/// </para>
 /// </summary>
 public sealed class InstallPlanStep
 {
+    private InstallTaskDescriptor? _task;
+
     /// <summary>步骤种类，VB 侧据此分派构造对应的 <c>LoaderBase</c>。</summary>
     public InstallStepKind Kind { get; }
 
@@ -71,6 +78,34 @@ public sealed class InstallPlanStep
     /// <summary>该步骤是否显示在加载列表里。</summary>
     public bool Show { get; }
 
+    /// <summary>该步骤的装配规格（加载器种类、槽位、子步骤、下载类别、取消与进度语义）。</summary>
+    public InstallTaskDescriptor Task
+        => _task ??= InstallTaskDescriptors.Create(Kind, Name, ProgressWeight, Block, Show);
+
+    /// <summary>执行该步骤所需的宿主资产名。</summary>
+    public IReadOnlyList<string> Inputs => Task.Inputs;
+
+    /// <summary>该步骤产出的宿主资产名。</summary>
+    public IReadOnlyList<string> Outputs => Task.Outputs;
+
+    /// <summary>复合体内部的子加载器骨架。</summary>
+    public IReadOnlyList<InstallTaskDescriptor> SubSteps => Task.SubSteps;
+
+    /// <summary>该步骤涉及的下载文件类别。</summary>
+    public IReadOnlyList<NetFileDescriptorKind> DownloadKinds => Task.DownloadKinds;
+
+    /// <summary>要构造的加载器种类。</summary>
+    public InstallLoaderKind LoaderKind => Task.LoaderKind;
+
+    /// <summary>取消语义。</summary>
+    public InstallCancelSemantics Cancel => Task.Cancel;
+
+    /// <summary>执行 lambda 是否自行设置 <c>Task.Progress</c>。</summary>
+    public bool ReportsProgress => Task.ReportsProgress;
+
+    /// <summary>子列表仍由宿主 VB 函数提供时登记的函数名。</summary>
+    public string? SubStepsSource => Task.SubStepsSource;
+
     public InstallPlanStep(InstallStepKind kind, string name, double progressWeight, bool block, bool show)
     {
         Kind = kind;
@@ -79,6 +114,10 @@ public sealed class InstallPlanStep
         Block = block;
         Show = show;
     }
+
+    /// <summary>由 <see cref="InstallPlan.AttachDescriptors"/> 调用，注入带请求上下文的装配规格。</summary>
+    internal void Attach(InstallTaskDescriptor task)
+        => _task = task ?? throw new ArgumentNullException(nameof(task));
 }
 
 /// <summary>
@@ -135,6 +174,14 @@ public sealed class InstallPlanRequest
 
     /// <summary>本次安装是否为「中间产物输出」（影响是否删除忽略标识）。</summary>
     public bool IsIntermediateOutput { get; set; }
+
+    /// <summary>
+    /// 调用方是否已提供原版版本 json 地址（<c>Request.MinecraftJson</c> 非 <c>Nothing</c>）。
+    /// 为 false 时 VB <c>McDownloadClientLoader</c> 会额外插入「获取原版 json 文件下载地址」任务，
+    /// 因此会影响 <see cref="InstallTaskDescriptor.SubSteps"/> 的骨架，但不影响顶层步骤决策。
+    /// P4-B 接线时须由 VB 显式传入；默认 false 与当前 VB 调用最保守的形态一致。
+    /// </summary>
+    public bool HasMinecraftJson { get; set; }
 }
 
 /// <summary>
@@ -154,6 +201,23 @@ public sealed class InstallPlan
     public InstallPlan(IReadOnlyList<InstallPlanStep> steps)
     {
         Steps = steps;
+    }
+
+    /// <summary>
+    /// 为每个步骤注入带请求上下文的装配规格（口径 A 的跨语言契约）。
+    /// <para>
+    /// 只有 <c>OptiFine</c> 的分流与 <c>Client</c> 的可选子步骤依赖请求，
+    /// 顺序 / 权重 / Block / Show 全部照抄步骤本身，不在这里重算。
+    /// </para>
+    /// </summary>
+    public void AttachDescriptors(InstallPlanRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        foreach (var step in Steps)
+        {
+            step.Attach(InstallTaskDescriptors.Create(
+                step.Kind, step.Name, step.ProgressWeight, step.Block, step.Show, request));
+        }
     }
 
     /// <summary>
@@ -259,6 +323,8 @@ public static class InstallPlanner
             steps.Add(new InstallPlanStep(InstallStepKind.RemoveIgnoreMarker, "删除忽略标识", 1, block: true, show: false));
         }
 
-        return new InstallPlan(steps);
+        var plan = new InstallPlan(steps);
+        plan.AttachDescriptors(request);
+        return plan;
     }
 }
