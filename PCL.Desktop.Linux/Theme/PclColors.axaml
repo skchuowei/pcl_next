@@ -18,6 +18,15 @@
     <SolidColorBrush x:Key="ColorBrushBg0" Color="#96c0f9" />
     <SolidColorBrush x:Key="ColorBrushBg1" Color="#bee0eafd" />
 
+    <!--
+      主题色对象（`Color` 类型，`Application.xaml` L31–L35），供渐变直接取色；
+      运行期真实值由 `ModSecret.vb` 的 `ThemeRefresh` 按 HSL 重算（登记 R16 / R17）。
+    -->
+    <Color x:Key="ColorObject1">#343d4a</Color>
+    <Color x:Key="ColorObject2">#0b5bcb</Color>
+    <Color x:Key="ColorObject3">#1370f3</Color>
+    <Color x:Key="ColorObject4">#4890f5</Color>
+
     <!-- 灰阶 -->
     <SolidColorBrush x:Key="ColorBrushGray1" Color="#404040" />
     <SolidColorBrush x:Key="ColorBrushGray2" Color="#737373" />

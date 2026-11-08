@@ -636,4 +636,39 @@
         <Setter Property="RenderTransform" Value="scale(0.8)" />
     </Style>
 
+    <!-- ===== MyRadioButton（1:1 对齐 MyRadioButton.xaml；状态色照抄 .xaml.vb L233–L254 的 ColorState.White 分支） ===== -->
+    <Style Selector="c|MyRadioButton">
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Foreground" Value="{DynamicResource ColorBrushWhite}" />
+        <Setter Property="Background" Value="{DynamicResource ColorBrushSemiTransparent}" />
+        <Setter Property="Template">
+            <ControlTemplate>
+                <Border Name="PART_PanBack" Background="{TemplateBinding Background}" CornerRadius="13.5"
+                        MinHeight="27" MaxHeight="27" HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal">
+                        <Path Name="PART_Path" Margin="12,0,0,0" Stretch="Uniform" MaxHeight="16" MaxWidth="16"
+                              VerticalAlignment="Center" Fill="{TemplateBinding Foreground}"
+                              RenderTransformOrigin="0.5,0.5" />
+                        <TextBlock Name="PART_Text" VerticalAlignment="Center" Margin="8,0,12,0" FontSize="13"
+                                   Foreground="{TemplateBinding Foreground}" Text="{TemplateBinding Text}" />
+                    </StackPanel>
+                </Border>
+            </ControlTemplate>
+        </Setter>
+    </Style>
+
+    <Style Selector="c|MyRadioButton:pointerover">
+        <Setter Property="Background" Value="#32eaf2fe" />
+    </Style>
+
+    <Style Selector="c|MyRadioButton:pressed">
+        <Setter Property="Background" Value="#78eaf2fe" />
+    </Style>
+
+    <!-- 选中态写在悬停/按下之后：同优先级下后写的样式生效（白底 + ColorBrush3 字/图标） -->
+    <Style Selector="c|MyRadioButton:checked">
+        <Setter Property="Background" Value="{DynamicResource ColorBrushWhite}" />
+        <Setter Property="Foreground" Value="{DynamicResource ColorBrush3}" />
+    </Style>
+
 </Styles>

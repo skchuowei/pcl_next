@@ -497,6 +497,7 @@ public class MyIconButton : TemplatedControl
         base.OnPropertyChanged(change);
 
         if (change.Property == LogoProperty) SyncLogo();
+        if (change.Property == LogoScaleProperty) SyncLogo();
         if (change.Property == IconThemeProperty)
         {
             Foreground = IconTheme switch
@@ -521,6 +522,9 @@ public class MyIconButton : TemplatedControl
     {
         if (_path is null) return;
         _path.Data = string.IsNullOrWhiteSpace(Logo) ? null : Geometry.Parse(Logo);
+        // 对照 MyIconButton.xaml.vb：Logo 上挂 ScaleTransform，缩放中心 0.5,0.5（模板 Margin 5、Stretch Uniform）
+        _path.RenderTransformOrigin = new RelativePoint(0.5, 0.5, RelativeUnit.Relative);
+        _path.RenderTransform = new ScaleTransform(LogoScale, LogoScale);
     }
 
     protected override void OnPointerPressed(PointerPressedEventArgs e)
@@ -538,5 +542,111 @@ public class MyIconButton : TemplatedControl
         if (!IsEnabled || !CanClick) return;
         if (e.InitialPressMouseButton != MouseButton.Left) return;
         Click?.Invoke(this, EventArgs.Empty);
+    }
+}
+
+/// <summary>
+/// 单选按钮，1:1 对齐 `pcl-next/Controls/MyRadioButton.xaml(.vb)`：
+/// 圆角 13.5、`MinHeight/MaxHeight 27`、常态底 `ColorBrushSemiTransparent`；图标上限 16（`Margin 12,0,0,0`）、
+/// 文案 `Margin 8,0,12,0`，白字白图标；选中 → 白底 + `ColorBrush3`；悬停 → 50 alpha `Color8` 底；
+/// 按下 → 120 alpha `Color8` 底（WPF 的 90/120/150ms 颜色过渡改为即时切换，并入 R10）。
+/// 同父容器内互斥语义照抄原 `SetChecked`：自己选中时取消同层其他按钮。
+/// `ColorState.Highlight` 分支当前无调用点，未接入（用到时按原 vb L200–L225 补）。
+/// </summary>
+public class MyRadioButton : TemplatedControl
+{
+    public static readonly StyledProperty<string?> TextProperty =
+        AvaloniaProperty.Register<MyRadioButton, string?>(nameof(Text));
+
+    public static readonly StyledProperty<string?> LogoProperty =
+        AvaloniaProperty.Register<MyRadioButton, string?>(nameof(Logo));
+
+    public static readonly StyledProperty<double> LogoScaleProperty =
+        AvaloniaProperty.Register<MyRadioButton, double>(nameof(LogoScale), 1d);
+
+    public static readonly StyledProperty<bool> CheckedProperty =
+        AvaloniaProperty.Register<MyRadioButton, bool>(nameof(Checked));
+
+    public string? Text
+    {
+        get => GetValue(TextProperty);
+        set => SetValue(TextProperty, value);
+    }
+
+    public string? Logo
+    {
+        get => GetValue(LogoProperty);
+        set => SetValue(LogoProperty, value);
+    }
+
+    public double LogoScale
+    {
+        get => GetValue(LogoScaleProperty);
+        set => SetValue(LogoScaleProperty, value);
+    }
+
+    public bool Checked
+    {
+        get => GetValue(CheckedProperty);
+        set => SetValue(CheckedProperty, value);
+    }
+
+    /// <summary>参数为勾选后的状态（对应原 `Check(raiseByMouse)` 的勾选态）。</summary>
+    public event EventHandler<bool>? Check;
+
+    private Avalonia.Controls.Shapes.Path? _path;
+    private bool _syncing;
+
+    protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
+    {
+        base.OnPropertyChanged(change);
+
+        if (change.Property == LogoProperty || change.Property == LogoScaleProperty) SyncLogo();
+        if (change.Property == CheckedProperty) OnCheckedChanged();
+    }
+
+    protected override void OnApplyTemplate(TemplateAppliedEventArgs e)
+    {
+        base.OnApplyTemplate(e);
+        _path = e.NameScope.Find<Avalonia.Controls.Shapes.Path>("PART_Path");
+        SyncLogo();
+        PseudoClasses.Set(":checked", Checked);
+    }
+
+    private void SyncLogo()
+    {
+        if (_path is null) return;
+        _path.Data = string.IsNullOrWhiteSpace(Logo) ? null : Geometry.Parse(Logo);
+        _path.RenderTransformOrigin = new RelativePoint(0.5, 0.5, RelativeUnit.Relative);
+        _path.RenderTransform = new ScaleTransform(LogoScale, LogoScale);
+    }
+
+    private void OnCheckedChanged()
+    {
+        PseudoClasses.Set(":checked", Checked);
+        if (Checked && !_syncing) UncheckSiblings();
+        Check?.Invoke(this, Checked);
+    }
+
+    private void UncheckSiblings()
+    {
+        if (Parent is not Panel panel) return;
+        foreach (var sibling in panel.Children)
+        {
+            if (sibling is MyRadioButton radio && !ReferenceEquals(radio, this) && radio.Checked)
+            {
+                radio._syncing = true;
+                radio.Checked = false;
+                radio._syncing = false;
+            }
+        }
+    }
+
+    protected override void OnPointerReleased(PointerReleasedEventArgs e)
+    {
+        base.OnPointerReleased(e);
+        if (!IsEnabled) return;
+        if (e.InitialPressMouseButton != MouseButton.Left) return;
+        if (!Checked) Checked = true;
     }
 }
