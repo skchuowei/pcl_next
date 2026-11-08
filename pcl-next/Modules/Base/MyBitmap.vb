@@ -60,7 +60,16 @@ Public Class MyBitmap
     End Sub
     Public Sub New(FilePathOrResourceName As String)
         Try
-            FilePathOrResourceName = FilePathOrResourceName.Replace("pack://application:,,,/images/", PathImage)
+            '兼容旧版 PCL（Plain Craft Launcher 2）保存在实例配置里的 Logo URI：
+            '程序集名已改为 pcl-next，旧的 "...;component/Images/..." 不会被下面的小写替换命中，
+            '会一路落到 FileUtils.ReadAsStream 被当成磁盘路径，抛 DirectoryNotFoundException。
+            Const ComponentImages As String = ";component/Images/"
+            Dim ComponentIndex = FilePathOrResourceName.IndexOf(ComponentImages, StringComparison.OrdinalIgnoreCase)
+            If ComponentIndex >= 0 AndAlso FilePathOrResourceName.StartsWithF("pack://application:,,,/", True) Then
+                FilePathOrResourceName = PathImage & FilePathOrResourceName.Substring(ComponentIndex + ComponentImages.Length)
+            Else
+                FilePathOrResourceName = FilePathOrResourceName.Replace("pack://application:,,,/images/", PathImage)
+            End If
             If FilePathOrResourceName.StartsWithF(PathImage) Then
                 '使用缓存
                 Static Cache As New Concurrent.ConcurrentDictionary(Of String, MyBitmap)

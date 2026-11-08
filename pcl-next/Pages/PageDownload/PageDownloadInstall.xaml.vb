@@ -1066,6 +1066,8 @@
             If SelectedOptiFine Is Nothing Then Return "需要安装 OptiFine"
             Return "获取中……"
         End If
+        '未配置 API Key 时列表被主动跳过（空列表），应明示原因而非显示「无」或反复报 403。
+        If Not ResourceSourceGate.CurseForgeAvailable Then Return "需要配置 CurseForge API Key"
         For Each Version In DlOptiFabricLoader.Output
             If Not IsOptiFabricCompatible(Version, VanillaName) Then Continue For '2135#
             If SelectedFabric Is Nothing AndAlso SelectedOptiFine Is Nothing Then Return "需要安装 OptiFine 与 Fabric"

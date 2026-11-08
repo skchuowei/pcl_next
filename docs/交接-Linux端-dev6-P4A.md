@@ -216,6 +216,24 @@ P4-A 提交之后，Windows 线另修了一个与编排 DTO 无关的真机缺�
 
 ---
 
+## 9.2 后续 Windows 增量 ②：0.72 真机日志四类修复（供 Linux 侧自行移植）
+
+P4-A 与 NeoForge 修复之后，Windows 线又根据 0.72 测试版真机日志修了四个互不相关的问题，
+详见 `PCL_NEXT_Windows/docs/经验与踩坑.md` ⑤。**不属于 P4-A 的 5 文件移植范围**，
+且三线起点相同，Linux / Android 目前**仍未修复**：
+
+| 症状 | 根因 | Windows 改动 | Linux 待办 |
+|---|---|---|---|
+| 每次启动弹「未找到设置项 `SystemPendingUpdateLogFrom`」，连带跳过加载池 | `FormMain.xaml.vb` 三处读写，但设置表未注册 | `pcl-next/Pages/PageSetup/Settings.vb` 加注册项 | 同样补注册；注意 VB 集合初始化器元素间不能插注释行 |
+| Fabric API / 资源详情页版本列表只剩 1 条、安装页显示「无」 | Modrinth 版本 `Id` 误取 `project_id`，`DistinctBy` 把整份列表压成 1 条 | `PCL.Download/ResourceVersion.cs` 改 `id` 优先 + 测试契约修正 + 守门用例 | 移植 C# 一行与 `PCL.Download.Tests/ResourceVersionTests.cs` 对应改动 |
+| OptiFabric List Loader 反复 403 | 无 `PCL_CURSEFORGE_API_KEY` 时仍按 CF 项目 ID 直查；Modrinth 无 `optifabric` 项目（实测 404） | `ModDownload.vb` 跳过请求、`PageDownloadInstall.xaml.vb` 明示提示 | 同样处理，或按 Linux 自己的源策略裁决 |
+| 版本图标 `DirectoryNotFoundException` | 旧实例配置里的 `Plain Craft Launcher 2;component/Images/...` URI 与新程序集名不匹配 | `MyBitmap.vb` 归一化 `;component/Images/` | 同样处理（若 Linux 侧读了旧实例配置） |
+
+验证口径（Windows 实测）：`dotnet test` 568/568；变异反证把 `Id` 改回旧口径时新守门用例变红；
+项目级入口构建 0 错误。Linux 侧移植后需按本仓库的 RID / 构建号体系自行回归。
+
+---
+
 ## 10. 依据文件索引
 
 | 文件 | 用途 |

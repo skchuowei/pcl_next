@@ -186,7 +186,10 @@ public class ResourceVersion
         {
             //Modrinth
             //简单信息
-            result.Id = data["project_id"].AsString() ?? data["id"].AsString() ?? ""; //两个 API 会返回的 key 不一样
+            // id 是「版本」的唯一 ID；project_id 是「项目」ID，同一项目下所有版本都相同。
+            // 早期实现让 project_id 优先，会使 FromProjectId 的 DistinctBy(Id) 把整份版本列表压成 1 条
+            // （实测症状：Fabric API 列表加载成功但 UI 显示「无」）。与 VB 原实现 .Id = Data("id") 对齐。
+            result.Id = data["id"].AsString() ?? data["project_id"].AsString() ?? "";
             result.Display = (data["name"].AsString() ?? "").Replace("\t", "").Trim(' ');
             result.Version = data["version_number"].AsString();
             result.ReleaseDate = data["date_published"].AsDate();

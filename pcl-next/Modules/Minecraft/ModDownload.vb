@@ -803,7 +803,17 @@ Public Module ModDownload
     ''' OptiFabric 列表，官方源。
     ''' </summary>
     Public DlOptiFabricLoader As New LoaderTask(Of Integer, List(Of ResourceVersion))("OptiFabric List Loader",
-        Sub(Task As LoaderTask(Of Integer, List(Of ResourceVersion))) Task.Output = ResourceVersion.FromProjectId("322385", ResourcePlatforms.CurseForge, LoadDependencies:=False))
+        Sub(Task As LoaderTask(Of Integer, List(Of ResourceVersion)))
+            'OptiFabric 只存在于 CurseForge（Modrinth 上无此项目，实测 404）。
+            '未配置 PCL_CURSEFORGE_API_KEY 时直连官方源必然 403，按 ResourceSourceGate 的降级口径
+            '直接跳过请求、返回空列表，由 LoadOptiFabricGetError 给出明确提示，避免反复报错刷屏。
+            If Not ResourceSourceGate.CurseForgeAvailable Then
+                Task.Output = New List(Of ResourceVersion)()
+                Logger.Info("未配置 CurseForge API Key，跳过 OptiFabric 列表加载（OptiFabric 仅存在于 CurseForge）")
+                Return
+            End If
+            Task.Output = ResourceVersion.FromProjectId("322385", ResourcePlatforms.CurseForge, LoadDependencies:=False)
+        End Sub)
 #End Region
 
 #Region "DlMod | Mod 镜像源请求"

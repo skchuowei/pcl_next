@@ -142,6 +142,7 @@ public class ResourceVersionTests
 
     private const string MrVersionJson = """
     {
+      "id": "V1",
       "project_id": "P7dR8mSHX",
       "name": "Cool Mod (Fabric)",
       "version_number": "2.0.1",
@@ -164,7 +165,7 @@ public class ResourceVersionTests
     public void FromPlatformJson_Modrinth_字段解析与VB语义一致()
     {
         var v = Parse(MrVersionJson);
-        Assert.Equal("P7dR8mSHX", v.Id); //project_id 优先于 id
+        Assert.Equal("V1", v.Id); //版本 ID 优先；project_id 只是项目 ID，不能拿来标识版本
         Assert.Equal("Cool Mod (Fabric)", v.Display);
         Assert.Equal("2.0.1", v.Version);
         Assert.Equal(ResourceVersion.ReleaseTypes.Beta, v.ReleaseType);
@@ -422,10 +423,38 @@ public class ResourceVersionTests
               "downloads": 1, "icon_url": "", "game_versions": ["1.20.1"], "loaders": ["fabric"], "categories": ["utility"] }
             """);
         api.Map(u => u.Contains("/version", StringComparison.Ordinal),
-            _ => JsonNode.Parse("[ " + MrVersionJson.Replace("\"project_id\": \"P7dR8mSHX\"", "\"id\": \"V1\"") + " ]")!);
+            _ => JsonNode.Parse("[ " + MrVersionJson + " ]")!);
         var versions = ResourceVersion.FromProjectId("P1", ResourcePlatforms.Modrinth, loadDependencies: false, api: api);
         Assert.Single(versions);
         Assert.Equal("V1", versions[0].Id);
+    }
+
+    /// <summary>
+    /// 回归守门：Modrinth 同一项目的所有版本 project_id 相同，若把 project_id 当作版本 ID，
+    /// FromProjectId 的 DistinctBy(Id) 会把整份列表压成 1 条——真实症状是
+    /// 「Fabric API 列表加载成功，但 26.3 界面显示『无』」（0.72 实测）。
+    /// </summary>
+    [Fact]
+    public void FromProjectId_Modrinth_同项目多版本不会被去重压成一条()
+    {
+        var api = new FakeResourceApi();
+        api.MapJsonExact("https://api.modrinth.com/v2/project/fabric-api",
+            """
+            { "id": "P7dR8mSH", "slug": "fabric-api", "title": "Fabric API", "description": "", "project_type": "mod",
+              "downloads": 1, "icon_url": "", "game_versions": ["26.3"], "loaders": ["fabric"], "categories": [] }
+            """);
+        var second = MrVersionJson
+            .Replace("\"id\": \"V1\"", "\"id\": \"V2\"")
+            .Replace("\"name\": \"Cool Mod (Fabric)\"", "\"name\": \"[26.3] Fabric API 0.165.2+26.3\"")
+            .Replace("\"version_number\": \"2.0.1\"", "\"version_number\": \"0.165.2+26.3\"");
+        api.Map(u => u.Contains("/version", StringComparison.Ordinal),
+            _ => JsonNode.Parse("[ " + MrVersionJson + ", " + second + " ]")!);
+
+        var versions = ResourceVersion.FromProjectId("fabric-api", ResourcePlatforms.Modrinth, loadDependencies: false, api: api);
+
+        Assert.Equal(2, versions.Count);
+        Assert.Equal(["V1", "V2"], versions.Select(v => v.Id).OrderBy(x => x, StringComparer.Ordinal).ToArray());
+        Assert.Contains(versions, v => v.Display.StartsWith("[26.3]", StringComparison.Ordinal));
     }
 
     [Fact]
