@@ -22,6 +22,7 @@
 | D5 | **后端** | `PCL.Download`（`net10.0`、纯 BCL）为唯一数据源，UI 不重抄下载/安装业务 | 内核已可 `linux-x64` 编译并跑 `selftest offline` |
 | D6 | **字族** | Windows 写死的 `PCL English / Microsoft YaHei UI` 在 Linux 换成可用字族并做 CJK 回退；属渲染层差异，**不得**因此降低布局还原度 | 用户明确要求登记 |
 | D7 | **共享库** | 本轮不建「中立/跨平台共享 UI 库」；`PCL.Desktop.Linux` 内的组件只服务于本平台 | 与 D1 配套 |
+| D8 | **主题基线** | **自绘优先，Fluent 只做兜底**：Windows 端 `OverridesDefaultStyle=True` + 自定义 `Template` 的控件类型，Linux 侧一律提供自绘 `ControlTheme`（显式 `Theme` 绑定、禁止引用 Fluent 资源键）；FluentTheme 保留但仅服务尚未移植的控件，可见差别须逐条登记。详见 §2.2 | 用户 2026-11-08 指示「开外壳前先解决系统性风险」；R13 已证明靠 Fluent 无法 1:1 |
 
 ---
 
@@ -102,10 +103,72 @@
 | **R10** | 动画引擎：WPF 自研 `Ani` 逐帧驱动 → Avalonia `Transitions` / `Animation` 近似 | 缓动曲线、逐帧节奏 | 时长数值照抄（勾选 150ms、悬停 100ms 进 / 200ms 出、按压 100ms）；`MyLoading` 镐子摆动改为 ±20°、1.4s 无限往返 |
 | **R11** | `MyHint` 关闭：Linux 暂无 `Settings`，关闭只隐藏；未做 200ms 缩放/淡出 + 150ms 收高，也未做「不再提示」记忆 | 关闭动画与持久化 | 关闭前后两种静态布局不变；`CanClose` 按钮尺寸 20×20 与 ToolTip 文案保留 |
 | **R12** | `MyIconButton` 主题色映射：WPF 源码散落在动画分支中，本轮取 `Color→#1370f3` / `White→白` / `Black→#343d4a` / `Red→#ff4c4c` | 图标颜色 | 图标尺寸（`Margin 5`、`Stretch Uniform`）、圆角 1000、按下 0.8 缩放不变 |
-| **R13** | ~~运行期缺陷：`MyComboBox` 在 WSLg 下未渲染~~ **已修（2026-11-08）**。根因：`MyComboBox : ComboBox` 未覆写 `StyleKeyOverride`，Avalonia Fluent 的 ControlTheme 按派生类型查不到 → 无 `Template` → 控件不渲染；Windows 端 `MyComboBox.vb` 同样**没有自定义模板**（纯继承 + 属性/动画改造），故正确修法是回到基类主题键，而非自写模板 | 不视为允许差异（属缺陷，已修复） | 收起态可见性（边框/选中文案/箭头）与 Fluent 弹出层细节仍需统一验收目视确认（R6 保留） |
+| **R13** | 运行期缺陷：`MyComboBox` 在 WSLg 下**未渲染**（收起态无边框、无选中文案、无箭头），编译期无报错。**根因已查明**：`MyComboBox : ComboBox` 未覆写 `StyleKeyOverride`，Avalonia Fluent 的 ControlTheme 按派生类型查不到 → 无 `Template` → 控件不渲染。**已修（2026-11-08）**，分两步：① 补 `StyleKeyOverride => typeof(ComboBox)` 让控件先可见；② 按本计划 §2.2 主题基线，改为**自绘 `ControlTheme`**（照抄 `pcl-next/Application.xaml` L336–L469 的 ComboBox / ToggleButton / ComboBoxItem 三个模板），不再依赖 Fluent 默认绘制。~~「Windows 端 `MyComboBox.vb` 同样没有自定义模板（纯继承 + 属性/动画改造）」~~ **此论断错误（2026-11-08 复核更正）**：Windows 端模板不在 `Controls/MyComboBox.xaml`（该文件确实不存在），而是写在 `pcl-next/Application.xaml` L336–L405 的 `Style TargetType="local:MyComboBox"`（`OverridesDefaultStyle=True` + 普通态/`IsEditable` 两套 `ControlTemplate`）；`MyComboBox.vb` 只负责 `RefreshColor` 配色与弹出层宽度/透明度。 | 不视为允许差异（属缺陷，已修复） | 收起态可见性与弹出层外观仍需统一验收目视确认（V1；`HasItems=false → 高 26` 等边角触发器暂未复刻，并入 R6） |
 | **R14** | ~~窗口/页面底色为纯白~~ **已修（2026-11-08）**：宿主窗口底色改为 `ColorBrush1` `#343d4a`，与 Windows 端窗口底色一致，`MyCard` 的 `#F5FFFFFF` 卡底与 `0 0 6 #12343d4a` 阴影因此可见 | **照抄**，不是允许差异：色值取自 Windows 端 `ColorBrush1`，未做任何近似。实现方式上的差别仅在于 Windows `Window` 本身是 `AllowsTransparency=True` + `Background={x:Null}`（底色由内容层提供），Linux 直接铺在 `Window` 根层——视觉结果一致 | 卡片圆角 5、`Margin -3,-4,-3,-3`、标题 15,12 等尺寸不得改 |
 
 ---
+
+### 2.2 主题基线（D8，2026-11-08 定案）
+
+**为什么必须在铺外壳之前定**：R13 暴露了一个系统性风险——Avalonia 的 Fluent 默认外观（`ComboBox` 弹出层、悬停高亮、圆角、焦点环、
+`ScrollBar` 浮层、阴影）与 WPF 端「逐个控件 `OverridesDefaultStyle=True` + 自写 `Template`」的做法差别很大。
+只要还依赖 Fluent 的默认 ControlTheme，就**不可能** 1:1；届时几十页按错误基线铺完再统一返工，代价远大于先补模板。
+
+**基线结论：自绘优先，Fluent 只做兜底。**
+
+1. Windows 端凡 `OverridesDefaultStyle=True` + 自定义 `Template` 的控件类型（下表），Linux 侧**必须**提供自己的
+   `ControlTheme`，放 `PCL.Desktop.Linux/Theme/PclControls.axaml` 的 `<Styles.Resources>` 内；模板结构、部件名、
+   尺寸、色值、状态与时序逐项照抄原 xaml。
+2. **显式绑定主题**：派生控件用 `<Style Selector="c|MyX"><Setter Property="Theme" Value="{StaticResource MyXTheme}"/>`
+   指定主题，不依赖主题查找顺序；`StyleKeyOverride` 保留作安全网（控件拿不到主题时不至于完全不渲染）。
+3. 自绘模板内**禁止**引用任何 Fluent 资源键（如 `ComboBoxBackground`、`OverlayCornerRadius`），只用
+   `Theme/PclColors.axaml` 的 25 个色值与自绘常量。
+4. `FluentTheme` **保留**在 `Application.Styles`：删掉会让尚未移植的控件直接没有主题、整页空白。它只服务
+   「尚未开工」的控件；某控件一旦开工，就切到自绘 `ControlTheme`，不允许「先靠 Fluent 凑合」。
+5. 可见差别**只允许出现在沿用 Fluent 的控件上**，且必须逐条登记（R6 / R15 …），不得出现在已自绘控件上。
+
+**Windows 端 `OverridesDefaultStyle=True` 清单（`pcl-next/Application.xaml`，13 处）**
+
+| # | 类型 | 行号 | Linux 处置 |
+|---|---|---|---|
+| 1 | `Window`（`MyWindow`） | 69–78 | 自绘（外壳 LU3，含标题栏/缩放 R2） |
+| 2 | `Label` | 81–98 | 无 Avalonia `Label`，用 `TextBlock` 等价 |
+| 3 | `MyTextButton` | 99–117 | 用 `TextBlock` / `Button` 自绘等价 |
+| 4 | `TextBlock`（默认 + `BasedOnTextBlock`） | 120–133 | 全局 `Style`（字号 13 / `ColorBrush1` / 省略号 / 字族）✅ 已落 |
+| 5 | `MyScrollBar` | 148–181 | **自绘**：宽 8、圆角 2、`ColorBrushSemiTransparent` 底 + 前景色拇指（圆角 3 / `Margin 2`）、仅鼠标悬停可拖 |
+| 6 | `MyScrollViewer` | 182–197 | **自绘**：无横向、右置 8px 竖条 |
+| 7 | `ScrollViewer`（`ScrollViewerFullMargin` / `ScrollViewerNoMargin`） | 199–238 | 同上，两个变体按 `Padding` 差异区分 |
+| 8 | `MyTextBox` | 241–324 | **自绘**（现有为精简等价模板，需按原模板补全） |
+| 9 | `MyComboBox` | 336–405 | **自绘** ✅ 本轮已落 |
+| 10 | `ToggleButton`（ComboBox 箭头） | 406–446 | **自绘** ✅ 本轮已落（15px V 形、0.2s 旋转 180°） |
+| 11 | `ComboBoxItem`（`MyComboBoxItem` + 默认） | 447–469 | **自绘** ✅ 本轮已落（`Padding 6,4`、无高亮） |
+| 12 | `ContextMenu` | 475–494 | **自绘**（白底、`ColorBrush1` 1px 边框、圆角 3、`DropShadowEffect 0.4/4/2`） |
+| 13 | `MenuItem`（`MyMenuItem`） | 495 起 | **自绘**（高 26、图标列 `SharedSizeGroup`、`ColorBrush1`） |
+
+另有 `Controls/*.xaml` 自带模板的 10 个控件（`MyButton` / `MyCheckBox` / `MyExtraButton` / `MyExtraTextButton` /
+`MyHint` / `MyIconButton` / `MyIconTextButton` / `MyListItem` / `MyLoading` / `MyRadioBox` / `MyRadioButton` /
+`MySearchBox` / `MySlider` / `MySliderDot`），一律自绘；其中 `MySlider(Dot)` / `MySearchBox` / `MyRadioBox*` 尚未落地。
+
+**沿用 Fluent 的控件与可见差别登记**
+
+| 控件 | 现状 | 与 Windows 端的可见差别 | 落地时机 |
+|---|---|---|---|
+| `Slider`（Fluent） | 未自绘 | 轨道高度、滑块形状、悬停范围 | 对应设置页开工前自绘 |
+| `ToolTip` | 未自绘 | 圆角、阴影、内边距 | 外壳阶段自绘 |
+| `ContextMenu` / `MenuItem` | 未自绘 | 弹层阴影、高亮条 | 首个右键菜单页面开工前自绘 |
+| `ProgressBar` | 未自绘 | 高度、圆角、动画 | 下载区开工前自绘 |
+| `Popup`（容器本身） | Avalonia 内建 | 无可见绘制，仅承载 | 沿用，不登记 |
+| `TextBox` 的 IME 候选窗 | 平台/输入法 | 位置与样式 | 登记 R6（不在自绘范围） |
+
+**代价对比（为什么不用另一条路线）**
+
+| 方案 | 做法 | 代价 | 结论 |
+|---|---|---|---|
+| **A. 自绘优先（采纳）** | 逐控件提供 `ControlTheme`，照抄 Windows 模板 | 一次性写 6–8 个完整模板（`ComboBox`/`ComboBoxItem+ToggleButton`/`ScrollBar`/`ScrollViewer`/`TextBox`/`Slider`/`ToolTip`/`ProgressBar`），其中 `ComboBox`、`ScrollBar+ScrollViewer` 最重 | 基线只定一次，后面 43 页不再返工 |
+| B. 靠 Fluent + 属性覆盖 | 只改颜色/圆角/字号 | 每页都残留圆角、悬停、滚动条、弹层差异；逐页判不合格再返工，最终仍要写模板 | 已由 R13 证明不可行，**不采纳** |
+
+→ 1:1 口径下只有 A 能达标，因此本条**不需要用户拍板**，已按 A 执行；实施顺序是「先补当前页面与外壳用到的控件模板，
+再铺页面」，即 `ComboBox`（本轮已落）→ `ScrollBar`/`ScrollViewer` → 外壳 → `TextBox` 补全 → 其余按页面开工顺序。
 
 ## 3. 目标与可验证标准
 
@@ -469,11 +532,42 @@ dotnet build PCL.Desktop.Linux/PCL.Desktop.Linux.csproj -c Release -r linux-x64
 
 ---
 
+### 13.5 主题基线定案 + ComboBox 自绘主题（2026-11-08，只做编译验证、不弹窗）
+
+**① 主题基线**：见 §2.2 / D8（自绘优先，Fluent 只做兜底）。核对依据是 `pcl-next/Application.xaml` 里
+13 处 `OverridesDefaultStyle=True`；其中 `MyComboBox` / `ComboBox` 箭头 `ToggleButton` / `ComboBoxItem` 三处本轮落地。
+
+**② 自绘 ComboBox 主题（R13 的最终形态）**：照抄 `pcl-next/Application.xaml` L336–L469 的三个模板，落到
+`PCL.Desktop.Linux/Theme/PclControls.axaml` 的 `<Styles.Resources>`：
+
+| 模板 | 对照来源 | 照抄的关键取值 |
+|---|---|---|
+| `MyComboBoxTheme` | Application.xaml L336–L370 | 外层 `Border` 圆角 3 / 1px、**边框色 = 前景色**（`BorderBrush="{TemplateBinding Foreground}"`，与 `RefreshColor` 一起变色）；箭头 `ToggleButton` `Margin 0,0,1.5,0`；内容 `ContentControl` `Margin 8.5,0,21.5,0`、`IsHitTestVisible=False`、垂直居中、内容取 `SelectionBoxItem`；`Popup` `VerticalOffset=-1.5`、宽度 = 控件宽度、`MaxDropDownHeight` 320；弹层白底内衬 + 圆角 3 边框 + `ScrollViewer` + `ItemsPresenter` |
+| `MyComboBoxToggleTheme` | Application.xaml L406–L446 | 近透明热区 `ColorBrushSemiTransparent`；箭头 `Path` 宽 15、`Data="M1,1L4.5,4.5L8,1"`、`StrokeThickness=1.5`、`RenderTransformOrigin 0.3,0.5`、右对齐居中；展开旋转 180°、200ms（缓动曲线近似，R10） |
+| `MyComboBoxItemTheme` | Application.xaml L447–L469 | `Padding 6,4`、背景 `ColorBrushTransparent`、无悬停高亮、`FocusAdorner` 置空 |
+
+**③ 与 Fluent 的切割**：`c|MyComboBox` / `c|MyComboBoxItem` 的样式里用
+`<Setter Property="Theme" Value="{StaticResource …Theme}"/>` 显式切到自绘主题，不再依赖 Fluent 默认绘制；
+`StyleKeyOverride` 保留作安全网。
+
+**④ 验证**（未起窗口）：
+
+```
+dotnet build PCL.Desktop.Linux/PCL.Desktop.Linux.csproj -c Release -r linux-x64
+→ 0 警告 / 0 错误
+产物：bin-net10/Dev/2.100.0.4-0.82/linux-x64/PCL.Desktop.Linux.dll
+```
+
+**⑤ 未复刻项（转 R6 / 统一验收）**：`HasItems=false → dropDownBorder 高 26` 触发器、
+弹层透明度跟随主窗口（`PanPopup.Opacity = FrmMain.Opacity`，需外壳提供不透明度）、
+`IsEditable` 分支（本轮页面未用可编辑 ComboBox）、弹出层滚动条（等 `ScrollBar`/`ScrollViewer` 自绘后统一）。
+
 ## 14. 待统一验收清单（UI 全部成型后一次性执行）
 
 | 编号 | 待验收项 | 为什么必须靠运行判断 | 当前已知线索 |
 |---|---|---|---|
-| **V1** | `MyComboBox` 收起态是否渲染（R13） | 编译期 0 报错，但实跑时「模式」行右侧完全空白 | **已修 / 待统一验收确认**：根因是缺 `StyleKeyOverride`（已补 `typeof(ComboBox)`），配色按 `RefreshColor` 补齐；仍需目视确认收起态边框/文案/箭头与弹出层样式 |
+| **V1** | `MyComboBox` 收起态是否渲染（R13） | 编译期 0 报错，但实跑时「模式」行右侧完全空白 | **已修 / 待统一验收确认**：① 补 `StyleKeyOverride` 让控件可见；② 改自绘 `ControlTheme`（照抄 Application.xaml L336–L469），已不再依赖 Fluent；仍需目视确认收起态边框/文案/箭头 |
+| **V7** | 自绘 ComboBox 模板的运行期契约（本轮新落） | 模板部件名/双向绑定只在运行时生效，编译期无法验证 | 需目视：点击任意位置是否展开（`ToggleButton` 热区）、弹层宽度是否等于控件宽、箭头是否 200ms 旋转 180°、`ItemsPresenter` 能否正常生成选项、弹层点击外部能否收起 |
 | **V2** | 卡片底色/阴影可见性（R14） | 取决于窗口与实例页底色，静态看不出 | **已修 / 待统一验收确认**：宿主窗口底色改为 `ColorBrush1 #343d4a`（照抄 Windows 端）；仍需目视确认卡底与 7% 阴影对比度 |
 | **V3** | I（交互路径）：下拉展开/选项切换、按钮 hover 与按压、输入框聚焦与 IME、提示条关闭 | 只有运行才能触发状态机 | 需在稳定 WSLg 会话中一次性走查 |
 | **V4** | E（异常与空态）：`PageSetupLink` 的空列表/无网络提示、`MyHint` 三主题、`MyLoading` 错误态 | 需要构造异常数据 | 依赖实例页外壳起来后才有真实空态 |
