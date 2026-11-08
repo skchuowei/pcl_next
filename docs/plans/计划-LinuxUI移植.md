@@ -99,6 +99,11 @@
 | **R7** | Windows 系统集成（注册表、托盘、跳转列表、通知、资源管理器定位） | 全部（换 XDG / DBus / 无等价物时不实现） | 页面内的文案与按钮布局不变；不做的集成须在页面里显式说明 |
 | **R8** | 音频：**不做**（用户裁决，登记项关闭） | 不适用 | 无需保留任何音频 UI：Windows 端 `ModMusic.vb` 无调用点（全库仅 1 处命中 = 自身声明），界面上不存在播放条/音量控件，不做不产生布局差异 |
 | **R9** | DPI / 多显示器缩放模型差异 | 缩放行为 | 100% 缩放下的尺寸必须一致 |
+| **R10** | 动画引擎：WPF 自研 `Ani` 逐帧驱动 → Avalonia `Transitions` / `Animation` 近似 | 缓动曲线、逐帧节奏 | 时长数值照抄（勾选 150ms、悬停 100ms 进 / 200ms 出、按压 100ms）；`MyLoading` 镐子摆动改为 ±20°、1.4s 无限往返 |
+| **R11** | `MyHint` 关闭：Linux 暂无 `Settings`，关闭只隐藏；未做 200ms 缩放/淡出 + 150ms 收高，也未做「不再提示」记忆 | 关闭动画与持久化 | 关闭前后两种静态布局不变；`CanClose` 按钮尺寸 20×20 与 ToolTip 文案保留 |
+| **R12** | `MyIconButton` 主题色映射：WPF 源码散落在动画分支中，本轮取 `Color→#1370f3` / `White→白` / `Black→#343d4a` / `Red→#ff4c4c` | 图标颜色 | 图标尺寸（`Margin 5`、`Stretch Uniform`）、圆角 1000、按下 0.8 缩放不变 |
+| **R13** | 运行期缺陷：`MyComboBox` 在 WSLg 下**未渲染**（收起态无边框、无选中文案、无箭头），编译期无报错 | 待排查前不视为已还原 | 不因此改动页面布局；必须查明是模板问题还是渲染后端问题 |
+| **R14** | 窗口/页面底色：当前 `Window` 背景为纯白，`MyCard` 的 `#F5FFFFFF` 卡底与 `0 0 6 #12343d4a` 阴影在白底上几乎不可见 | 待对照实例页底色 | 卡片圆角 5、`Margin -3,-4,-3,-3`、标题 15,12 等尺寸不得改；只改底色使卡底/阴影可见 |
 
 ---
 
@@ -112,7 +117,7 @@
 | `linux-x64` **0 错误**编译 | `dotnet build PCL.Desktop.Linux/PCL.Desktop.Linux.csproj -c Release -r linux-x64` |
 | XAML 生成期校验 | 统一 `.axaml` 扩展名；构建日志 0 `AVLN` 错误 |
 | 逐页静态核对 | 每页交付说明带 L/C/F/S/T 取值清单 |
-| 运行期走查（I/E） | **必须在 Linux 本机或 WSL + X11 上人工执行**，本机 Windows 只做编译验证 |
+| 运行期走查（I/E） | **统一在全部 UI 成型后一次性执行**（WSL2 + WSLg，见 §13.3 / §14）；中途只做不弹窗的编译与静态检查 |
 | 内核不回归 | `dotnet test PCL.Download.Tests -c Release` 全绿 |
 
 ---
@@ -150,14 +155,14 @@
 | 文件 | 优先级 | 特有检查点 | 状态 |
 |---|---|---|---|
 | `Controls/MyButton.xaml` | P0 | 外层 `#01eaf2fe`、内层圆角 3 / 1px / `#55FFFFFF`；Normal `Brush1`、Highlight `Brush2`、Red `RedDark`；hover `Brush3`（Red→`RedLight`）+ 背景 `Brush7`（Red→`RedBack`）；100ms/200ms；按压缩放 0.955 | ✅（动画曲线 R4） |
-| `Controls/MyCheckBox.xaml` | P0 | 勾选框尺寸、边框色、选中色 | ⬜ |
+| `Controls/MyCheckBox.xaml` | P0 | 勾选框尺寸、边框色、选中色 | ✅（13.3） |
 | `Controls/MyExtraButton.xaml` | P1 | 图标按钮尺寸与 hover 底色 `Brush7` | ⬜ |
 | `Controls/MyExtraTextButton.xaml` | P1 | 文字按钮字号与下划线交互 | ⬜ |
-| `Controls/MyHint.xaml` | P0 | 提示条背景/边框/图标与字号 | ⬜ |
-| `Controls/MyIconButton.xaml` | P0 | 矢量图标 + 圆角 + hover | ⬜ |
+| `Controls/MyHint.xaml` | P0 | 提示条背景/边框/图标与字号 | ✅（13.3，R11） |
+| `Controls/MyIconButton.xaml` | P0 | 矢量图标 + 圆角 + hover | ✅（13.3，R12） |
 | `Controls/MyIconTextButton.xaml` | P1 | 图标 + 文字间距、字号 | ⬜ |
-| `Controls/MyListItem.xaml` | P0 | 列表项高度、左图标、副标题灰阶、选中底色 | ⬜ |
-| `Controls/MyLoading.xaml` | P0 | 加载图形尺寸与旋转时序 | ⬜ |
+| `Controls/MyListItem.xaml` | P0 | 列表项高度、左图标、副标题灰阶、选中底色 | ✅（13.3） |
+| `Controls/MyLoading.xaml` | P0 | 加载图形尺寸与旋转时序 | ✅（13.3，R10） |
 | `Controls/MyMsg/MyMsgInput.xaml` | P1 | 弹窗尺寸、按钮排布 | ⬜ |
 | `Controls/MyMsg/MyMsgSelect.xaml` | P1 | 选项列表与按钮排布 | ⬜ |
 | `Controls/MyMsg/MyMsgText.xaml` | P1 | 文本弹窗内边距与按钮 | ⬜ |
@@ -395,3 +400,62 @@ dotnet test PCL.Download.Tests/PCL.Download.Tests.csproj -c Release -r win-x64
 **顺带修正（仓库级）**：`scripts/git-hooks/prepare-commit-msg` 与 `post-commit` 原先不读
 `scripts/build-number.base`，在 2026-11-08 起的三独立仓库模式下会把构建号算成 `0.0x`
 （比旧线更小，违反 §5.2.1 单调性）；已补上基数逻辑，与 `Get-BuildSmallVersion.ps1` 同源。
+
+### 13.3 LU4 第二批控件 + WSL2 运行期首跑（2026-11-08）
+
+**本批控件（1:1 对照 Windows 源）**
+
+| 控件 | 对照基准 | 已还原要点 | 登记差异 |
+|---|---|---|---|
+| `MyCheckBox` | `Controls/MyCheckBox.xaml(.vb)` | 边框 18×18 / 圆角 3 / 边框 1.1 / 底 `ColorBrushHalfWhite` / 左边距 1；勾选路径 12×12、中心缩放 0→1、150ms；文字 13 号、左边距 26；勾选 `ColorBrush2`、悬停 `ColorBrush3`、禁用 `ColorBrushGray5`、按下底 `ColorBrushBg1` | R10 |
+| `MyHint` | `Controls/MyHint.xaml(.vb)` | 左边框 3px / 圆角 2 / `HasBorder` 补 1px 三边；三套主题 `#d9ecff·#1172D4·#0F64B8` / `#ffdddf·#d82929·#bf0b0b` / `#ffebd7·#f57a00·#d86c00`；行高 16、内边距 12,9、右边距 -1、自动换行；关闭按钮 20×20 + ToolTip「不再提示」 | R11 |
+| `MyListItem` | `Controls/MyListItem.xaml` | 高 42；列 `2/0/4/1*/4`、行 `1*/Auto/Auto/1*`；标题第 2 个 `Auto` 行、第 4 列、左边距 4、超出省略；`RectBack`/`LabInfo` 在源文件里本就注释掉，同样不还原 | — |
+| `MyLoading` | `Controls/MyLoading.xaml(.vb)` | 最小 50×50、底 `#01eaf2fe`；图形区 60×47、镐子 35 高/描边 2/旋转 55°、碎片 3×5、错误叉 17×17 缩放 0.6、底线 25×2；文本 16 号、上边距 10、默认「加载中」/错误「加载失败」 | R10 |
+| `MyIconButton` | `Controls/MyIconButton.xaml(.vb)` | 外层/内层圆角 1000、边框 0.001、底 `#01eaf2fe`；`Path` `Stretch=Uniform` + `Margin 5`；按下内层 0.8 缩放；`Logo` 以 SVG 路径字符串传入 | R12 |
+
+**构建验证**：`dotnet build PCL.Desktop.Linux/PCL.Desktop.Linux.csproj -c Release -r linux-x64` → **0 错误**，
+产物 `bin-net10/Dev/2.100.0.4-0.80/linux-x64/`。
+
+**WSL2 运行环境（实跑，替代此前「只能在 Linux 本机验证」的边界）**
+
+- 发行版：`Ubuntu-24.04`（**默认发行版未改**，未新建任何发行版/虚拟机），内核 6.18.x；WSLg 可用：
+  `DISPLAY=:0`、`WAYLAND_DISPLAY=wayland-0`、`/mnt/wslg` 存在；虚拟屏幕 1920×1200。
+- .NET：`/opt/dotnet` 下已有 SDK 10.0.403（**为原有环境，本轮未安装**）。
+- 本轮在该发行版内补装（用于让 GUI 起得来）：
+  - X11 客户端库 `libice6 libsm6 libx11-6 libxext6 libxrandr2 libxrender1 libxcursor1 libxi6 libxkbcommon0 libxkbcommon-x11-0 libfontconfig1 libfreetype6`
+    （缺 `libICE.so.6` 时 apphost 直接启动失败，报 `DllNotFoundException`）；
+  - `fonts-noto-cjk`（89 MB，未装前中文全是豆腐块）；
+  - `xdotool`（交互走查用）。
+  - 装完已 `apt-get clean` 并清空 `/var/lib/apt/lists`；`ext4.vhdx` 现为 3.89 GB（`D:\WSL\Ubuntu-24.04`）。
+- 运行方式：仓库与产物**都留在 `/mnt/d`**（未复制到家目录、未把构建输出改到 WSL 原生盘）；
+  `DOTNET_ROOT=/opt/dotnet` 后直接运行 apphost（WSL 内 dotnet 不在 `/usr/share/dotnet`，需显式给根目录）。
+
+**首次成功启动**：窗口按要求拉起（标题 `pcl-next · Linux`，客户端 960×640），中文正常渲染，
+`PageSetupLink` 两张卡片的标题/文本/输入框/按钮均按布局落位。
+
+**环境备注（非代码问题）**
+
+- WSLg 的 GL 走 ZINK→d3d12；本次会话里 `dxgkio` 驱动查询失败（`Failed to choose pdev`），
+  GLX 回退 `drisw` 也报错。窗口仍能起，但渲染后端不稳定。
+- 用 `PrintWindow` 抓图会使窗口被销毁（进程存活但 X 窗口消失）；后续统一测试改用「置顶 + 屏幕抓取」。
+- `xdotool` 在窗口失效后下发点击/按键会返回 `BadWindow`。
+- 恢复 WSLg 稳定会话通常需要 `wsl --shutdown` / `wsl --terminate`，但同一发行版**另有会话在用**，
+  未擅自执行；统一测试前若仍需恢复，先征询。
+
+**测试节奏（用户 2026-11-08 裁决）**：**先把 UI 写完，最后统一测试**。中途不再反复拉起窗口，
+只做 `dotnet build -r linux-x64` 与 XAML 资源等静态检查；需要靠运行才能判断的点一律进 §14 待验收清单。
+
+**下一步**：按 §5 清单继续写页面与控件 → `FormMain` 外壳 + 左侧导航 → 全部成型后按 §14 一次性统一走查。
+
+---
+
+## 14. 待统一验收清单（UI 全部成型后一次性执行）
+
+| 编号 | 待验收项 | 为什么必须靠运行判断 | 当前已知线索 |
+|---|---|---|---|
+| **V1** | `MyComboBox` 收起态是否渲染（R13） | 编译期 0 报错，但实跑时「模式」行右侧完全空白 | 同页 `MyTextBox` 1px 边框正常，怀疑模板层；需在统一测试时逐项压测 |
+| **V2** | 卡片底色/阴影可见性（R14） | 取决于窗口与实例页底色，静态看不出 | 白底上 `#F5FFFFFF` 卡底与 7% 阴影几乎不可见 |
+| **V3** | I（交互路径）：下拉展开/选项切换、按钮 hover 与按压、输入框聚焦与 IME、提示条关闭 | 只有运行才能触发状态机 | 需在稳定 WSLg 会话中一次性走查 |
+| **V4** | E（异常与空态）：`PageSetupLink` 的空列表/无网络提示、`MyHint` 三主题、`MyLoading` 错误态 | 需要构造异常数据 | 依赖实例页外壳起来后才有真实空态 |
+| **V5** | T（状态与过渡）时序核对（R10/R11/R12） | 动画与主题色映射需目视 | 已按注释取值，未目视验证 |
+| **V6** | 字体与 CJK 渲染（R1） | 取决于目标机字体 | 本环境装 `fonts-noto-cjk` 后中文正常；最终仍需内嵌 `PCL English` + CJK 回退 |
