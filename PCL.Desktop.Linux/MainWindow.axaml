@@ -3,11 +3,14 @@
         xmlns:views="using:PCL.Desktop.Linux.Views"
         x:Class="PCL.Desktop.Linux.MainWindow"
         Title="pcl-next · Linux"
+        Background="{DynamicResource ColorBrush1}"
         Width="960"
         Height="640">
     <!--
       LU2 起：窗口承载第一个 1:1 页面（设置·联机），对照 pcl-next/Pages/PageSetup/PageSetupLink.xaml。
       左侧导航与 FormMain 外壳属后续阶段，这里先验证「页面容器 + 主题 + 控件」这一条链路。
+      窗口底色 ColorBrush1（#343d4a）：照抄 Windows 端窗口底色（R14），
+      使 MyCard 的 #F5FFFFFF 卡底与 0 0 6 #12343d4a 阴影可见。
     -->
     <views:PageSetupLinkView />
 </Window>

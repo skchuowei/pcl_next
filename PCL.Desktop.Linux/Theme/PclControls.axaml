@@ -167,7 +167,7 @@
         </Setter>
     </Style>
 
-    <!-- ===== MyComboBox（属性级对齐；弹出层模板待补齐） ===== -->
+    <!-- ===== MyComboBox（复用 Fluent 模板 + 照抄 MyComboBox.vb 的 RefreshColor 配色；R13 已修） ===== -->
     <Style Selector="c|MyComboBox">
         <Setter Property="Background" Value="{DynamicResource ColorBrushHalfWhite}" />
         <Setter Property="BorderBrush" Value="{DynamicResource ColorBrushBg0}" />
@@ -175,14 +175,61 @@
         <Setter Property="CornerRadius" Value="3" />
         <Setter Property="FontSize" Value="13" />
         <Setter Property="FontFamily" Value="{DynamicResource PclFont}" />
-        <Setter Property="Foreground" Value="{DynamicResource ColorBrush1}" />
+        <Setter Property="Foreground" Value="{DynamicResource ColorBrushBg0}" />
         <Setter Property="MaxDropDownHeight" Value="320" />
         <Setter Property="MinHeight" Value="26" />
         <Setter Property="Padding" Value="8,0,8,0" />
+        <!-- 常态切换 100ms（RefreshColor 常态分支） -->
+        <Setter Property="Transitions">
+            <Transitions>
+                <BrushTransition Property="Background" Duration="0:0:0.1" />
+                <BrushTransition Property="Foreground" Duration="0:0:0.1" />
+            </Transitions>
+        </Setter>
+    </Style>
+
+    <Style Selector="c|MyComboBox:pointerover">
+        <Setter Property="Foreground" Value="{DynamicResource ColorBrush4}" />
+        <Setter Property="Background" Value="{DynamicResource ColorBrush7}" />
+    </Style>
+
+    <!-- 按下 / 展开：与 Windows 端 RefreshColor 同一分支，10ms 极快切换 -->
+    <Style Selector="c|MyComboBox:pressed">
+        <Setter Property="Foreground" Value="{DynamicResource ColorBrush3}" />
+        <Setter Property="Background" Value="{DynamicResource ColorBrush7}" />
+        <Setter Property="Transitions">
+            <Transitions>
+                <BrushTransition Property="Background" Duration="0:0:0.01" />
+                <BrushTransition Property="Foreground" Duration="0:0:0.01" />
+            </Transitions>
+        </Setter>
+    </Style>
+    <Style Selector="c|MyComboBox:expanded">
+        <Setter Property="Foreground" Value="{DynamicResource ColorBrush3}" />
+        <Setter Property="Background" Value="{DynamicResource ColorBrush7}" />
+        <Setter Property="Transitions">
+            <Transitions>
+                <BrushTransition Property="Background" Duration="0:0:0.01" />
+                <BrushTransition Property="Foreground" Duration="0:0:0.01" />
+            </Transitions>
+        </Setter>
+    </Style>
+
+    <Style Selector="c|MyComboBox:disabled">
+        <Setter Property="Foreground" Value="{DynamicResource ColorBrushGray5}" />
+        <Setter Property="Background" Value="{DynamicResource ColorBrushGray6}" />
+        <Setter Property="Transitions">
+            <Transitions>
+                <BrushTransition Property="Background" Duration="0:0:0.2" />
+                <BrushTransition Property="Foreground" Duration="0:0:0.2" />
+            </Transitions>
+        </Setter>
     </Style>
 
     <Style Selector="c|MyComboBoxItem">
         <Setter Property="FontSize" Value="13" />
+        <Setter Property="FontFamily" Value="{DynamicResource PclFont}" />
+        <Setter Property="Foreground" Value="{DynamicResource ColorBrush1}" />
         <Setter Property="MinHeight" Value="26" />
         <Setter Property="Padding" Value="6,4" />
     </Style>

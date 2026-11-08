@@ -79,19 +79,66 @@ public class MyTextBox : TextBox
 }
 
 /// <summary>
-/// 下拉框，对齐 `pcl-next/Application.xaml` 的 MyComboBox 样式：
-/// 1px 边框 ColorBrushBg0、背景 #55FFFFFF、圆角 3、字号 13、下拉项高 26。
-/// 当前只按属性级样式对齐，完整弹出层模板与模板化下拉按钮尚待逐像素核对（登记项 R6）。
+/// 下拉框，1:1 对齐 `pcl-next/Controls/MyComboBox.vb`：
+/// Windows 端**没有自定义模板**（纯继承 WPF ComboBox 默认模板 + 属性/动画改造），
+/// 因此这里同样复用 Avalonia Fluent 的 ComboBox 模板，只覆写 <see cref="StyleKeyOverride"/> 让
+/// Fluent 的 ControlTheme 能按基类 <c>ComboBox</c> 命中——否则派生类型查不到主题、无 Template、
+/// 控件完全不渲染（R13 根因）。
+/// 配色照抄 `RefreshColor`：常态 前景 ColorBrushBg0 / 背景 ColorBrushHalfWhite、
+/// 悬停 前景 ColorBrush4 / 背景 ColorBrush7、按下或展开 前景 ColorBrush3 / 背景 ColorBrush7、
+/// 禁用 前景 ColorBrushGray5 / 背景 ColorBrushGray6；边框固定 ColorBrushBg0、圆角 3、字号 13、下拉项高 26。
+/// WPF 侧「可编辑态文本框聚焦」分支在 Linux 只对可编辑 ComboBox 有意义，本轮页面未用到，登记于 R6。
+/// 动画时序（10ms / 100ms / 200ms）用 Transitions 近似，登记于 R10。
 /// </summary>
 public class MyComboBox : ComboBox
 {
+    /// <summary>Fluent 的 ComboBox 主题按基类注册；派生类必须回到基类键，否则无模板（R13）。</summary>
+    protected override Type StyleKeyOverride => typeof(ComboBox);
+
+    protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
+    {
+        base.OnPropertyChanged(change);
+        if (change.Property == IsDropDownOpenProperty) SyncExpanded();
+    }
+
+    protected override void OnApplyTemplate(TemplateAppliedEventArgs e)
+    {
+        base.OnApplyTemplate(e);
+        SyncExpanded();
+    }
+
+    /// <summary>展开态与按下态同色（Windows 端 RefreshColor 把 IsDropDownOpen 与按下并为同一分支）。</summary>
+    private void SyncExpanded() => PseudoClasses.Set(":expanded", IsDropDownOpen);
+
+    // 按下态：照抄 Windows 端的 PreviewMouseLeftButtonDown / Up + MouseLeave 三个钩子，
+    // 自己维护 :pressed，避免依赖 Fluent 模板是否给 ComboBox 设了同名伪类。
+    protected override void OnPointerPressed(PointerPressedEventArgs e)
+    {
+        base.OnPointerPressed(e);
+        if (!IsEnabled || !e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
+        PseudoClasses.Set(":pressed", true);
+    }
+
+    protected override void OnPointerReleased(PointerReleasedEventArgs e)
+    {
+        base.OnPointerReleased(e);
+        PseudoClasses.Set(":pressed", false);
+    }
+
+    protected override void OnPointerExited(PointerEventArgs e)
+    {
+        base.OnPointerExited(e);
+        PseudoClasses.Set(":pressed", false);
+    }
 }
 
 /// <summary>
-/// 下拉项，对齐 `pcl-next/Controls/MyComboBoxItem.vb` 的视觉（无额外装饰，供 ComboBox 使用）。
+/// 下拉项，1:1 对齐 `pcl-next/Controls/MyComboBoxItem.vb` 的视觉（无额外装饰，供 ComboBox 使用）。
+/// 同样需要 <see cref="StyleKeyOverride"/> 才能命中 Fluent 的 ComboBoxItem 主题（R13）。
 /// </summary>
 public class MyComboBoxItem : ComboBoxItem
 {
+    protected override Type StyleKeyOverride => typeof(ComboBoxItem);
 }
 
 /// <summary>

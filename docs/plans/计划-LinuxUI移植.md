@@ -102,8 +102,8 @@
 | **R10** | 动画引擎：WPF 自研 `Ani` 逐帧驱动 → Avalonia `Transitions` / `Animation` 近似 | 缓动曲线、逐帧节奏 | 时长数值照抄（勾选 150ms、悬停 100ms 进 / 200ms 出、按压 100ms）；`MyLoading` 镐子摆动改为 ±20°、1.4s 无限往返 |
 | **R11** | `MyHint` 关闭：Linux 暂无 `Settings`，关闭只隐藏；未做 200ms 缩放/淡出 + 150ms 收高，也未做「不再提示」记忆 | 关闭动画与持久化 | 关闭前后两种静态布局不变；`CanClose` 按钮尺寸 20×20 与 ToolTip 文案保留 |
 | **R12** | `MyIconButton` 主题色映射：WPF 源码散落在动画分支中，本轮取 `Color→#1370f3` / `White→白` / `Black→#343d4a` / `Red→#ff4c4c` | 图标颜色 | 图标尺寸（`Margin 5`、`Stretch Uniform`）、圆角 1000、按下 0.8 缩放不变 |
-| **R13** | 运行期缺陷：`MyComboBox` 在 WSLg 下**未渲染**（收起态无边框、无选中文案、无箭头），编译期无报错 | 待排查前不视为已还原 | 不因此改动页面布局；必须查明是模板问题还是渲染后端问题 |
-| **R14** | 窗口/页面底色：当前 `Window` 背景为纯白，`MyCard` 的 `#F5FFFFFF` 卡底与 `0 0 6 #12343d4a` 阴影在白底上几乎不可见 | 待对照实例页底色 | 卡片圆角 5、`Margin -3,-4,-3,-3`、标题 15,12 等尺寸不得改；只改底色使卡底/阴影可见 |
+| **R13** | ~~运行期缺陷：`MyComboBox` 在 WSLg 下未渲染~~ **已修（2026-11-08）**。根因：`MyComboBox : ComboBox` 未覆写 `StyleKeyOverride`，Avalonia Fluent 的 ControlTheme 按派生类型查不到 → 无 `Template` → 控件不渲染；Windows 端 `MyComboBox.vb` 同样**没有自定义模板**（纯继承 + 属性/动画改造），故正确修法是回到基类主题键，而非自写模板 | 不视为允许差异（属缺陷，已修复） | 收起态可见性（边框/选中文案/箭头）与 Fluent 弹出层细节仍需统一验收目视确认（R6 保留） |
+| **R14** | ~~窗口/页面底色为纯白~~ **已修（2026-11-08）**：宿主窗口底色改为 `ColorBrush1` `#343d4a`，与 Windows 端窗口底色一致，`MyCard` 的 `#F5FFFFFF` 卡底与 `0 0 6 #12343d4a` 阴影因此可见 | **照抄**，不是允许差异：色值取自 Windows 端 `ColorBrush1`，未做任何近似。实现方式上的差别仅在于 Windows `Window` 本身是 `AllowsTransparency=True` + `Background={x:Null}`（底色由内容层提供），Linux 直接铺在 `Window` 根层——视觉结果一致 | 卡片圆角 5、`Margin -3,-4,-3,-3`、标题 15,12 等尺寸不得改 |
 
 ---
 
@@ -447,14 +447,34 @@ dotnet test PCL.Download.Tests/PCL.Download.Tests.csproj -c Release -r win-x64
 
 **下一步**：按 §5 清单继续写页面与控件 → `FormMain` 外壳 + 左侧导航 → 全部成型后按 §14 一次性统一走查。
 
+### 13.4 R13 / R14 缺陷修复（2026-11-08，只做编译验证、不弹窗）
+
+用户指示：R13 / R14 当缺陷立刻修，不留到统一验收；修完只做编译验证、不起窗口。
+
+| 项 | 症状 | 根因（已核实） | 修法 | 改动文件 |
+|---|---|---|---|---|
+| **R13** | `MyComboBox` 收起态完全不渲染（无边框、无选中文案、无箭头） | `MyComboBox : ComboBox` 未覆写 `StyleKeyOverride`；Avalonia Fluent 的 ControlTheme 按**派生类型**查找，查不到即无 `Template`，控件不画任何东西。对照 `pcl-next/Controls/MyComboBox.vb` 确认 Windows 端**没有** `MyComboBox.xaml`（纯继承 WPF 默认模板 + `RefreshColor` 配色 + `PART_EditableTextBox`/`PART_Content` 访问），所以不存在「`PART_` 名称对不上」的模板可抄，正确修法是回到基类主题键 | ① `MyComboBox` 补 `StyleKeyOverride => typeof(ComboBox)`；`MyComboBoxItem` 补 `typeof(ComboBoxItem)`（下拉项同理，否则展开后也是空白）。② 配色照抄 `RefreshColor`：常态 前景 `ColorBrushBg0` / 背景 `ColorBrushHalfWhite`（100ms）、悬停 前景 `ColorBrush4` / 背景 `ColorBrush7`（100ms）、按下与展开 前景 `ColorBrush3` / 背景 `ColorBrush7`（10ms）、禁用 前景 `ColorBrushGray5` / 背景 `ColorBrushGray6`（200ms）；边框固定 `ColorBrushBg0`、圆角 3、字号 13、下拉项高 26。③ 按下态由控件自身维护 `:pressed`（照抄 Windows 的 `PreviewMouseLeftButtonDown/Up + MouseLeave` 三钩子），展开态用 `:expanded`（跟随 `IsDropDownOpen`），不依赖 Fluent 是否给 ComboBox 设了同名伪类 | `Controls/MyControls.cs`、`Theme/PclControls.axaml` |
+| **R14** | 窗口纯白底，`MyCard` 的 `#F5FFFFFF` 卡底与 7% 阴影不可见 | 宿主窗口未设底色，Avalonia 默认白 | 宿主窗口底色设为 `ColorBrush1`（`#343d4a`），与 Windows 端窗口底色一致；**属「照抄」而非「允许差异」**（色值原样取自 Windows `Application.xaml` L22，未做近似） | `MainWindow.axaml` |
+
+**验证**（按用户要求只做编译验证，**未起窗口**）：
+
+```
+dotnet build PCL.Desktop.Linux/PCL.Desktop.Linux.csproj -c Release -r linux-x64
+→ 0 警告 / 0 错误
+产物：bin-net10/Dev/2.100.0.4-0.81/linux-x64/PCL.Desktop.Linux.dll
+```
+
+**未验证项（转 §14）**：收起态是否真渲染、边框/文案/箭头观感、弹出层样式（R6）、
+卡底与阴影在 `#343d4a` 底上的对比度——均需统一验收阶段一次性目视确认（V1 / V2）。
+
 ---
 
 ## 14. 待统一验收清单（UI 全部成型后一次性执行）
 
 | 编号 | 待验收项 | 为什么必须靠运行判断 | 当前已知线索 |
 |---|---|---|---|
-| **V1** | `MyComboBox` 收起态是否渲染（R13） | 编译期 0 报错，但实跑时「模式」行右侧完全空白 | 同页 `MyTextBox` 1px 边框正常，怀疑模板层；需在统一测试时逐项压测 |
-| **V2** | 卡片底色/阴影可见性（R14） | 取决于窗口与实例页底色，静态看不出 | 白底上 `#F5FFFFFF` 卡底与 7% 阴影几乎不可见 |
+| **V1** | `MyComboBox` 收起态是否渲染（R13） | 编译期 0 报错，但实跑时「模式」行右侧完全空白 | **已修 / 待统一验收确认**：根因是缺 `StyleKeyOverride`（已补 `typeof(ComboBox)`），配色按 `RefreshColor` 补齐；仍需目视确认收起态边框/文案/箭头与弹出层样式 |
+| **V2** | 卡片底色/阴影可见性（R14） | 取决于窗口与实例页底色，静态看不出 | **已修 / 待统一验收确认**：宿主窗口底色改为 `ColorBrush1 #343d4a`（照抄 Windows 端）；仍需目视确认卡底与 7% 阴影对比度 |
 | **V3** | I（交互路径）：下拉展开/选项切换、按钮 hover 与按压、输入框聚焦与 IME、提示条关闭 | 只有运行才能触发状态机 | 需在稳定 WSLg 会话中一次性走查 |
 | **V4** | E（异常与空态）：`PageSetupLink` 的空列表/无网络提示、`MyHint` 三主题、`MyLoading` 错误态 | 需要构造异常数据 | 依赖实例页外壳起来后才有真实空态 |
 | **V5** | T（状态与过渡）时序核对（R10/R11/R12） | 动画与主题色映射需目视 | 已按注释取值，未目视验证 |
