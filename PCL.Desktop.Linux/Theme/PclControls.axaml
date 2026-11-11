@@ -209,6 +209,37 @@
                 </ControlTemplate>
             </Setter>
         </ControlTheme>
+
+        <!-- ===== ScrollViewerFullMargin（对照 Application.xaml L199–L217）
+             与 MyScrollViewer 唯一差别：竖向滚动条 Margin 2,1,1,1；用法 `<ScrollViewer Classes="fullmargin">` ===== -->
+        <ControlTheme x:Key="MyScrollViewerFullMarginTheme" TargetType="ScrollViewer">
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <Grid ColumnDefinitions="*,Auto">
+                        <ScrollContentPresenter Name="PART_ContentPresenter"
+                                                Grid.Column="0"
+                                                Background="{TemplateBinding Background}"
+                                                Padding="{TemplateBinding Padding}"
+                                                HorizontalSnapPointsType="{TemplateBinding HorizontalSnapPointsType}"
+                                                VerticalSnapPointsType="{TemplateBinding VerticalSnapPointsType}"
+                                                HorizontalSnapPointsAlignment="{TemplateBinding HorizontalSnapPointsAlignment}"
+                                                VerticalSnapPointsAlignment="{TemplateBinding VerticalSnapPointsAlignment}"
+                                                ScrollViewer.IsScrollInertiaEnabled="{TemplateBinding IsScrollInertiaEnabled}">
+                            <ScrollContentPresenter.GestureRecognizers>
+                                <ScrollGestureRecognizer CanHorizontallyScroll="{Binding CanHorizontallyScroll, ElementName=PART_ContentPresenter}"
+                                                         CanVerticallyScroll="{Binding CanVerticallyScroll, ElementName=PART_ContentPresenter}"
+                                                         IsScrollInertiaEnabled="{Binding (ScrollViewer.IsScrollInertiaEnabled), ElementName=PART_ContentPresenter}" />
+                            </ScrollContentPresenter.GestureRecognizers>
+                        </ScrollContentPresenter>
+                        <ScrollBar Name="PART_VerticalScrollBar"
+                                   Orientation="Vertical"
+                                   Grid.Column="1"
+                                   Margin="2,1,1,1"
+                                   Theme="{StaticResource MyScrollBarTheme}" />
+                    </Grid>
+                </ControlTemplate>
+            </Setter>
+        </ControlTheme>
     </Styles.Resources>
 
     <!-- ===== 全局：所有 ScrollBar / ScrollViewer（含 Fluent 模板内部创建的实例）一律切到自绘主题 ===== -->
@@ -217,6 +248,10 @@
     </Style>
     <Style Selector="ScrollViewer">
         <Setter Property="Theme" Value="{StaticResource MyScrollViewerTheme}" />
+    </Style>
+    <!-- FullMargin 变体：滚动条 Margin 2,1,1,1（R15 关闭） -->
+    <Style Selector="ScrollViewer.fullmargin">
+        <Setter Property="Theme" Value="{StaticResource MyScrollViewerFullMarginTheme}" />
     </Style>
 
     <!-- ===== TextBlock：字号 13、ColorBrush1、字符省略号、PCL 字族 ===== -->

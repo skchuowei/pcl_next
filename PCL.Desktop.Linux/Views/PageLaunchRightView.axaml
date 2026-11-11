@@ -1,0 +1,46 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="using:PCL.Desktop.Linux.Controls"
+             x:Class="PCL.Desktop.Linux.Views.PageLaunchRightView">
+
+    <!--
+      1:1 对照基准：pcl-next/Pages/PageLaunch/PageLaunchRight.xaml（全文 21 行）
+      · MyScrollViewer(Vertical=Auto, Horizontal=Disabled) → StackPanel Margin 25,25,25,10
+      · MyHint（Theme=Blue、CanClose、RelativeSetup=HintSnapshot、Margin 0,0,0,15，文案原文）
+      · PanCustom：运行期注入的自定义启动项容器，Linux 侧暂无自定义项服务，保留空 StackPanel
+      · MyCard「启动日志」Margin 0,0,0,15；内部 MyTextBox Margin 15,34,15,13、Padding 0,4、
+        IsReadOnly、AcceptsReturn、TextWrapping=Wrap、BorderThickness=0、HasBackground=False
+      差异登记：
+      · R22 —— Windows 的 PageLaunchRight 继承 MyPageRight，由 PanScroll 提供右页滚动条动画；
+        Avalonia 侧右页宿主尚未移植 MyPageRight，滚动与淡入由原生 ScrollViewer 承担
+      · R23 —— WPF `HasBackground="False"` 是 MyTextBox 的自定义属性，Avalonia 侧以
+        Background=Transparent + BorderThickness=0 等价表达；WPF TextBox 的
+        `VerticalScrollBarVisibility/HorizontalScrollBarVisibility=Disabled` 在 Avalonia TextBox 上
+        是 ScrollViewer 的附加属性，本轮未设（只读日志框内容为空，不出现滚动条）
+    -->
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                  Name="PanBack">
+        <StackPanel Name="PanMain" Margin="25,25,25,10">
+            <c:MyHint Name="PanHint"
+                      RelativeSetup="HintSnapshot"
+                      HintTheme="Blue"
+                      CanClose="True"
+                      Margin="0,0,0,15"
+                      Text="快照版 PCL Next 包含尚未正式发布的测试功能，仅限赞助者自己使用。&#xa;请不要随意发给其他人，或是用来制作整合包哦！" />
+
+            <StackPanel Name="PanCustom" />
+
+            <c:MyCard Name="PanLog" Margin="0,0,0,15" Title="启动日志">
+                <c:MyTextBox Name="LabLog"
+                             Margin="15,34,15,13"
+                             Padding="0,4"
+                             IsReadOnly="True"
+                             AcceptsReturn="True"
+                             TextWrapping="Wrap"
+                             BorderThickness="0"
+                             Background="Transparent" />
+            </c:MyCard>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

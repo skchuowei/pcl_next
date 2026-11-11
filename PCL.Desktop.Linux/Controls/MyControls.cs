@@ -1080,6 +1080,9 @@ public class MyPageLeft : Grid
         var items = GetAnimatedItems();
         if (AnimatedControl is null || items.Count == 0)
         {
+            // Windows `MyPageLeft.vb` L17–L28 只在 AnimatedControl 为空时走缩放；
+            // 指定了 AnimatedControl 但没有可动画元素（如版本选择页的空列表）时，原逻辑不产生任何动画。
+            if (AnimatedControl is not null) return;
             ShowWithScale();
             return;
         }
@@ -1130,6 +1133,8 @@ public class MyPageLeft : Grid
         var items = GetAnimatedItems();
         if (AnimatedControl is null || items.Count == 0)
         {
+            // 同 TriggerShowAnimation：指定了 AnimatedControl 但无元素时不产生动画
+            if (AnimatedControl is not null) return;
             HideWithScale();
             return;
         }

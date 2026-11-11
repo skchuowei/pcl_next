@@ -105,13 +105,18 @@
 | **R12** | `MyIconButton` 主题色映射：WPF 源码散落在动画分支中，本轮取 `Color→#1370f3` / `White→白` / `Black→#343d4a` / `Red→#ff4c4c` | 图标颜色 | 图标尺寸（`Margin 5`、`Stretch Uniform`）、圆角 1000、按下 0.8 缩放不变 |
 | **R13** | 运行期缺陷：`MyComboBox` 在 WSLg 下**未渲染**（收起态无边框、无选中文案、无箭头），编译期无报错。**根因已查明**：`MyComboBox : ComboBox` 未覆写 `StyleKeyOverride`，Avalonia Fluent 的 ControlTheme 按派生类型查不到 → 无 `Template` → 控件不渲染。**已修（2026-11-08）**，分两步：① 补 `StyleKeyOverride => typeof(ComboBox)` 让控件先可见；② 按本计划 §2.2 主题基线，改为**自绘 `ControlTheme`**（照抄 `pcl-next/Application.xaml` L336–L469 的 ComboBox / ToggleButton / ComboBoxItem 三个模板），不再依赖 Fluent 默认绘制。~~「Windows 端 `MyComboBox.vb` 同样没有自定义模板（纯继承 + 属性/动画改造）」~~ **此论断错误（2026-11-08 复核更正）**：Windows 端模板不在 `Controls/MyComboBox.xaml`（该文件确实不存在），而是写在 `pcl-next/Application.xaml` L336–L405 的 `Style TargetType="local:MyComboBox"`（`OverridesDefaultStyle=True` + 普通态/`IsEditable` 两套 `ControlTemplate`）；`MyComboBox.vb` 只负责 `RefreshColor` 配色与弹出层宽度/透明度。 | 不视为允许差异（属缺陷，已修复） | 收起态可见性与弹出层外观仍需统一验收目视确认（V1；`HasItems=false → 高 26` 等边角触发器暂未复刻，并入 R6） |
 | **R14** | ~~窗口/页面底色为纯白~~ **已修（2026-11-08）**：宿主窗口底色改为 `ColorBrush1` `#343d4a`，与 Windows 端窗口底色一致，`MyCard` 的 `#F5FFFFFF` 卡底与 `0 0 6 #12343d4a` 阴影因此可见 | **照抄**，不是允许差异：色值取自 Windows 端 `ColorBrush1`，未做任何近似。实现方式上的差别仅在于 Windows `Window` 本身是 `AllowsTransparency=True` + `Background={x:Null}`（底色由内容层提供），Linux 直接铺在 `Window` 根层——视觉结果一致 | 卡片圆角 5、`Margin -3,-4,-3,-3`、标题 15,12 等尺寸不得改 |
-| **R15** | `ScrollViewer` 变体与横向滚动条：本轮只落 `MyScrollViewer`（滚动条贴边无 `Margin`）；Windows 端另有 `ScrollViewerFullMargin`（滚动条 `Margin 2,1,1,1`）与 `ScrollViewerNoMargin` 两个变体，用到它们的页面再按原模板补；横向滚动条未自绘（Windows 端 `HorizontalScrollBarVisibility` 全部为 `Disabled`，界面不应出现横向条） | 未用到的变体缺省不影响当前页面；一旦某页用到对应变体，必须在开工该页前补齐，不得带着差异上线 | 已用页面（`PageSetupLink`）用 `MyScrollViewer` 变体，滚动条宽度 8、贴边、拇指配色不受影响 |
+| **R15** | `ScrollViewer` 变体与横向滚动条：~~本轮只落 `MyScrollViewer`（滚动条贴边无 `Margin`）~~ **2026-11-11 补**：`ScrollViewerFullMargin` 变体已按 `Application.xaml` L199–L217 补自绘主题（`Classes="fullmargin"` → 竖向滚动条 `Margin 2,1,1,1`）；仍缺 `ScrollViewerNoMargin`（`TextBox` 模板内部使用，本轮页面未直接使用）；横向滚动条未自绘（Windows 端 `HorizontalScrollBarVisibility` 全部为 `Disabled`，界面不应出现横向条） | 未用到的变体缺省不影响当前页面；一旦某页用到对应变体，必须在开工该页前补齐，不得带着差异上线 | 已用页面（`PageSetupLink` / `PageSelectLeft`）的滚动条宽度 8、拇指配色、FullMargin 的 2,1,1,1 边距不受影响 |
 | **R16** | 调色板**资源**（`PclColors.axaml` 的 `ColorBrush1..8`）仍取 `Application.xaml` 的静态色值（`#343d4a` / `#0b5bcb` …），而标题栏/页面背景已改为运行期 HSL 重算（R17）：两者逐通道差 ≤2（实测 `Color1`：静态 `(52,61,74)` vs 重算 `(51,62,72)`，`Color8`：`(234,242,254)` vs `(238,246,254)`） | 仅允许 ≤2/255 的单通道偏差，肉眼不可分辨 | 不得因此改任何**布局**数值；因本 fork 皮肤不改变主题参数（§13.8），静态资源与运行期重算不存在分叉风险；若后续把 `ColorBrush*` 也改为运行期写入，则 R16 关闭 |
 | **R17** | 标题栏渐变与主页面背景**已在 Linux 侧按同一 HSL 算法、同一取整算**（`Theme/PclTheme.cs`：`FromHSL2` / `FromHSL` / `Hue` 逐行移植自 `ModBase.vb` L360–L409），主题参数已由 `const` 改为**皮肤参数字段 + `Refresh(theme)` 早退语义**（同 `ModSecret.vb` L69–L110），默认值 `ColorHue=210`、`ColorSat=85`、`ColorLightAdjust=0`、`ColorHueTopbarDelta=0`（`ModSecret.vb` L66）。**核实结论（§13.8）：Windows 端本 fork 不存在「皮肤编号 → 参数」的映射表，四个参数全程无赋值点，故参数恒为默认值、配色恒为 PCL 蓝**；`UiBackgroundColorful` 开关与设置页联动待设置页接入 | 参数恒定本身与 Windows 端一致，不算降级 | 算法与取整不得改成近似值；不得自行发明映射表；取得映射数据后在 `PclTheme.Refresh` 单点接入 |
 | **R18** | 标题栏 logo 只接入 `UiLogoType=1`（默认档：文字 `PCL Next`、17 号白字、`Margin 18,0,0,0`）；其余三档（`0` 形状 / `2` 自定义文本 / `3` 图片）与 `UiLogoLeft`、`UiLogoText`、`ImgTitle` 背景图未接入 | 未接入档不影响默认外观 | 默认档的位置/字号/色值不得改；接入时按 vb L820–L869 的分支补齐 |
 | **R19** | 窗口壳的行为近似：① 开场/关闭动画缓动由 `AniEaseOutBack` 改 `BackEaseOut`（时长 600/500ms 照抄）；② `IsMouseDirectlyOver` 无等价物，标题栏拖拽改为「向上找 `MyIconButton`/`MyRadioButton` 祖先」；③ Avalonia 11 无 `CanMinimize` 属性，最小化走 `WindowState.Minimized`；④ `Topmost` 启动瞬间、`UiOpacity` 窗口不透明度、窗口尺寸/位置记忆（`Settings`）未接入 | 只允许实现手段差异 | 标题栏高度 48、按钮 28×28 与边距 12/44、缩放热区 8/13px 不得改 |
-| **R20** | **【临时状态】**页面栈与外壳其余部件：5 个栈里只有「联机」有页面（`PageSetupLink`）、「设置」有左导航（`PageSetupLeft`），**初始选中因此临时改为「联机」**（Windows 端默认「启动」，vb L1438–L1471），其余栈宿主置空；`ImgBack` 背景图（`UiBackgroundOpacity` / `Blur` / `Suit`）、`PanTitleInner`、`PanHint`、`BtnExtra*` 未接入；设置左导航的重置按钮点击为空操作（设置子页未移植） | **临时状态不算允许差异**：页面补齐后必须把初始选中恢复成 Windows 端的「启动」，并逐步删掉这段降级；不得以「Linux 默认联机」沉淀成既定行为 | 「联机」页与外壳几何不得因此改动；每移植完一个栈就必须回收对应降级项并在本节留痕 |
+| **R20** | **【临时状态，2026-11-11 收窄】**页面栈与外壳其余部件：启动栈（0）、联机栈（2）、设置栈左导航（3）、版本选择次级栈（5）已有页面；**初始选中已恢复 Windows 默认「启动」**（vb L1438–L1471、`FormMain.xaml` L121 `BtnTitleSelect0 Checked=True`）；设置栈右页、下载栈（1）、更多栈（4）仍为宿主置空；`ImgBack` 背景图（`UiBackgroundOpacity` / `Blur` / `Suit`）、`PanTitleInner`（次级页面标题栏）、`PanHint`、`BtnExtra*` 未接入；设置左导航的重置按钮点击为空操作（设置子页未移植） | **临时状态不算允许差异**：页面补齐后必须继续回收，不得以「Linux 少几个栈」沉淀成既定行为 | 已回收项（初始选中、启动栈、版本选择栈）不得回退；「联机」页与外壳几何不得因此改动；每移植完一个栈就必须回收对应降级项并在本节留痕 |
 | **R21** | 左竖条（`RectLeftBackground`）宽度动画的触发时机：Windows 由 `PanMainLeft.SizeChanged` 驱动；Linux 改为「切换栈并完成布局后取 `PanMainLeft.Bounds.Width` 驱动一次」。因左列为 `Auto`、内容固定，窗口缩放不改变该宽度，实际表现一致 | 仅触发时机 | 目标宽度值、180ms 时长、阴影淡出条件不得改；若后续左页宽度随内容变化，必须补回尺寸监听 |
+| **R22** | 右页宿主 `MyPageRight` 尚未移植：Windows 端右页继承 `MyPageRight`，由 `PanScroll` 提供滚动条横向滑入（350ms / 90ms）、内容逐个进入（0→1 淡入 100ms、-16→0 位移 250+350ms）与退出动画；Linux 右页为普通 `UserControl` + 原生 `ScrollViewer`，无这些动画 | 仅动画；不改变任何静态布局 | 右页内容的 `Margin`、卡片间距、字号、滚动条宽度不得改；移植 `MyPageRight` 时逐项补齐并在 §13 留痕 |
+| **R23** | `MyTextBox` 属性差异：WPF 自定义属性 `HasBackground="False"`（启动日志）在 Avalonia 无等价物，改 `Background=Transparent`；WPF `TextBox.VerticalScrollBarVisibility/HorizontalScrollBarVisibility=Disabled` 在 Avalonia 是 `ScrollViewer` 附加属性，本轮未设（只读日志框内容为空，不出现滚动条） | 仅属性表达方式 | 内边距 `Padding 0,4`、`Margin 15,34,15,13`、`BorderThickness 0`、字号 13 不得改 |
+| **R24** | 启动页行为边界：Linux 侧无实例列表 / 启动服务，`PageLaunchLeft` 固定呈现 Windows「加载完成但无可用版本」的 Case 2（`PageLaunchLeft.xaml.vb` L671–L677）——按钮「下载游戏」可点、版本按钮可用、`LabVersion`「未找到可用的游戏版本」；`BtnVersion`/`BtnLaunch` 只做栈跳转，`BtnMore`/`BtnCancel` 空操作；启动中整页 `PanLaunching` 结构已还原但无流程驱动 | 仅运行期状态机；静态布局必须完整 | 行/列定义、`BtnLaunch` 高 54、`BtnVersion` 高 35、`LabVersion` 11 号、`PanLaunching` 全部尺寸不得简化；接入启动服务后必须按 `RefreshButtonsUI` 的 0–3 状态分支补齐 |
+| **R25** | 启动页 WPF-only 视觉未复刻：`DropShadowBitmapEffect`（`PanLaunching` 标题投影，L85–L87）、`CombinedGeometry` 提示气泡上沿挖孔裁剪（L137–L147）、`LabVersion` 对 `BtnLaunch` 的 `RealRenderTransform` 缩放绑定（L66–L70）、`MyButton.TextPadding`（`BtnMore`，L28）在 Avalonia 无等价物或当前无对应属性 | 仅装饰与绑定 | 提示气泡 `Width 260`、`Margin 0,16,0,2`、标题字号 20/13.5、进度条高 4 与 69.28*/30.72* 比例不得改 |
+| **R26** | 版本选择页行为边界：Linux 侧无实例列表服务，`PageSelectLeft.PanList` 保持空、`PageSelectRight` 固定呈现空态卡片（`PageSelectRight.xaml.vb` L98–L109：`LabEmptyTitle`「无可用版本」、说明两行、下载按钮）；列表条目、「添加文件夹」注入项、加载卡片状态机未接入 | 仅数据与状态机；空态布局必须完整 | 左列 `MinWidth 250 / MaxWidth 300`、空态卡片 `Margin 40`、标题 19 号、分隔线高 2、按钮 `MinWidth 140 / Padding 13,0` 不得改 |
 
 ---
 
@@ -272,25 +277,25 @@
 
 | 文件 | 优先级 | 特有检查点 | 状态 |
 |---|---|---|---|
-| `FormMain.xaml` | P0 | 自绘标题栏高度、最小化/最大化/关闭按钮尺寸与图标、无边框拖拽区、窗口圆角 | ⬜（R2） |
-| `Pages/PageSelectLeft.xaml` | P0 | 左侧导航栏宽度、条目高度、分组标题字号 | ⬜ |
-| `Pages/PageSelectRight.xaml` | P0 | 右侧页面容器（`MyPageRight`）留白与滚动 | ⬜ |
+| `FormMain.xaml` | P0 | 自绘标题栏高度、最小化/最大化/关闭按钮尺寸与图标、无边框拖拽区、窗口圆角 | ✅（13.7，R2 / R19） |
+| `Pages/PageSelectLeft.xaml` | P0 | 左侧导航栏宽度、条目高度、分组标题字号 | ✅（13.10，R26） |
+| `Pages/PageSelectRight.xaml` | P0 | 右侧页面容器（`MyPageRight`）留白与滚动 | ✅（13.10，空态；R26） |
 
 ### 5.4 五大左侧导航（4，`PageSelectLeft` 除外的分区导航）
 
 | 文件 | 优先级 | 特有检查点 | 状态 |
 |---|---|---|---|
-| `Pages/PageLaunch/PageLaunchLeft.xaml` | P0 | 启动区导航条目与折叠 | ⬜ |
+| `Pages/PageLaunch/PageLaunchLeft.xaml` | P0 | 启动区导航条目与折叠 | ✅（13.10，R24 / R25） |
 | `Pages/PageInstance/PageInstanceLeft.xaml` | P1 | 实例列表为空时的空态 | ⬜（E） |
 | `Pages/PageDownload/PageDownloadLeft.xaml` | P1 | 下载区导航条目 | ⬜ |
-| `Pages/PageSetup/PageSetupLeft.xaml` | P1 | 设置区导航条目（含联机页入口） | ⬜ |
+| `Pages/PageSetup/PageSetupLeft.xaml` | P1 | 设置区导航条目（含联机页入口） | ✅（13.9） |
 | `Pages/PageOther/PageOtherLeft.xaml` | P2 | 其他区导航条目 | ⬜ |
 
 ### 5.5 启动区页面（11）
 
 | 文件 | 优先级 | 特有检查点 | 状态 |
 |---|---|---|---|
-| `Pages/PageLaunch/PageLaunchRight.xaml` | P0 | 版本卡片网格、卡片内边距、选中态 | ⬜ |
+| `Pages/PageLaunch/PageLaunchRight.xaml` | P0 | 版本卡片网格、卡片内边距、选中态 | ✅（13.10，提示条 + 日志卡；R22 / R23） |
 | `Pages/PageLaunch/MySkin.xaml` | P1 | 皮肤切换控件外观 | ⬜ |
 | `Pages/PageLaunch/MyMsgLogin.xaml` | P1 | 登录弹窗按钮顺序与文案 | ⬜ |
 | `Pages/PageLaunch/PageLoginMs.xaml` | P1 | 微软登录步骤布局 | ⬜（R7 浏览器回调） |
@@ -655,6 +660,20 @@ dotnet build PCL.Desktop.Linux/PCL.Desktop.Linux.csproj -c Release -r linux-x64
 2. `PclTheme.Refresh(int theme)` 按原语义实现（早退 + 重算 + 触发调用方套用画刷），参数恒为默认值，配色恒为 PCL 蓝。
 3. **不自行发明**「皮肤编号 → HSL」映射表；若要求皮肤真正改变颜色，须先由用户提供上游 PCL2 的映射数据，再在该单点接入。
 
+**补充核实（2026-11-11，只读上游 C# 分支）**：`pcl_nex插件参考/PCL2-Nex-dev` 是另一套 **LCH/Lab** 主题体系，
+不是本 fork 的 15 编号皮肤：`PCL.Core/App/ConfigEnums.cs` L16–L22 `ColorTheme { SkyBlue=0, CatBlue=1, DeathBlue=2, HmclBlue=3 }`；
+`PCL.Core/UI/Theme/ThemeService.cs` L151–L166 `GetCurrentThemeArgs()` 返回 `(Hue, LightAdjust, ChromaAdjust)` 四组常量
+（235/0.36/0.2、255/0/-0.2、268/-0.05/-0.1、275/-0.03/-0.35），L182–L214 用 `LabColor.FromLch` 逐通道算色；
+`Plain Craft Launcher 2/Modules/UI/Theme/ThemeManager.cs` L22 `ThemeRefresh(int newTheme = -1)` **同样不使用 `newTheme`**，
+只重取灰阶资源并调 `ThemeRefreshMain()`。两套编号语义与色彩空间均不一致，**不能把 Nex 的四个 LCH 参数当成 VB 0–14 的映射**。
+
+> **P-skin 待办（2026-11-11 用户裁决：换肤以后再说，先写完 UI）**
+> - 结论保留：本 fork 入口与持久化同 Windows（`UiLauncherTheme` 可切换），配色恒为 PCL 蓝；`PclTheme.Refresh` 是唯一接入点。
+> - **上游无可推导数据**：VB 侧无映射表（§13.8 上表 L66 无赋值点）；C# 分支是 4 主题 LCH 体系，编号不可对齐。
+> - 接入所需数据清单：① 0–14 编号 → `(Hue, Sat, LightAdjust, HueTopbarDelta)` 四参数表；② 自定义皮肤（14 号）四个滑块的取值语义
+>   （`UiLauncherHue/Sat/Delta/Light`，`Settings.vb` L140–L149，目前全库无读取点）；③ 5–14 号是否随解锁开放。
+> - 取得数据前**不再花时间翻参考仓库**，`PclTheme.Refresh` 保持现状即可。
+
 ### 13.9 设置栈左导航（LU3.1，2026-11-08）
 
 **对照来源**：`pcl-next/Pages/PageSetup/PageSetupLeft.xaml`（全部）；
@@ -680,6 +699,41 @@ dotnet build PCL.Desktop.Linux/PCL.Desktop.Linux.csproj -c Release -r linux-x64
 
 **未验证项**：悬停配色、勾选竖条、逐个进入/退出动画、左竖条宽度动画均需 Linux 显示环境（统一验收 V 项）。
 
+### 13.10 启动栈 + 版本选择栈（LU5.1，2026-11-11，只做编译验证、不弹窗）
+
+**对照来源**：`pcl-next/Pages/PageLaunch/PageLaunchLeft.xaml`（全文 156 行）+ `.xaml.vb`（L634–L690 `RefreshButtonsUI` 状态分支）；
+`pcl-next/Pages/PageLaunch/PageLaunchRight.xaml`（全文 21 行）；
+`pcl-next/Pages/PageSelectLeft.xaml`（17 行）+ `PageSelectRight.xaml`（25 行）+ `.xaml.vb` L98–L109（空态）；
+`pcl-next/FormMain.xaml.vb` L325–L385（构造期预建两页、首页直接挂载）、L1543–L1544（启动栈映射）、L1558–L1561（版本选择栈）；
+`FormMain.xaml` L121（默认选中「启动」）。
+
+**Linux 实现**：`Views/PageLaunchLeftView.axaml(.cs)`、`Views/PageLaunchRightView.axaml(.cs)`、
+`Views/PageSelectLeftView.axaml(.cs)`、`Views/PageSelectRightView.axaml(.cs)`；
+`MainWindow.axaml(.cs)`（首页改回启动栈、`StackVersionSelect=5` 次级栈、通用退出动画）；
+`Theme/PclControls.axaml`（补 `ScrollViewerFullMargin` 变体）；
+`Controls/MyControls.cs`（`MyPageLeft`：指定 `AnimatedControl` 但无可动画元素时不播放缩放动画，对齐 `MyPageLeft.vb` L17–L28）。
+
+| 项 | Windows 取值 | Linux 实现 | 结论 |
+|---|---|---|---|
+| 启动左页宽度 | `PageLaunchLeft Width=300` | `MyPageLeft Width=300` | 一致 |
+| `PanInput` 行列 | 行 `Auto/*/Auto/Auto/20`；列 `Auto/20/1*/Auto/10` | 同 | 一致 |
+| `BtnVersion` | 行3列2、高 35、`Margin 0,10,10,0`、「版本选择」 | 同；可点击 → 版本选择栈 | 一致（R24） |
+| `BtnMore` | 行3列3、高 35、初始 `Collapsed`、「版本设置」 | 同；`TextPadding` 未接入（R25），点击空操作（R24） | R24 / R25 |
+| `BtnLaunch` | 行2 跨5列、高 54、`Margin 20,0`、Highlight、`Padding 30,0,30,15` | 同；Case 2 文案「下载游戏」、可点击 → 下载栈 | 一致（R24） |
+| `LabVersion` | 同格底部、`Margin 35,0,35,10`、11 号、`ColorBrushGray3`、字符省略号 | 同；去掉对 `BtnLaunch` 的 `RealRenderTransform` 缩放绑定（R25） | R25 |
+| `PanTypeOne` | 跨5列、`Margin 20,24,20,-4`、胶囊圆角 13 / 高 27、图标 16×16 Scale 1.05、14 号主题色 | 同（图标 `Data` 运行期注入，当前为空） | 一致（R24） |
+| `PanType` | 跨5列、`Margin 20,22,20,0`、初始 `Collapsed`、正版/离线两个 `MyRadioButton` | 同；路径逐字节搬运 | 一致 |
+| `PanLaunching` | 5 行网格、初始 `Collapsed`+`Opacity 0`、`MyLoading` 高 50、标题 20 / 版本名 13.5 号 + `SkewTransform -3°`、进度条高 4（69.28*/30.72*）、四行信息、提示气泡 `Width 260`、取消按钮行4 | 结构全部照抄；`DropShadowBitmapEffect` 与气泡挖孔裁剪未复刻（R25） | R25 |
+| 右页 | `MyPageRight PanScroll`；`MyHint`（Blue / CanClose / HintSnapshot / Margin 0,0,0,15）；`PanCustom`；「启动日志」卡片 + 只读文本框 | `UserControl` + `ScrollViewer`；其余逐项照抄；`HasBackground=False` 用 `Transparent` 表达 | R22 / R23 |
+| 版本选择左页 | `MyPageLeft AnimatedControl="PanList"`；ScrollViewer `MinWidth 250 / MaxWidth 300`、`FullMargin`；行 `Auto/*/5` | 同（`AdornerDecorator` → `Grid`，无视觉差异） | 一致（R26） |
+| 版本选择右页 | 列表 / 空态卡片（居中、`Margin 40`、标题 19 号、分隔线 2、说明两行、按钮 `MinWidth 140`）/ 加载卡片三态 | 固定空态；按钮 → 下载栈 | 一致（R26） |
+| 首页 | 构造期直接挂 `FrmLaunchLeft`/`FrmLaunchRight`，标题栏「启动」选中 | 同（`ShowStack(0)`，无切换动画） | **R20 已回收** |
+| 版本选择栈 | `PageChange(InstanceSelect)` → `PageChangeAnim(FrmSelectLeft, FrmSelectRight)`；标题栏进入 `PanTitleInner`「版本选择」 | 切左右页；标题栏仍「启动」选中（`PanTitleInner` 未移植，R20） | R20 |
+
+**验证**：`dotnet build PCL.Desktop.Linux/PCL.Desktop.Linux.csproj -c Release -r linux-x64`
+→ **0 警告 / 0 错误**（产物 `bin-net10/Dev/2.100.0.4-0.86/linux-x64/`）。
+**未验证项**：启动页与版本选择页的进入动画、右页滚动、按钮 hover/按压、空态卡片居中均需统一验收目视（V3 / V10）。
+
 ## 14. 待统一验收清单（UI 全部成型后一次性执行）
 
 | 编号 | 待验收项 | 为什么必须靠运行判断 | 当前已知线索 |
@@ -693,3 +747,4 @@ dotnet build PCL.Desktop.Linux/PCL.Desktop.Linux.csproj -c Release -r linux-x64
 | **V6** | 字体与 CJK 渲染（R1） | 取决于目标机字体 | 本环境装 `fonts-noto-cjk` 后中文正常；最终仍需内嵌 `PCL English` + CJK 回退 |
 | **V8** | 无边框窗口契约（R2 / R19） | 拖拽、缩放、圆角裁剪都只在真实窗口后端生效，编译期无法判断 | 需目视：标题栏空白处拖动整窗、8 个热区（边 8px / 角 13px）各向缩放、`BorderForm` 圆角 6 裁剪内容、`PanBack` 起手 −4°/Y60 归零动画 |
 | **V9** | 标题栏外观与交互（R17 / R18 / R20） | 渐变由 HSL 运行期算出、状态色靠伪类，静态看不出来 | 需目视：三段渐变方向与明暗、`PCL Next` 文字位置（18px 左缩进）、5 个 Tab 常/悬停/按下/选中三态配色与单选互斥、关闭/最小化、点击其他栈后宿主置空且不报错 |
+| **V10** | 启动栈 / 版本选择栈（13.10） | 空态居中、按钮三态、页面进入动画、右页滚动、`ScrollViewerFullMargin` 滚动条 2,1,1,1 边距均需运行观察 | 需目视：首页为「启动」且标题栏「启动」选中、启动左页 300 宽（按钮 54 / 35 高）、「版本选择」点开进入 250–300 宽左列 + 居中空态卡片、「下载游戏」可点、右页提示条与日志卡、`PanLaunching` 保持隐藏 |

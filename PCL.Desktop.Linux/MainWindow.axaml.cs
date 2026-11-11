@@ -27,7 +27,14 @@ namespace PCL.Desktop.Linux;
 /// </summary>
 public partial class MainWindow : Window
 {
+    /// <summary>版本选择是次级页面栈（Windows `PageType.InstanceSelect`），不属于标题栏 5 个 Tab。</summary>
+    private const int StackVersionSelect = 5;
+
     private readonly Control? _linkPage;
+    private readonly PageLaunchLeftView _launchLeft;
+    private readonly PageLaunchRightView _launchRight;
+    private readonly PageSelectLeftView _selectLeft;
+    private readonly PageSelectRightView _selectRight;
     private MyPageLeft? _setupLeftPage;
     private CancellationTokenSource? _leftWidthAnimation;
 
@@ -63,14 +70,26 @@ public partial class MainWindow : Window
 
         HookResizers();
 
-        // 栈切换（vb L1438–L1471）：当前只有「联机」栈的页面已移植（R20）
-        _linkPage = PageRight.Content as Control;
+        // 页面实例：启动栈两页（vb L329–L330 在 FormMain 构造函数里预先创建）、版本选择栈两页
+        _launchLeft = new PageLaunchLeftView();
+        _launchRight = new PageLaunchRightView();
+        _selectLeft = new PageSelectLeftView();
+        _selectRight = new PageSelectRightView();
+        _linkPage = new PageSetupLinkView();
+
+        _launchLeft.VersionSelectRequested += (_, _) => ShowStack(StackVersionSelect);
+        _launchLeft.DownloadRequested += (_, _) => ShowStack(1);
+        _selectRight.DownloadRequested += (_, _) => ShowStack(1);
+
+        // 栈切换（vb L1438–L1471）
         BtnTitleSelect0.Check += (_, on) => { if (on) ShowStack(0); };
         BtnTitleSelect1.Check += (_, on) => { if (on) ShowStack(1); };
         BtnTitleSelect2.Check += (_, on) => { if (on) ShowStack(2); };
         BtnTitleSelect3.Check += (_, on) => { if (on) ShowStack(3); };
         BtnTitleSelect4.Check += (_, on) => { if (on) ShowStack(4); };
-        ShowStack(2);
+
+        // 首页 = 启动栈（vb L378–L385：直接把 FrmLaunchLeft / FrmLaunchRight 挂到左右宿主，无切换动画）
+        ShowStack(0);
     }
 
     /// <summary>
@@ -84,23 +103,30 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// 切换页面栈（vb L1438–L1471）。Windows 端「联机」栈的左页是空的（L1551 `PageChangeAnim(New MyPageLeft, FrmLinkMain)`）；
-    /// 「设置」栈左页用 `PageSetupLeftView`，右页尚缺设置子页（登记 R20）；其余三栈两页都未移植，宿主置空。
+    /// 切换页面栈（vb L1438–L1471）。
+    /// 0 启动 / 2 联机 / 3 设置 已有页面；1 下载 / 4 更多 尚未移植（宿主置空，R20）；
+    /// 5 = 版本选择次级栈（`PageType.InstanceSelect`，标题栏保持「启动」选中，与原逻辑一致）。
     /// </summary>
     private void ShowStack(int index)
     {
-        if (PageLeft.Content is MyPageLeft leaving && index != 3) leaving.TriggerHideAnimation();
+        if (PageLeft.Content is MyPageLeft leaving) leaving.TriggerHideAnimation();
 
         switch (index)
         {
+            case 0:
+                PageLeft.Content = _launchLeft;
+                PageRight.Content = _launchRight;
+                // 页面刚挂上，等布局跑完再播放进入动画（对应 Windows 端 `TriggerShowAnimation`）
+                Dispatcher.UIThread.Post(() => _launchLeft.TriggerShowAnimation(), DispatcherPriority.Loaded);
+                break;
             case 2:
                 PageLeft.Content = null;
                 PageRight.Content = _linkPage;
                 break;
             case 3:
                 _setupLeftPage ??= new PageSetupLeftView();
-                PageRight.Content = null;
                 PageLeft.Content = _setupLeftPage;
+                PageRight.Content = null;
                 // 页面刚挂上，等布局跑完再取宽度并播放逐个进入动画（对应 Windows 端 `TriggerShowAnimation`）
                 Dispatcher.UIThread.Post(() =>
                 {
@@ -108,6 +134,11 @@ public partial class MainWindow : Window
                     UpdateLeftBackgroundWidth();
                 }, DispatcherPriority.Loaded);
                 return;
+            case StackVersionSelect:
+                PageLeft.Content = _selectLeft;
+                PageRight.Content = _selectRight;
+                Dispatcher.UIThread.Post(() => _selectLeft.TriggerShowAnimation(), DispatcherPriority.Loaded);
+                break;
             default:
                 PageLeft.Content = null;
                 PageRight.Content = null;

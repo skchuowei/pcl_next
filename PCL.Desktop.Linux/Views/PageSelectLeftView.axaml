@@ -1,0 +1,31 @@
+<c:MyPageLeft xmlns="https://github.com/avaloniaui"
+              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+              xmlns:c="using:PCL.Desktop.Linux.Controls"
+              x:Class="PCL.Desktop.Linux.Views.PageSelectLeftView"
+              AnimatedControl="PanList">
+
+    <!--
+      1:1 对照基准：pcl-next/Pages/PageSelectLeft.xaml（全文 17 行）
+      · 根 MyPageLeft AnimatedControl="PanList"
+      · WPF `AdornerDecorator` 只作装饰层宿主，无视觉输出 → Avalonia 直接用 Grid 承担行布局
+      · 行 Auto / * / 5；ScrollViewer 行1、MaxWidth 300、MinWidth 250、竖排 Auto、横排 Disabled、
+        Style=ScrollViewerFullMargin（滚动条 Margin 2,1,1,1，已在 PclControls.axaml 补 fullmargin 变体）
+      · PanList：版本列表容器，条目由运行期注入（Linux 暂无实例列表服务，保持空）
+      差异登记：R26 —— 列表条目与「添加文件夹」运行时注入项未移植
+    -->
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition />
+            <RowDefinition Height="5" />
+        </Grid.RowDefinitions>
+        <ScrollViewer Grid.Row="1"
+                      Classes="fullmargin"
+                      MaxWidth="300" MinWidth="250"
+                      VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled">
+            <StackPanel x:Name="PanList" />
+        </ScrollViewer>
+    </Grid>
+</c:MyPageLeft>
