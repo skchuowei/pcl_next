@@ -117,6 +117,8 @@
 | **R24** | 启动页行为边界：Linux 侧无实例列表 / 启动服务，`PageLaunchLeft` 固定呈现 Windows「加载完成但无可用版本」的 Case 2（`PageLaunchLeft.xaml.vb` L671–L677）——按钮「下载游戏」可点、版本按钮可用、`LabVersion`「未找到可用的游戏版本」；`BtnVersion`/`BtnLaunch` 只做栈跳转，`BtnMore`/`BtnCancel` 空操作；启动中整页 `PanLaunching` 结构已还原但无流程驱动 | 仅运行期状态机；静态布局必须完整 | 行/列定义、`BtnLaunch` 高 54、`BtnVersion` 高 35、`LabVersion` 11 号、`PanLaunching` 全部尺寸不得简化；接入启动服务后必须按 `RefreshButtonsUI` 的 0–3 状态分支补齐 |
 | **R25** | 启动页 WPF-only 视觉未复刻：`DropShadowBitmapEffect`（`PanLaunching` 标题投影，L85–L87）、`CombinedGeometry` 提示气泡上沿挖孔裁剪（L137–L147）、`LabVersion` 对 `BtnLaunch` 的 `RealRenderTransform` 缩放绑定（L66–L70）、`MyButton.TextPadding`（`BtnMore`，L28）在 Avalonia 无等价物或当前无对应属性 | 仅装饰与绑定 | 提示气泡 `Width 260`、`Margin 0,16,0,2`、标题字号 20/13.5、进度条高 4 与 69.28*/30.72* 比例不得改 |
 | **R26** | 版本选择页行为边界：Linux 侧无实例列表服务，`PageSelectLeft.PanList` 保持空、`PageSelectRight` 固定呈现空态卡片（`PageSelectRight.xaml.vb` L98–L109：`LabEmptyTitle`「无可用版本」、说明两行、下载按钮）；列表条目、「添加文件夹」注入项、加载卡片状态机未接入 | 仅数据与状态机；空态布局必须完整 | 左列 `MinWidth 250 / MaxWidth 300`、空态卡片 `Margin 40`、标题 19 号、分隔线高 2、按钮 `MinWidth 140 / Padding 13,0` 不得改 |
+| **R27** | `MySlider` 数值提示：WPF 的 `Popup`（`GetHintText` 动态文案、拖动/键盘时弹出、700ms 后收起）未移植；拖动时的 1.3 滑块缩放与 40ms 颜色切换并入 R10 近似 | 仅提示气泡与动画 | 轨道 1px/2px、滑块 10×10、宽度算法（两端 0.5 补偿）与配色分支不得改；接入设置页后再按 `RefreshPopup` 补 |
+| **R28** | `MyExtraTextButton` 近似：WPF 圆角绑定 `ActualHeight×0.4`（52 → 20.8）改为固定 21；`Show` 进出场（0→1 淡入 80ms + 0.15→0.85 缩放）未移植；按下 800ms→0.85、60ms→0.80 的分段压缩为 100ms→0.8，回弹 300ms `BackEaseOut` 保留 | 仅动画与绑定表达式 | 高 52、内层下移 10、文案 16 号 `ColorBrush8`、图标 `Margin 2,12,0,12`、悬停 `ColorBrush4` / 禁用 `ColorBrushGray4` 不得改 |
 
 ---
 
@@ -256,7 +258,7 @@
 | `Controls/MyButton.xaml` | P0 | 外层 `#01eaf2fe`、内层圆角 3 / 1px / `#55FFFFFF`；Normal `Brush1`、Highlight `Brush2`、Red `RedDark`；hover `Brush3`（Red→`RedLight`）+ 背景 `Brush7`（Red→`RedBack`）；100ms/200ms；按压缩放 0.955 | ✅（动画曲线 R4） |
 | `Controls/MyCheckBox.xaml` | P0 | 勾选框尺寸、边框色、选中色 | ✅（13.3） |
 | `Controls/MyExtraButton.xaml` | P1 | 图标按钮尺寸与 hover 底色 `Brush7` | ⬜ |
-| `Controls/MyExtraTextButton.xaml` | P1 | 文字按钮字号与下划线交互 | ⬜ |
+| `Controls/MyExtraTextButton.xaml` | P1 | 文字按钮字号与下划线交互 | ✅（13.11，R28） |
 | `Controls/MyHint.xaml` | P0 | 提示条背景/边框/图标与字号 | ✅（13.3，R11） |
 | `Controls/MyIconButton.xaml` | P0 | 矢量图标 + 圆角 + hover | ✅（13.3，R12） |
 | `Controls/MyIconTextButton.xaml` | P1 | 图标 + 文字间距、字号 | ⬜ |
@@ -265,10 +267,10 @@
 | `Controls/MyMsg/MyMsgInput.xaml` | P1 | 弹窗尺寸、按钮排布 | ⬜ |
 | `Controls/MyMsg/MyMsgSelect.xaml` | P1 | 选项列表与按钮排布 | ⬜ |
 | `Controls/MyMsg/MyMsgText.xaml` | P1 | 文本弹窗内边距与按钮 | ⬜ |
-| `Controls/MyRadioBox.xaml` | P1 | 圆点尺寸、选中色 | ⬜ |
-| `Controls/MyRadioButton.xaml` | P1 | 单选按钮间距与字号 | ⬜ |
+| `Controls/MyRadioBox.xaml` | P1 | 圆点尺寸、选中色 | ✅（13.11） |
+| `Controls/MyRadioButton.xaml` | P1 | 单选按钮间距与字号 | ✅（13.7） |
 | `Controls/MySearchBox.xaml` | P1 | 搜索图标位置、占位文案 | ⬜ |
-| `Controls/MySlider.xaml` | P1 | 轨道高度、滑块尺寸、渐变 | ⬜ |
+| `Controls/MySlider.xaml` | P1 | 轨道高度、滑块尺寸、渐变 | ✅（13.11，R27） |
 | `Controls/MySliderDot.xaml` | P1 | 圆点尺寸与选中态 | ⬜ |
 
 > 注：`MyCard` 在 WPF 端无独立 `.xaml`（纯代码类），对照基准为 [MyCard.vb](file:///d:/bing/MC/pcl_x/PCL_NEXT_Linux/pcl-next/Controls/MyCard.vb)；`MyTextBox` / `MyComboBox` 样式取自 `Application.xaml`。
@@ -734,6 +736,26 @@ dotnet build PCL.Desktop.Linux/PCL.Desktop.Linux.csproj -c Release -r linux-x64
 → **0 警告 / 0 错误**（产物 `bin-net10/Dev/2.100.0.4-0.86/linux-x64/`）。
 **未验证项**：启动页与版本选择页的进入动画、右页滚动、按钮 hover/按压、空态卡片居中均需统一验收目视（V3 / V10）。
 
+### 13.11 设置页前置控件（LU4.1，2026-11-11，只做编译验证、不弹窗）
+
+**动机**：设置区三页（`PageSetupLaunch/UI/System`）依赖尚未移植的 `MyRadioBox`（7/24/0 处）、`MySlider`（1/8/3 处）、`MyExtraTextButton`（1 处）；
+按「控件先于页面」纪律先补这三个控件。
+
+**对照来源**：`pcl-next/Controls/MyRadioBox.xaml`（全文 9 行）+ `.xaml.vb`（`SyncUI` L101–L149、互斥 L57–L87）；
+`pcl-next/Controls/MySlider.xaml`（全文 29 行）+ `.xaml.vb`（`RefreshWidth` L70–L77、`DragDoing` L93–L100、配色 L119–L161、按键 L165–L192、提示 L108–L115）；
+`pcl-next/Controls/MyExtraTextButton.xaml`（全文 33 行）+ `.xaml.vb`（点击 L83–L90、缩放 L94–L125、配色 L131–L161）。
+
+**Linux 实现**：`Controls/MyControls.cs` 三个类 + `Theme/PclControls.axaml` 三段自绘模板。
+
+| 控件 | 关键取值（照抄） | 差异 |
+|---|---|---|
+| `MyRadioBox` | 圆环 18×18 / `Stroke 1.1` / `Margin 1,0,0,0`；圆点选中 9×9 `Margin 5.5`、未选中 0×0 `Margin 10`；文案 13 号 `Margin 26,0,0,0`；常态 `ColorBrush1` / 选中 `ColorBrush2` / 悬停 `ColorBrush3` / 禁用 `ColorBrushGray5`；同父容器互斥 | 150ms 勾选与颜色动画用 `Transitions` 近似（R10） |
+| `MySlider` | 高 16；底轨 1px `ColorBrushBg0`×0.3（`Margin 0,2,1,0`、右对齐）；前轨 2px（`Margin 1,1,0,0`、左对齐）；滑块 10×10 `Stroke 1.2`；宽度 `Value/MaxValue*(W-10)` + 两端 0.5 补偿；拖动取值 `(x-5)/(W-10)` clamp；←/→ 步进 `ValueByKey` | 数值提示 `Popup` 未移植（R27）；拖动缩放并入 R10 |
+| `MyExtraTextButton` | 高 52 / 圆角 21；外层 `ColorBrushSemiTransparent`、内层 `ColorBrush3` 下移 10 + 10px 阴影；图标 `Margin 2,12,0,12`、文案 16 号 `ColorBrush8` `Margin 12,0,0,0.8`；悬停 `ColorBrush4`、禁用 `ColorBrushGray4` | 圆角绑定改固定 21、`Show` 动画未接入、按压缩放分段合并（R28） |
+
+**验证**：`dotnet build PCL.Desktop.Linux/PCL.Desktop.Linux.csproj -c Release -r linux-x64` → **0 警告 / 0 错误**
+（产物 `bin-net10/Dev/2.100.0.4-0.87/linux-x64/`）。三个控件尚未被页面使用，需随设置页统一验收目视（V11）。
+
 ## 14. 待统一验收清单（UI 全部成型后一次性执行）
 
 | 编号 | 待验收项 | 为什么必须靠运行判断 | 当前已知线索 |
@@ -748,3 +770,4 @@ dotnet build PCL.Desktop.Linux/PCL.Desktop.Linux.csproj -c Release -r linux-x64
 | **V8** | 无边框窗口契约（R2 / R19） | 拖拽、缩放、圆角裁剪都只在真实窗口后端生效，编译期无法判断 | 需目视：标题栏空白处拖动整窗、8 个热区（边 8px / 角 13px）各向缩放、`BorderForm` 圆角 6 裁剪内容、`PanBack` 起手 −4°/Y60 归零动画 |
 | **V9** | 标题栏外观与交互（R17 / R18 / R20） | 渐变由 HSL 运行期算出、状态色靠伪类，静态看不出来 | 需目视：三段渐变方向与明暗、`PCL Next` 文字位置（18px 左缩进）、5 个 Tab 常/悬停/按下/选中三态配色与单选互斥、关闭/最小化、点击其他栈后宿主置空且不报错 |
 | **V10** | 启动栈 / 版本选择栈（13.10） | 空态居中、按钮三态、页面进入动画、右页滚动、`ScrollViewerFullMargin` 滚动条 2,1,1,1 边距均需运行观察 | 需目视：首页为「启动」且标题栏「启动」选中、启动左页 300 宽（按钮 54 / 35 高）、「版本选择」点开进入 250–300 宽左列 + 居中空态卡片、「下载游戏」可点、右页提示条与日志卡、`PanLaunching` 保持隐藏 |
+| **V11** | 设置页前置控件（13.11） | 圆点/圆环尺寸、滑块宽度算法、拖动与键盘步进、胶囊按钮配色均需运行观察 | 需目视：`MyRadioBox` 18 圆环 + 9 圆点（选中 `ColorBrush2`、悬停 `ColorBrush3`）、`MySlider` 底轨 1px/前轨 2px/滑块 10、拖动与 ←/→ 生效、`MyExtraTextButton` 52 高 + 内层下移 10 + 悬停 `ColorBrush4` |

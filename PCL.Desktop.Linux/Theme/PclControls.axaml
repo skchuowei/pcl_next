@@ -717,4 +717,154 @@
         <Setter Property="Foreground" Value="{DynamicResource ColorBrush3}" />
     </Style>
 
+    <!-- ===== MyRadioBox（对照 Controls/MyRadioBox.xaml）
+         18×18 圆环 + 圆点 + 13 号文案 Margin 26,0,0,0；配色统一走 Foreground ===== -->
+    <Style Selector="c|MyRadioBox">
+        <Setter Property="Foreground" Value="{DynamicResource ColorBrush1}" />
+        <Setter Property="Background" Value="{DynamicResource ColorBrushSemiTransparent}" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="Focusable" Value="True" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate>
+                    <Grid MinWidth="20" MinHeight="20" Background="{TemplateBinding Background}">
+                        <TextBlock Name="PART_LabText" Text="{TemplateBinding Text}"
+                                   FontSize="{TemplateBinding FontSize}"
+                                   Margin="26,0,0,0" Foreground="{TemplateBinding Foreground}"
+                                   HorizontalAlignment="Left" VerticalAlignment="Center"
+                                   IsHitTestVisible="False" />
+                        <Ellipse Width="18" Height="18" Margin="1,0,0,0"
+                                 Stroke="{TemplateBinding Foreground}" StrokeThickness="1.1"
+                                 Fill="{DynamicResource ColorBrushHalfWhite}"
+                                 HorizontalAlignment="Left" VerticalAlignment="Center"
+                                 IsHitTestVisible="False" />
+                        <Ellipse Name="PART_Dot" Width="0" Height="0" Margin="10,0,0,0"
+                                 Fill="{TemplateBinding Foreground}"
+                                 HorizontalAlignment="Left" VerticalAlignment="Center"
+                                 IsHitTestVisible="False">
+                            <Ellipse.Transitions>
+                                <Transitions>
+                                    <DoubleTransition Property="Width" Duration="0:0:0.15" />
+                                    <DoubleTransition Property="Height" Duration="0:0:0.15" />
+                                </Transitions>
+                            </Ellipse.Transitions>
+                        </Ellipse>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+    <Style Selector="c|MyRadioBox:checked">
+        <Setter Property="Foreground" Value="{DynamicResource ColorBrush2}" />
+    </Style>
+    <!-- 悬停写在选中之后：原代码 MouseEnter 一律切 ColorBrush3（含选中态） -->
+    <Style Selector="c|MyRadioBox:pointerover">
+        <Setter Property="Foreground" Value="{DynamicResource ColorBrush3}" />
+    </Style>
+    <Style Selector="c|MyRadioBox:disabled">
+        <Setter Property="Foreground" Value="{DynamicResource ColorBrushGray5}" />
+    </Style>
+    <Style Selector="c|MyRadioBox:checked /template/ Ellipse#PART_Dot">
+        <Setter Property="Width" Value="9" />
+        <Setter Property="Height" Value="9" />
+        <Setter Property="Margin" Value="5.5,0,0,0" />
+    </Style>
+
+    <!-- ===== MySlider（对照 Controls/MySlider.xaml）
+         高 16；底轨 1px（Bg0×0.3）、前轨 2px、滑块 10×10；前景色统一走 BorderBrush ===== -->
+    <Style Selector="c|MySlider">
+        <Setter Property="MinHeight" Value="16" />
+        <Setter Property="Background" Value="{DynamicResource ColorBrushSemiTransparent}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource ColorBrushBg0}" />
+        <Setter Property="Focusable" Value="True" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate>
+                    <Border Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}">
+                        <Border.Transitions>
+                            <Transitions>
+                                <BrushTransition Property="BorderBrush" Duration="0:0:0.1" />
+                            </Transitions>
+                        </Border.Transitions>
+                        <Grid MinHeight="16" MaxHeight="16" IsHitTestVisible="False">
+                            <Rectangle Name="PART_LineBack" Height="1"
+                                       Fill="{TemplateBinding BorderBrush}" Opacity="0.3"
+                                       Margin="0,2,1,0" HorizontalAlignment="Right" VerticalAlignment="Top" />
+                            <Rectangle Name="PART_LineFore" Height="2"
+                                       Fill="{TemplateBinding BorderBrush}"
+                                       Margin="1,1,0,0" HorizontalAlignment="Left" VerticalAlignment="Top" />
+                            <Ellipse Name="PART_Dot" Width="10" Height="10"
+                                     Stroke="{TemplateBinding BorderBrush}" StrokeThickness="1.2"
+                                     Fill="{TemplateBinding BorderBrush}"
+                                     HorizontalAlignment="Left" VerticalAlignment="Center" />
+                        </Grid>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+    <Style Selector="c|MySlider:pointerover">
+        <Setter Property="BorderBrush" Value="{DynamicResource ColorBrush3}" />
+    </Style>
+    <Style Selector="c|MySlider:disabled">
+        <Setter Property="BorderBrush" Value="{DynamicResource ColorBrushGray5}" />
+    </Style>
+
+    <!-- ===== MyExtraTextButton（对照 Controls/MyExtraTextButton.xaml）
+         高 52、圆角 21、外层半透明胶囊 + 内层 ColorBrush3 胶囊（下移 10）、图标 + 16 号文案 ===== -->
+    <Style Selector="c|MyExtraTextButton">
+        <Setter Property="Height" Value="52" />
+        <Setter Property="Margin" Value="20" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate>
+                    <Grid RenderTransformOrigin="0.5,0.5">
+                        <Border Name="PART_Click" BorderThickness="0.001"
+                                Background="{DynamicResource ColorBrushSemiTransparent}"
+                                CornerRadius="21" />
+                        <Grid Name="PART_PanScale" Margin="0,10,0,0"
+                              RenderTransformOrigin="0.5,0.5" IsHitTestVisible="False">
+                            <Grid.Transitions>
+                                <Transitions>
+                                    <TransformOperationsTransition Property="RenderTransform"
+                                                                   Duration="0:0:0.1" />
+                                </Transitions>
+                            </Grid.Transitions>
+                            <Border Name="PART_Color" BorderThickness="0.001"
+                                    Background="{DynamicResource ColorBrush3}" CornerRadius="21"
+                                    BoxShadow="0 0 10 0 #33000000">
+                                <Border.Transitions>
+                                    <Transitions>
+                                        <BrushTransition Property="Background" Duration="0:0:0.12" />
+                                    </Transitions>
+                                </Border.Transitions>
+                            </Border>
+                            <StackPanel Orientation="Horizontal" Margin="20,0">
+                                <Path Name="PART_Path" Stretch="Uniform"
+                                      Margin="2,12,0,12" Fill="{DynamicResource ColorBrush8}"
+                                      RenderTransformOrigin="0.5,0.5" />
+                                <TextBlock Name="PART_LabText" Text="{TemplateBinding Text}"
+                                           VerticalAlignment="Center"
+                                           Foreground="{DynamicResource ColorBrush8}"
+                                           FontSize="16" Margin="12,0,0,0.8" />
+                            </StackPanel>
+                        </Grid>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+    <Style Selector="c|MyExtraTextButton:pointerover /template/ Border#PART_Color">
+        <Setter Property="Background" Value="{DynamicResource ColorBrush4}" />
+    </Style>
+    <Style Selector="c|MyExtraTextButton:disabled /template/ Border#PART_Color">
+        <Setter Property="Background" Value="{DynamicResource ColorBrushGray4}" />
+    </Style>
+    <Style Selector="c|MyExtraTextButton:down /template/ Grid#PART_PanScale">
+        <Setter Property="RenderTransform" Value="scale(0.8)" />
+    </Style>
+
 </Styles>

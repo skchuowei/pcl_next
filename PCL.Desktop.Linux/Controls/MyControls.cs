@@ -1059,6 +1059,320 @@ public class MyRadioButton : TemplatedControl
 }
 
 /// <summary>
+/// 单选框（圆点），1:1 对齐 `pcl-next/Controls/MyRadioBox.xaml(.vb)`：
+/// 18×18 圆环（`Stroke 1.1`、`Margin 1,0,0,0`）+ 圆点（选中 9×9 / `Margin 5.5,0,0,0`，未选中 0×0 / `Margin 10,0,0,0`），
+/// 文案 13 号、`Margin 26,0,0,0`。配色统一走 `Foreground`：常态 `ColorBrush1`、选中 `ColorBrush2`、
+/// 悬停 `ColorBrush3`、禁用 `ColorBrushGray5`（文字与圆环同色，与原代码逐分支一致）。
+/// 150ms 勾选动画用 `Transitions` 近似（R10）；同父容器内互斥照抄原 `SetChecked`。
+/// </summary>
+public class MyRadioBox : TemplatedControl
+{
+    public static readonly StyledProperty<string?> TextProperty =
+        AvaloniaProperty.Register<MyRadioBox, string?>(nameof(Text));
+
+    public static readonly StyledProperty<bool> CheckedProperty =
+        AvaloniaProperty.Register<MyRadioBox, bool>(nameof(Checked));
+
+    public string? Text
+    {
+        get => GetValue(TextProperty);
+        set => SetValue(TextProperty, value);
+    }
+
+    public bool Checked
+    {
+        get => GetValue(CheckedProperty);
+        set => SetValue(CheckedProperty, value);
+    }
+
+    /// <summary>参数为勾选后的状态（对应原 `Check(raiseByMouse)`）。</summary>
+    public event EventHandler<bool>? Check;
+
+    private bool _syncing;
+
+    protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
+    {
+        base.OnPropertyChanged(change);
+        if (change.Property == CheckedProperty) OnCheckedChanged();
+    }
+
+    private void OnCheckedChanged()
+    {
+        PseudoClasses.Set(":checked", Checked);
+        if (Checked && !_syncing) UncheckSiblings();
+        Check?.Invoke(this, Checked);
+    }
+
+    /// <summary>手动设置勾选（对应原 `SetChecked(value, user)`）。</summary>
+    public void SetChecked(bool value, bool user = false) => Checked = value;
+
+    private void UncheckSiblings()
+    {
+        if (Parent is not Panel panel) return;
+        foreach (var sibling in panel.Children)
+        {
+            if (sibling is MyRadioBox radio && !ReferenceEquals(radio, this) && radio.Checked)
+            {
+                radio._syncing = true;
+                radio.Checked = false;
+                radio._syncing = false;
+            }
+        }
+    }
+
+    protected override void OnPointerReleased(PointerReleasedEventArgs e)
+    {
+        base.OnPointerReleased(e);
+        if (!IsEnabled) return;
+        if (e.InitialPressMouseButton != MouseButton.Left) return;
+        if (!Checked) Checked = true;
+    }
+}
+
+/// <summary>
+/// 滑动条，1:1 对齐 `pcl-next/Controls/MySlider.xaml(.vb)`：
+/// 根 `Border` 高 16、背景 `ColorBrushSemiTransparent`、边框色承载前景色；
+/// 底轨 1px（`ColorBrushBg0` × 0.3，右对齐、`Margin 0,2,1,0`）、前轨 2px（左对齐、`Margin 1,1,0,0`）、
+/// 滑块 10×10（`Stroke 1.2`、`Fill` 同前景）。
+/// 宽度算法逐行照抄 `RefreshWidth`（`NewWidth = Value/MaxValue*(W-10)`，两端各补 0.5 抗锯齿）。
+/// 配色：常态/选中 `ColorBrushBg0`、悬停与拖动 `ColorBrush3`、禁用 `ColorBrushGray5`。
+/// 未接入：数值提示 `Popup`（`GetHintText`，R27）、拖动时的 40ms 颜色/1.3 缩放动画（并入 R10）。
+/// </summary>
+public class MySlider : TemplatedControl
+{
+    public static readonly StyledProperty<int> MaxValueProperty =
+        AvaloniaProperty.Register<MySlider, int>(nameof(MaxValue), 100);
+
+    public static readonly StyledProperty<int> ValueProperty =
+        AvaloniaProperty.Register<MySlider, int>(nameof(Value));
+
+    public static readonly StyledProperty<int> ValueByKeyProperty =
+        AvaloniaProperty.Register<MySlider, int>(nameof(ValueByKey), 1);
+
+    public int MaxValue
+    {
+        get => GetValue(MaxValueProperty);
+        set => SetValue(MaxValueProperty, Math.Max(0, value));
+    }
+
+    public int Value
+    {
+        get => GetValue(ValueProperty);
+        set => SetValue(ValueProperty, Math.Clamp(value, 0, Math.Max(0, MaxValue)));
+    }
+
+    public int ValueByKey
+    {
+        get => GetValue(ValueByKeyProperty);
+        set => SetValue(ValueByKeyProperty, value);
+    }
+
+    /// <summary>值改变（对应原 `Change(sender, user)`；user 语义由调用方自行判断）。</summary>
+    public event EventHandler<int>? Changed;
+
+    private Shapes.Rectangle? _lineBack;
+    private Shapes.Rectangle? _lineFore;
+    private Shapes.Ellipse? _dot;
+    private bool _dragging;
+
+    public MySlider()
+    {
+        SizeChanged += (_, _) => RefreshWidth();
+    }
+
+    protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
+    {
+        base.OnPropertyChanged(change);
+
+        if (change.Property == ValueProperty)
+        {
+            if (Value > MaxValue) Value = MaxValue;
+            RefreshWidth();
+            Changed?.Invoke(this, Value);
+        }
+        else if (change.Property == MaxValueProperty)
+        {
+            if (Value > MaxValue) Value = MaxValue;
+            RefreshWidth();
+        }
+        else if (change.Property == IsEnabledProperty)
+        {
+            Cursor = new Cursor(IsEnabled ? StandardCursorType.Hand : StandardCursorType.Arrow);
+        }
+    }
+
+    protected override void OnApplyTemplate(TemplateAppliedEventArgs e)
+    {
+        base.OnApplyTemplate(e);
+        _lineBack = e.NameScope.Find<Shapes.Rectangle>("PART_LineBack");
+        _lineFore = e.NameScope.Find<Shapes.Rectangle>("PART_LineFore");
+        _dot = e.NameScope.Find<Shapes.Ellipse>("PART_Dot");
+        RefreshWidth();
+    }
+
+    private void RefreshWidth()
+    {
+        if (_lineBack is null || _lineFore is null || _dot is null) return;
+
+        var width = Bounds.Width;
+        var usable = Math.Max(0, width - _dot.Width);
+        if (usable <= 0)
+        {
+            _lineFore.Width = 0;
+            _lineBack.Width = 0;
+            _dot.Margin = new Thickness(0);
+            return;
+        }
+
+        var newWidth = MaxValue <= 0 ? 0d : (double)Value / MaxValue * usable;
+        var back = usable - newWidth;
+        _lineFore.Width = Math.Max(0, newWidth + (newWidth < 0.5 ? 0 : 0.5));
+        _lineBack.Width = Math.Max(0, back + (back < 0.5 ? 0 : 0.5));
+        _dot.Margin = new Thickness(newWidth, 0, 0, 0);
+    }
+
+    protected override void OnPointerPressed(PointerPressedEventArgs e)
+    {
+        base.OnPointerPressed(e);
+        if (!IsEnabled || !e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
+        e.Pointer.Capture(this);
+        _dragging = true;
+        Focus();
+        UpdateFromPointer(e.GetPosition(this).X);
+        e.Handled = true;
+    }
+
+    protected override void OnPointerMoved(PointerEventArgs e)
+    {
+        base.OnPointerMoved(e);
+        if (_dragging) UpdateFromPointer(e.GetPosition(this).X);
+    }
+
+    protected override void OnPointerReleased(PointerReleasedEventArgs e)
+    {
+        base.OnPointerReleased(e);
+        if (!_dragging) return;
+        _dragging = false;
+        e.Pointer.Capture(null);
+        UpdateFromPointer(e.GetPosition(this).X);
+    }
+
+    private void UpdateFromPointer(double x)
+    {
+        var usable = Bounds.Width - (_dot?.Width ?? 10);
+        if (usable <= 0 || MaxValue <= 0) return;
+        var percent = Math.Clamp((x - (_dot?.Width ?? 10) / 2) / usable, 0d, 1d);
+        var newValue = (int)(percent * MaxValue);
+        if (newValue != Value) Value = newValue;
+    }
+
+    protected override void OnKeyDown(KeyEventArgs e)
+    {
+        base.OnKeyDown(e);
+        if (e.Key == Key.Left)
+        {
+            Value = Math.Max(0, Value - ValueByKey);
+            e.Handled = true;
+        }
+        else if (e.Key == Key.Right)
+        {
+            Value = Math.Min(MaxValue, Value + ValueByKey);
+            e.Handled = true;
+        }
+    }
+}
+
+/// <summary>
+/// 附加文字按钮（设置页底部的「版本独立设置」大按钮），1:1 对齐 `pcl-next/Controls/MyExtraTextButton.xaml(.vb)`：
+/// 高 52、圆角 0.4×高（≈21）、外层 `ColorBrushSemiTransparent` 胶囊、
+/// 内层 `ColorBrush3` 胶囊（下移 10）、图标（`Margin 2,12,0,12`）+ 16 号 `ColorBrush8` 文案（`Margin 12,0,0,0.8`）；
+/// 悬停 → `ColorBrush4`，禁用 → `ColorBrushGray4`；按下内层缩到 0.8。
+/// 未接入：`Show` 进出场动画、按压缩放的 800ms/60ms 分段（合并为 100ms 近似，R28）。
+/// </summary>
+public class MyExtraTextButton : TemplatedControl
+{
+    public static readonly StyledProperty<string?> TextProperty =
+        AvaloniaProperty.Register<MyExtraTextButton, string?>(nameof(Text));
+
+    public static readonly StyledProperty<string?> LogoProperty =
+        AvaloniaProperty.Register<MyExtraTextButton, string?>(nameof(Logo));
+
+    public static readonly StyledProperty<double> LogoScaleProperty =
+        AvaloniaProperty.Register<MyExtraTextButton, double>(nameof(LogoScale), 1d);
+
+    public string? Text
+    {
+        get => GetValue(TextProperty);
+        set => SetValue(TextProperty, value);
+    }
+
+    public string? Logo
+    {
+        get => GetValue(LogoProperty);
+        set => SetValue(LogoProperty, value);
+    }
+
+    public double LogoScale
+    {
+        get => GetValue(LogoScaleProperty);
+        set => SetValue(LogoScaleProperty, value);
+    }
+
+    public event EventHandler? Click;
+
+    private Shapes.Path? _path;
+    private bool _pressed;
+
+    protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
+    {
+        base.OnPropertyChanged(change);
+        if (change.Property == LogoProperty || change.Property == LogoScaleProperty) SyncLogo();
+    }
+
+    protected override void OnApplyTemplate(TemplateAppliedEventArgs e)
+    {
+        base.OnApplyTemplate(e);
+        _path = e.NameScope.Find<Shapes.Path>("PART_Path");
+        SyncLogo();
+    }
+
+    private void SyncLogo()
+    {
+        if (_path is null) return;
+        _path.Data = string.IsNullOrWhiteSpace(Logo) ? null : Geometry.Parse(Logo);
+        _path.RenderTransformOrigin = new RelativePoint(0.5, 0.5, RelativeUnit.Relative);
+        _path.RenderTransform = new ScaleTransform(LogoScale, LogoScale);
+    }
+
+    protected override void OnPointerPressed(PointerPressedEventArgs e)
+    {
+        base.OnPointerPressed(e);
+        if (!IsEnabled || !e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
+        _pressed = true;
+        PseudoClasses.Set(":down", true);
+        Focus();
+        e.Handled = true;
+    }
+
+    protected override void OnPointerReleased(PointerReleasedEventArgs e)
+    {
+        base.OnPointerReleased(e);
+        if (!_pressed) return;
+        _pressed = false;
+        PseudoClasses.Set(":down", false);
+        if (e.InitialPressMouseButton == MouseButton.Left) Click?.Invoke(this, EventArgs.Empty);
+        e.Handled = true;
+    }
+
+    protected override void OnPointerExited(PointerEventArgs e)
+    {
+        base.OnPointerExited(e);
+        _pressed = false;
+        PseudoClasses.Set(":down", false);
+    }
+}
+
+/// <summary>
 /// 左侧页基类，1:1 对齐 `pcl-next/Controls/MyPageLeft.vb`：
 /// `AnimatedControl` 指向容器时，对其中每个元素逐个做「下移 -25 → 100ms 淡入 + 500ms 位移」的错峰进入动画；
 /// 置空时退化为整页 0.96 → 1 缩放 + 淡入。退出方向为「-6 位移 + 50ms 淡出」，错峰间隔 70/N。
