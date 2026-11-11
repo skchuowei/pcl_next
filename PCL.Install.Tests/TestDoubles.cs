@@ -12,6 +12,54 @@ internal sealed class AllPresentAssets : IInstallAssetSource
     }
 }
 
+/// <summary>用例自己的临时目录；结束时整棵树删掉，不落在仓库里。</summary>
+internal sealed class TempWorkspace : IDisposable
+{
+    public TempWorkspace()
+    {
+        Root = Path.Combine(Path.GetTempPath(), "pcl-install-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(Root);
+    }
+
+    public string Root { get; }
+
+    public string PathOf(params string[] segments) => Path.Combine([Root, .. segments]);
+
+    public void Dispose()
+    {
+        try
+        {
+            if (Directory.Exists(Root)) Directory.Delete(Root, recursive: true);
+        }
+        catch (IOException)
+        {
+            // 临时目录清不掉只是脏一点点磁盘，不应让用例结论翻转。
+        }
+    }
+}
+
+/// <summary>只用公开装配 API 造一个单步骤执行上下文，避免为测试开放 internal 构造。</summary>
+internal static class InstallTestContext
+{
+    public static InstallStepContext Create(
+        InstallStepKind kind, InstallAssetBag assets, string name = "步骤", double weight = 1)
+    {
+        var request = new InstallPlanRequest { MinecraftVersion = "1.20.1" };
+        var plan = new InstallPlan([new InstallPlanStep(kind, name, weight, block: true, show: true)]);
+        plan.AttachDescriptors(request);
+
+        var registry = new InstallActionRegistry { Fallback = new RecordingAction([]) };
+        var nodes = new InstallAssembler(request, assets, new FakeFileSource(), registry).Assemble(plan);
+        return new InstallStepContext
+        {
+            Node = nodes[0],
+            Assets = assets,
+            Engine = new FakeEngine(),
+        };
+    }
+}
+
+
 /// <summary>按键名精确给出下载清单的假实现；默认按描述符声明的下载类别合成一份。</summary>
 internal sealed class FakeFileSource : INetFileSource
 {

@@ -1,6 +1,6 @@
 # 计划：P4-B 装配层设计（Linux 线）
 
-> 状态：**PB0–PB2 已落地（2026-11-08）**，PB3–PB5 未开始。
+> 状态：**PB0–PB3 已落地（2026-11-11）**，PB4–PB5 未开始。
 > 验证环境：Windows 侧提交 / 推送；构建与单测在 **WSL2 `Ubuntu-24.04` + .NET SDK `10.0.403`** 内用 `-r linux-x64` 实跑。
 > 依据：`PCL_NEXT_Linux/AGENTS.md` §3.1 / §3.2 / §零 / §五 / §十；《分支与发布规范.md》§0B / §0C；
 > P4-A 交付（提交 `a8a1ae6`）；交接文档 `PCL_NEXT_Windows/docs/交接-Linux端-dev6-P4A.md` §1 / §6.7；
@@ -152,7 +152,7 @@ public sealed class InstallNode
 | **PB0** 设计 | 本文件成稿 + 取舍项提交用户拍板 | 文档评审通过 | ✅ 2026-11-08（D1–D5 全按推荐） |
 | **PB1** 契约与装配骨架 | 新建 `PCL.Install`（`net10.0`、`PclIsGuiFree=true`、`PclUseTreePath`）；四个契约；`InstallAssembler`（纯数据，无 IO）；`InstallNode`；`InstallSessionFactory` | WSL2 `-r linux-x64` 编译 0 错误；装配单测（不重算、顺序、fail-fast、子步骤来源）全绿 | ✅ 编译通过 + 21/21 用例通过 |
 | **PB2** 下载执行 | `DownloadStepAction` + `NetFileRequestFactory`（`NetFileDescriptor` → `DownloadFileRequest`）；`InstallRunner` 顺序 / Block / 进度 / 取消 / 资产前置校验 | fake `IDownloadEngine` 单测：映射口径、取消传播、Block 阻塞语义、进度单调 | ✅ 同上（含在 21 例内） |
-| **PB3** 中性任务动作 | `IgnoreMarker` / `InstallGame`（`VersionMerger` + `InstallLayout`）/ `RecordManifest` / `RemoveIgnoreMarker` 的 C# 实现 | 每个动作独立单测（临时目录，真实文件系统但本地）；`RecordManifest` 需先对照 VB 确认清单格式 | ⬜ |
+| **PB3** 中性任务动作 | `IgnoreMarker` / `InstallGame`（`VersionMerger` + `InstallLayout`）/ `RecordManifest` / `RemoveIgnoreMarker` 的 C# 实现 | 每个动作独立单测（临时目录，真实文件系统但本地）；`RecordManifest` 需先对照 VB 确认清单格式 | ✅ 编译通过 + 47/47 用例通过（含 PB1/PB2 的 21 例） |
 | **PB4** 加载器子步骤 | 为 `McDownloadOptiFineLoader` / `McDownloadForgelikeLoader(false/true)` / `McDownloadLiteLoaderLoader` / `McDownloadFabricLoader` 提供 C# 版 `ISubStepProvider` | 逐加载器单测：子步骤名 / 权重 / Show / 下载类别与 P4-A 常量一致；与 VB 源码逐段核对记录 | ⬜ |
 | **PB5** 宿主接线与真机闭环 | 一个宿主（先 CLI 子命令或 headless selftest，后接 UI 线 LU3）跑完整安装 | Linux 实机跑通 vanilla + 至少一种加载器；与 Windows 装出的实例目录逐项对比 | ⬜ |
 
@@ -166,7 +166,7 @@ public sealed class InstallNode
 |---|---|---|---|
 | P1 | P4-A 已提交（`a8a1ae6`） | ✅ | PB1 可直接依赖 |
 | P2 | 内核积木齐备（`InstallLayout` / `InstallCommitPlan` / `VersionMerger` / `DownloadEngine`） | ✅ 实存 | PB2 / PB3 可用 |
-| P3 | `McInstallManifest` 的 C# 实现与文件格式 | ⛔ 内核无此类，只有 `InstallManifestRules` 两条字符串规则 | PB3 的 `RecordManifest` 需先对照 VB 源码确定格式，可能拆成独立小批 |
+| P3 | `McInstallManifest` 的 C# 实现与文件格式 | ✅ PB3 已落地（模型 + `PCL/config.json` 同名键写入，见 §5.2 取舍 ①） | PB3 不再阻塞；PB5 接 PCLCS 配置子系统时可直接复用 |
 | P4 | 合规前置（问询未发送、`PLATFORM_RELEASE_ENABLED` 未开） | ⛔ | 只阻塞对外分发；不阻塞编译、单测、本地 headless 验证 |
 | P5 | 有显示的 Linux 环境 | ⛔ 本机只有 Windows | PB5 的 UI 闭环必须在 Linux 实机 / WSL+X11 验收；本机能验的是编译 + 单测 |
 | P6 | UI 线正在同一仓库新增 `PCL.Desktop.Linux` 与计划文档 | ⚠️ 并行 | 本批**不改其任何文件**；`PCL.Install` 不引用 Avalonia |
@@ -197,6 +197,62 @@ public sealed class InstallNode
 - ❌ 不新增 `.vb`、不引用 `pcl-next` 工程、不引入 Avalonia；
 - ❌ 不做真机安装与打包。
 
+### 5.1 PB3 改动文件（已落地，2026-11-11）
+
+| # | 文件 | 内容 |
+|---|---|---|
+| 1 | `PCL.Install/InstallFileOps.cs` | internal：建目录 + 递归复制目录内容（语义对齐 MeloongCore `DirectoryUtils.Copy`） |
+| 2 | `PCL.Install/IgnoreMarkerActions.cs` | `IgnoreMarkerAction`（写 `.pclignore`，文件名 / 内容与 VB 逐字一致）+ `RemoveIgnoreMarkerAction` |
+| 3 | `PCL.Install/InstallGameAction.cs` | `InstallGameOptions`（中间产物 / 是否 Modable / 版本隔离解析器）+ `InstallGameAction` |
+| 4 | `PCL.Install/InstallManifest.cs` | `InstallManifest` / `InstallManifestComponents` / `ManagedInstallFile` / `InstallManifestStore`（JSON 形状与落盘） |
+| 5 | `PCL.Install/RecordManifestAction.cs` | `RecordManifestAction`（组件版本规范化 + 受管理文件哈希 + 写清单） |
+| 6 | `PCL.Install/Contracts.cs` | 新增 `InstallStepContext.GetAsset<T>`（缺失 / 类型不符均 fail-fast） |
+| 7 | `PCL.Install/InstallExceptions.cs` | 新增 `InstallAssetTypeException` |
+| 8 | `PCL.Install.Tests/MarkerActionTests.cs`（7 例） | 文件名 / 内容 / 无 BOM / 建目录 / 删除幂等 / 缺资产 / 类型不符 / 已取消 |
+| 9 | `PCL.Install.Tests/InstallGameActionTests.cs`（10 例） | 原版复写 / 加载器合并顺序与去继承 / libraries 迁移 / mods 复制 / 空 mods 创建 / 版本隔离 / 中间产物 / 进度点 / 缺资产 / json 缺失 |
+| 10 | `PCL.Install.Tests/RecordManifestTests.cs`（9 例） | 字段与 VB 口径 / 保留其它配置键 / 可选键省略 / 空清单 / 目标文件缺失 / 配置损坏中止 / 缺资产 / 缩进写回 / 版本常量 |
+| 11 | `PCL.Install.Tests/TestDoubles.cs` | 新增 `TempWorkspace` 与 `InstallTestContext`（只走公开装配 API，不开放 internal 构造） |
+
+**明确不做（PB3）**：
+
+- ❌ 不实现 5 个加载器子步骤（PB4），`RecordManifest` 之外的 `SubStepsSource` 仍「未注册即失败」；
+- ❌ 不做宿主接线（PB5），四个动作只提供类与单测，不自动注册进任何会话；
+- ❌ 不改 `PCL.Download` 的公开签名；`ModsTempFolder` 未加进 P4-A 的 `RecordManifest.Inputs`（见 5.2 取舍 ②）；
+- ❌ 不写 `PCL.Install` 之外的任何工程，不动 `PCL.Desktop.Linux` 与 UI 计划文档。
+
+### 5.2 PB3 清单格式对照（VB → C#）与取舍
+
+对照源：`PCL_NEXT_Windows/pcl-next/Modules/Download/LoaderPlanAdapter.vb`
+（`AssembleIgnoreMarker` / `AssembleInstallGame` / `AssembleRecordManifest` / `AssembleRemoveIgnoreMarker`）。
+
+| VB 行为 | C# 实现 | 备注 |
+|---|---|---|
+| `FileUtils.Write(VersionFolder & ".pclignore", "用于临时地在 PCL Next 的版本列表中屏蔽此版本。")` | `IgnoreMarkerAction` 写 `Path.Combine(VersionFolder, ".pclignore")`，内容为同一条字符串常量 | 单元测试锁住文件名、内容、首字节无 BOM |
+| `FileUtils.Delete(VersionFolder & ".pclignore")` | `RemoveIgnoreMarkerAction` → `File.Delete` | 文件不存在不报错，与 VB 一致 |
+| `MergeJson(...)` 源顺序：Minecraft → OptiFine（非 Mod 时）→ Forge → NeoForge → LiteLoader → Fabric | `InstallGameAction.BuildMergeSources` 同序 | 合并规则本身在 `VersionMerger`（P4-A 已验收） |
+| `DirectoryUtils.Copy(TempMcFolder & "libraries", McFolderSelected & "libraries")` | `InstallFileOps.CopyDirectory(layout.TempFolder + "libraries", mcFolder + "libraries")` | 只复制文件、目标目录按需创建 |
+| `TargetFolder = If(IsIntermediateOutput, VersionFolder, McInstance(VersionFolder).PathIndie)` | `InstallGameOptions.IsIntermediateOutput` + `ResolveTargetFolder`（宿主注入隔离策略，默认不隔离） | Linux 无 PCL 设置子系统，隔离策略归宿主 |
+| `ModsTempFolder` 存在则复制、否则 `Modable` 时建空目录 | 同左（`HasAnyModLoader`） | 日志文案沿用「自动创建 Mod 文件夹 / 自动创建资源包文件夹」 |
+| `Task.Progress = 0.2 / 0.8` | `context.Progress.Report(Fraction = 0.2 / 0.8)` | 单测断言两个进度点与顺序 |
+| `RelativePath = Entry.Value.Substring(ModsTempFolder.Length)` | `Path.GetRelativePath(_modsTempFolder, sourcePath)` | 结果一致，且不依赖尾分隔符 |
+| `InstallManifestRules.ManagedModPath(RelativePath)` | 同（P4-A 已移植） | 正斜杠 + 全小写 + `mods/` 前缀 |
+| `ComputeFileHash(..., Sha1)` + `GetInfo(...).LastWriteTimeUtc` | `HashHelper.ComputeFile(path, HashType.Sha1)` + `File.GetLastWriteTimeUtc` | SHA1 小写 40 位，单测逐值比对 |
+| `TempLoaderVersions(Forge) = NormalizeLoaderVersion(...)`（NeoForge 同） | `RecordManifestAction.BuildComponents` 同 | 其余加载器版本原样保留 |
+| `Configs.McInstallManifest.Set(New McInstallManifest(Versions.McInstallManifestVersion, Target, Date.UtcNow, ManagedFiles), InstanceConfig); InstanceConfig.Save()` | `InstallManifestStore.Write(versionFolder, manifest)` 写 `{versionFolder}/PCL/config.json` 的 `MinecraftInstallManifest` 键 | 见取舍 ① |
+
+**取舍 ①（清单落盘容器）**：Windows 的清单存在实例配置 `PCL/config.json` 的一个键里（`JsonConfigProvider`），
+不是独立文件。Linux 线没有配置子系统，`PCL.Install` 也不能引用 PCLCS（`net10.0-windows` + WPF）。
+本批选择**由动作直接读写该文件的同名键**（读-改-写、保留其它键、原子替换），
+这样清单位置与 Windows 完全一致，将来 PCLCS 的 `JsonConfigProvider` 接管时无需迁移。
+JSON 形状按 PCLCS 的 Newtonsoft 默认序列化对齐：PascalCase、可选键为 null 时省略、缩进写回。
+偏差：现有配置不是合法 JSON 时**直接失败并保留原文件**（VB 会记日志后当作空配置覆盖），
+这里按「不许静默丢用户配置」处理。
+
+**取舍 ②（`ModsTempFolder` 没进 `RecordManifest.Inputs`）**：P4-A 的 `RecordManifest` 只声明
+`TargetFolder / ManagedFileSources / VersionFolder`，但 VB 计算相对路径时用了 `Ctx.ModsTempFolder`。
+本批不改 P4-A 描述符（它是已验收契约，且 Windows 侧 VB 装配同样在用），改为由宿主构造动作时传入；
+PB5 接线时与 `InstallGame` 的 `ModsTempFolder` 资产取同一个值即可（`InstallLayout.ModsRoot`）。
+
 ---
 
 ## 6. 回归影响面
@@ -223,13 +279,16 @@ dotnet test  PCL.Install.Tests/PCL.Install.Tests.csproj -c Release -r linux-x64
 dotnet test  PCL.Download.Tests/PCL.Download.Tests.csproj -c Release -r linux-x64
 ```
 
-实测结果（2026-11-08）：
+实测结果（2026-11-11，含 PB3）：
 
 | 命令 | 结果 |
 |---|---|
-| `dotnet build PCL.Install -r linux-x64` | 0 错误（2 个既有 CS860x 告警） |
-| `dotnet test PCL.Install.Tests -r linux-x64` | **21/21 通过**（Linux 上真跑，非仅编译） |
+| `dotnet build PCL.Install -r linux-x64` | 0 错误（2 个既有 CS860x 告警，来自 `PCL.Download/ResourceSearcher.cs`） |
+| `dotnet test PCL.Install.Tests -r linux-x64` | **47/47 通过**（PB1/PB2 的 21 例 + PB3 的 26 例；Linux 上真跑，非仅编译） |
 | `dotnet test PCL.Download.Tests -r linux-x64` | **548/549**；唯一失败 `LocalResourceFileTests.Equals_按路径忽略大小写` 是「Windows 路径大小写不敏感」的平台假设，Linux 上必然失败，属既有用例问题，与本批无关，未改动 |
+
+> 2026-11-08 首次记录时 `PCL.Install.Tests` 为 21/21；PB3 追加 26 例后为 47/47。
+> 用例的临时目录放在系统临时区并在用例结束时整棵删除，单次运行只有几 KB 级占用，不在 WSL 家目录留存。
 
 > WSL 侧 NuGet 有 `NU1900` 告警（漏洞数据源不可达），不影响还原与测试。
 

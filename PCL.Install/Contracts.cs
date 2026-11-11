@@ -81,6 +81,20 @@ public sealed class InstallStepContext
     /// <summary>该节点可用的下载文件清单（非下载节点为空）。</summary>
     public IReadOnlyList<NetFileDescriptor> Files => Node.Files;
 
+    /// <summary>
+    /// 按名取宿主资产并校验类型。缺失抛 <see cref="MissingInstallAssetException"/>，
+    /// 类型不符抛 <see cref="InstallAssetTypeException"/>——两者都不静默降级。
+    /// </summary>
+    public T GetAsset<T>(string name)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        if (!Assets.TryGet(name, out var value))
+            throw new MissingInstallAssetException(Name, name);
+        if (value is not T typed)
+            throw new InstallAssetTypeException(Name, name, typeof(T), value?.GetType());
+        return typed;
+    }
+
     internal InstallStepContext WithProgress(IProgress<InstallStepProgress>? progress)
         => new()
         {

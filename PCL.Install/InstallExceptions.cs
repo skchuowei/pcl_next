@@ -77,3 +77,25 @@ public sealed class MissingInstallAssetException : InstallAssemblyException
         AssetName = assetName;
     }
 }
+
+/// <summary>宿主资产存在，但类型与动作期望的不一致。</summary>
+public sealed class InstallAssetTypeException : InstallAssemblyException
+{
+    public string StepName { get; }
+
+    public string AssetName { get; }
+
+    public Type ExpectedType { get; }
+
+    public Type? ActualType { get; }
+
+    public InstallAssetTypeException(string stepName, string assetName, Type expectedType, Type? actualType)
+        : base($"执行失败：步骤「{stepName}」的宿主资产「{assetName}」类型不符，"
+               + $"期望 {expectedType.FullName}，实际 {actualType?.FullName ?? "null"}。")
+    {
+        StepName = stepName;
+        AssetName = assetName;
+        ExpectedType = expectedType;
+        ActualType = actualType;
+    }
+}
