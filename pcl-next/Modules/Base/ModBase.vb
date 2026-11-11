@@ -1035,7 +1035,7 @@ Public Module ModBase
             Location = Location.Replace("/", "\").Trim(" "c, """"c)
             Logger.Info($"正在打开资源管理器：{Location}")
             If Location.EndsWithF("\") Then
-                StartProcess(Location)
+                StartProcess("explorer", $"""{Location}""")
             Else
                 StartProcess("explorer", $"/select,""{Location}""")
             End If

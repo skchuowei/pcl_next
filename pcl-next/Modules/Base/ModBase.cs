@@ -1235,7 +1235,7 @@ namespace PCL
                 Logger.Info($"正在打开资源管理器：{Location}");
                 if (Location.EndsWithF(@"\"))
                 {
-                    StartProcess(Location);
+                    StartProcess("explorer", $"\"{Location}\"");
                 }
                 else
                 {
