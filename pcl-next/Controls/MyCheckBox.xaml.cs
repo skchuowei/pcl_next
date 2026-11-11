@@ -47,6 +47,7 @@ namespace PCL
 
         public MyCheckBox()
         {
+            InitializeComponent();
             this.MouseLeftButtonUp += (_, __) => Checkbox_MouseUp();
             this.MouseLeftButtonDown += (_, __) => Checkbox_MouseDown();
             this.MouseLeave += (_, __) => Checkbox_MouseLeave();

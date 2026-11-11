@@ -42,6 +42,15 @@ namespace PCL
 
         public PageInstanceExport()
         {
+            InitializeComponent();
+            this.CardOptions.MouseLeftButtonDown += (p1, p2) => CardOptions_MouseLeftButtonDown();
+            this.BtnAdvancedExport.Click += (p1, p2) => ExportConfig();
+            this.BtnAdvancedImport.Click += (p1, p2) => ImportConfig();
+            this.BtnExport.Click += (p1, p2) => StartExport();
+            this.TextExportName.GotFocus += (p1, p2) => TextExportName_GotFocus();
+            this.CheckAdvancedInclude.Change += (p1, p2) => CheckAdvancedInclude_Change((object)p1, (bool)p2);
+            this.CheckAdvancedModrinth.Change += (p1, p2) => CheckAdvancedModrinth_Change((object)p1, (bool)p2);
+            this.CheckOptionsPcl.Change += (p1, p2) => CheckAdvancedModrinth_Change((object)p1, (bool)p2);
             this.Initialized += PageInstanceExport_Initialized;
             this.Loaded += (_, __) => PageInstanceExport_Loaded();
             this.Loaded += (_, __) => RefreshJavaInfo();

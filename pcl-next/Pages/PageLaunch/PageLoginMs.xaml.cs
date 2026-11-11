@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -14,6 +14,13 @@ namespace PCL
 {
     public partial class PageLoginMs
     {
+
+        public PageLoginMs()
+        {
+            InitializeComponent();
+            this.ComboAccounts.SelectionChanged += (p1, p2) => ComboAccounts_SelectionChanged((object)p1, (SelectionChangedEventArgs)p2);
+            this.BtnLogin.Click += (p1, p2) => BtnLogin_Click((object)p1, (EventArgs)p2);
+        }
 
         /// <summary>
     /// 刷新页面显示的所有信息。

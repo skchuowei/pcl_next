@@ -22,6 +22,7 @@ namespace PCL
 
         public PageSpeedLeft()
         {
+            InitializeComponent();
             this.Loaded += Page_Loaded;
         }
         private void Page_Loaded(object sender, RoutedEventArgs e)

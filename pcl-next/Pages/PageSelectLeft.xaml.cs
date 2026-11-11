@@ -19,6 +19,7 @@ namespace PCL
     {
         public PageSelectLeft()
         {
+            InitializeComponent();
             this.Initialized += PageSelectLeft_Initialized;
             this.Loaded += PageSelectLeft_Loaded;
         }

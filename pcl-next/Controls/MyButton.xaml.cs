@@ -102,6 +102,7 @@ namespace PCL
 
         public MyButton()
         {
+            InitializeComponent();
             this.MouseEnter += (_, __) => RefreshColor();
             this.MouseLeave += (_, __) => RefreshColor();
             this.Loaded += (_, __) => RefreshColor();

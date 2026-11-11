@@ -32,6 +32,10 @@ namespace PCL
             try
             {
                 this.InitializeComponent();
+            this.Btn1.Click += (p1, p2) => Btn1_Click();
+            this.Btn3.Click += (p1, p2) => Btn3_Click();
+            this.PanBorder.MouseLeftButtonDown += (p1, p2) => Drag((object)p1, (MouseButtonEventArgs)p2);
+            this.LabTitle.MouseLeftButtonDown += (p1, p2) => Drag((object)p1, (MouseButtonEventArgs)p2);
                 this.Btn1.Name = this.Btn1.Name + ModBase.GetUuid();
                 this.Btn2.Name = this.Btn2.Name + ModBase.GetUuid();
                 this.Btn3.Name = this.Btn3.Name + ModBase.GetUuid();

@@ -238,9 +238,14 @@
     两者都不需要额外维护。规则见《分支与发布规范》§5.2.1 / §5.3。
   -->
   <Target Name="PclVersionedArtifact" AfterTargets="Build">
-    <Exec Command="powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\scripts\Copy-VersionedArtifact.ps1&quot; -ExePath &quot;$(TargetPath)&quot; -Channel &quot;$(PclChannel)&quot;&#xD;&#xA;" IgnoreExitCode="true" StandardOutputImportance="low" StandardErrorImportance="low" />
+    <!--
+      C# 工程里 $(TargetPath) 指向托管程序集 pcl-next.dll（VB 工程才指向 .exe），
+      真正的可执行入口是 apphost $(TargetDir)$(AssemblyName).exe，必须显式拼出来，
+      否则会把 dll 改名成 exe 复制到产物旁边，得到一个双击就跑不起来的假 exe。
+    -->
+    <Exec Command="powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\scripts\Copy-VersionedArtifact.ps1&quot; -ExePath &quot;$(TargetDir)$(AssemblyName).exe&quot; -Channel &quot;$(PclChannel)&quot;&#xD;&#xA;" IgnoreExitCode="true" StandardOutputImportance="low" StandardErrorImportance="low" />
   </Target>
   <Target Name="PclVersionedArtifactPublish" AfterTargets="Publish" Condition="'$(PublishDir)' != ''">
-    <Exec Command="powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\scripts\Copy-VersionedArtifact.ps1&quot; -ExePath &quot;$(PublishDir)$(TargetFileName)&quot; -Channel &quot;$(PclChannel)&quot;&#xD;&#xA;" IgnoreExitCode="true" StandardOutputImportance="low" StandardErrorImportance="low" />
+    <Exec Command="powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\scripts\Copy-VersionedArtifact.ps1&quot; -ExePath &quot;$(PublishDir)$(AssemblyName).exe&quot; -Channel &quot;$(PclChannel)&quot;&#xD;&#xA;" IgnoreExitCode="true" StandardOutputImportance="low" StandardErrorImportance="low" />
   </Target>
 </Project>

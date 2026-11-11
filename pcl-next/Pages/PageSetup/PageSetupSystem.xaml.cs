@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
@@ -18,6 +18,16 @@ namespace PCL
 
         public PageSetupSystem()
         {
+            InitializeComponent();
+            this.SliderDownloadThread.PreviewChange += (p1, p2) => SliderDownloadThread_PreviewChange((object)p1, (ModBase.RouteEventArgs)p2);
+            this.BtnSystemIdentify.Click += (p1, p2) => BtnSystemIdentify_Click((object)p1, (MouseButtonEventArgs)p2);
+            this.BtnSystemUnlock.Click += (p1, p2) => BtnSystemUnlock_Click((object)p1, (MouseButtonEventArgs)p2);
+            this.CheckDebugMode.Change += (p1, p2) => CheckDebugMode_Change();
+            this.ComboSystemActivity.SelectionChanged += (p1, p2) => ComboSystemActivity_SelectionChanged((object)p1, (SelectionChangedEventArgs)p2);
+            this.ComboSystemUpdate.SelectionChanged += (p1, p2) => ComboSystemUpdate_SelectionChanged((object)p1, (SelectionChangedEventArgs)p2);
+            this.BtnSystemUpdate.Click += (p1, p2) => BtnSystemUpdate_Click((object)p1, (EventArgs)p2);
+            this.BtnSystemSettingExp.Click += (p1, p2) => BtnSystemSettingExp_Click((object)p1, (MouseButtonEventArgs)p2);
+            this.BtnSystemSettingImp.Click += (p1, p2) => BtnSystemSettingImp_Click((object)p1, (MouseButtonEventArgs)p2);
             this.Loaded += PageSetupSystem_Loaded;
         }
 

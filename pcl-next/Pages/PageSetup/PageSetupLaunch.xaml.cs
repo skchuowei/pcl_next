@@ -21,6 +21,22 @@ namespace PCL
 
         public PageSetupLaunch()
         {
+            InitializeComponent();
+            this.RadioSkinType4.PreviewCheck += (p1, p2) => RadioSkinType3_Check((object)p1, (ModBase.RouteEventArgs)p2);
+            this.SliderRamCustom.Change += (p1, p2) => RefreshRam((bool)p1);
+            this.RadioRamType0.Check += (p1, p2) => RefreshRam((bool)p1);
+            this.RadioRamType1.Check += (p1, p2) => RefreshRam((bool)p1);
+            this.RectRamGame.SizeChanged += (p1, p2) => RefreshRamText();
+            this.RectRamEmpty.SizeChanged += (p1, p2) => RefreshRamText();
+            this.LabRamGame.SizeChanged += (p1, p2) => RefreshRamText();
+            this.ComboArgumentWindowType.SelectionChanged += (p1, p2) => WindowTypeUIRefresh();
+            this.ComboArgumentVisibie.SelectionChanged += (p1, p2) => ComboArgumentVisibie_SizeChanged((object)p1, (SelectionChangedEventArgs)p2);
+            this.CheckArgumentRam.Change += (p1, p2) => CheckArgumentRam_Change();
+            this.ComboArgumentIndieV2.SelectionChanged += (p1, p2) => ComboArgumentIndie_SelectionChanged((object)p1, (SelectionChangedEventArgs)p2);
+            this.TextAdvanceRun.TextChanged += (p1, p2) => TextAdvanceRun_TextChanged((object)p1, (TextChangedEventArgs)p2);
+            this.TextAdvanceJvm.ValidatedTextChanged += (p1, p2) => TextAdvanceJvm_TextChanged();
+            this.TextAdvanceJvm.TextChanged += (p1, p2) => ReplaceEnter((MyTextBox)p1, (TextChangedEventArgs)p2);
+            this.TextAdvanceGame.TextChanged += (p1, p2) => ReplaceEnter((MyTextBox)p1, (TextChangedEventArgs)p2);
             this.Loaded += PageSetupLaunch_Loaded;
         }
 

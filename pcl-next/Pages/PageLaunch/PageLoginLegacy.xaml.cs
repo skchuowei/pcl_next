@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Windows;
 using System.Windows.Controls;
@@ -14,6 +14,9 @@ namespace PCL
         public PageLoginLegacy()
         {
             this.InitializeComponent();
+            this.ComboName.PreviewKeyDown += (p1, p2) => ComboName_PreviewKeyDown((object)p1, (System.Windows.Input.KeyEventArgs)p2);
+            this.ComboName.TextChanged += (p1, p2) => ComboLegacy_TextChanged((object)p1, (TextChangedEventArgs)p2);
+            this.Skin.Click += (p1, p2) => Skin_Click();
             this.Skin.Loader = PageLaunchLeft.SkinLegacy;
             this.Loaded += PageLoginLegacy_Loaded;
         }

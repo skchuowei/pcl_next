@@ -41,6 +41,15 @@ namespace PCL
 
         public PageLinkMain()
         {
+            InitializeComponent();
+            this.PanSelectCreate.MouseLeftButtonUp += (p1, p2) => Create_MouseLeftButtonUp();
+            this.PanSelectJoin.Loaded += (p1, p2) => PanSelectJoin_Loaded();
+            this.BtnLoadCancel.Click += (p1, p2) => BtnLoadCancel_Click();
+            this.CardLoad.MouseLeftButtonUp += (p1, p2) => CardLoad_MouseLeftButtonUp();
+            this.CardLoad.SizeChanged += (p1, p2) => CardLoad_SizeChanged();
+            this.BtnFinishExit.Click += (p1, p2) => BtnFinishExit_Click();
+            this.BtnFinishCopy.Click += (p1, p2) => Copy();
+            this.BtnFinishIp.MouseLeftButtonUp += (p1, p2) => BtnFinishIp_MouseLeftButtonUp((object)p1, (MouseButtonEventArgs)p2);
             // 原文是 LoaderCombo(Of Integer)("联机", { ... }) 的花括号数组，元素都是 LoaderBase；
             // 转换器误写成 object[]，这里改回 ModLoader.LoaderBase[] 以匹配构造函数的 IEnumerable<LoaderBase> 形参
             LinkLoader = new ModLoader.LoaderCombo<int>("联机", new ModLoader.LoaderBase[]{ new ModLoader.LoaderTask<int, int>("获取配置", InitConfig) { ProgressWeight = 8d }, new ModLoader.LoaderTask<int, List<ModNet.NetFile>>("准备下载联机模块", InitPrepareDownload) { ProgressWeight = 2d }, new ModNet.LoaderDownload("下载联机模块", new List<ModNet.NetFile>()) { ProgressWeight = 40d }, new ModLoader.LoaderTask<int, int>("启动联机模块", InitLaunch) { ProgressWeight = 50d } });

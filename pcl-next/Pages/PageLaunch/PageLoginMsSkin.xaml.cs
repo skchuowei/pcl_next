@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Net;
 using System.Net.Http;
 using System.Threading;
@@ -17,6 +17,8 @@ namespace PCL
         public PageLoginMsSkin()
         {
             this.InitializeComponent();
+            this.PanData.MouseEnter += (p1, p2) => ShowPanel((object)p1, (MouseEventArgs)p2);
+            this.PanData.MouseLeave += (p1, p2) => HidePanel((object)p1, (EventArgs)p2);
             this.Skin.Loader = PageLaunchLeft.SkinMs;
             this.Loaded += PageLoginLegacy_Loaded;
         }

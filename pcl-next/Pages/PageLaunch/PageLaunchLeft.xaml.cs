@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -24,6 +24,16 @@ namespace PCL
 
         public PageLaunchLeft()
         {
+            InitializeComponent();
+            this.RadioLoginType0.Check += (p1, p2) => RadioLoginType_Change((object)p1, (bool)p2);
+            this.RadioLoginType5.Check += (p1, p2) => RadioLoginType_Change((object)p1, (bool)p2);
+            this.BtnVersion.Click += (p1, p2) => BtnVersion_Click();
+            this.BtnLaunch.Click += (p1, p2) => LaunchButtonClick();
+            this.BtnLaunch.Loaded += (p1, p2) => RefreshButtonsUI();
+            this.BtnCancel.Click += (p1, p2) => BtnCancel_Click();
+            this.BtnMore.Click += (p1, p2) => BtnMore_Click();
+            this.PanLaunchingInfo.SizeChanged += (p1, p2) => PanLaunchingInfo_SizeChangedW((object)p1, (SizeChangedEventArgs)p2);
+            this.PanLaunchingInfo.SizeChanged += (p1, p2) => PanLaunchingInfo_SizeChangedH((object)p1, (SizeChangedEventArgs)p2);
             this.Loaded += (_, __) => PageLaunchLeft_Loaded();
         }
         public void PageLaunchLeft_Loaded()

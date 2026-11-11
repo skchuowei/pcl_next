@@ -20,6 +20,12 @@ namespace PCL
         public PageDownloadLeft()
         {
             this.InitializeComponent();
+            this.ItemInstall.Check += (p1, p2) => PageCheck((FrameworkElement)p1, (ModBase.RouteEventArgs)p2);
+            this.ItemMod.Check += (p1, p2) => PageCheck((FrameworkElement)p1, (ModBase.RouteEventArgs)p2);
+            this.ItemPack.Check += (p1, p2) => PageCheck((FrameworkElement)p1, (ModBase.RouteEventArgs)p2);
+            this.ItemResourcePack.Check += (p1, p2) => PageCheck((FrameworkElement)p1, (ModBase.RouteEventArgs)p2);
+            this.ItemShader.Check += (p1, p2) => PageCheck((FrameworkElement)p1, (ModBase.RouteEventArgs)p2);
+            this.ItemDataPack.Check += (p1, p2) => PageCheck((FrameworkElement)p1, (ModBase.RouteEventArgs)p2);
             if (!ModDownloadPolicy.RestrictMcDownload)
                 return;
             this.ItemInstall.Visibility = Visibility.Collapsed;

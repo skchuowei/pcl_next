@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Linq;
 using System.Threading;
 using System.Windows;
@@ -100,6 +100,7 @@ namespace PCL
 
         public MySlider()
         {
+            InitializeComponent();
             this.SizeChanged += RefreshWidth;
             this.MouseLeftButtonDown += DragStart;
             this.IsEnabledChanged += (_, __) => RefreshColor();

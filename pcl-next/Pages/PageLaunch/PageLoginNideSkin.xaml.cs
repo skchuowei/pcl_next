@@ -1,4 +1,4 @@
-using System.Windows;
+﻿using System.Windows;
 using System.Windows.Input;
 
 namespace PCL
@@ -9,6 +9,9 @@ namespace PCL
         public PageLoginNideSkin()
         {
             this.InitializeComponent();
+            this.PanData.MouseEnter += (p1, p2) => PageLoginNideSkin_MouseEnter((object)p1, (MouseEventArgs)p2);
+            this.PanData.MouseLeave += (p1, p2) => PageLoginNideSkin_MouseLeave((object)p1, (MouseEventArgs)p2);
+            this.Skin.Click += (p1, p2) => Skin_Click((object)p1, (MouseButtonEventArgs)p2);
             this.Skin.Loader = PageLaunchLeft.SkinNide;
             this.Loaded += PageLoginLegacy_Loaded;
         }

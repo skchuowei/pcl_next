@@ -1,10 +1,18 @@
-using System;
+﻿using System;
 using System.Windows;
 
 namespace PCL
 {
     public partial class PageInstanceModDisabled
     {
+
+        public PageInstanceModDisabled()
+        {
+            InitializeComponent();
+            this.BtnDownload.Click += (p1, p2) => BtnDownload_Click((object)p1, (EventArgs)p2);
+            this.BtnVersion.Click += (p1, p2) => BtnVersion_Click((object)p1, (EventArgs)p2);
+            this.BtnDownload.Loaded += (p1, p2) => BtnDownload_Loaded();
+        }
 
         private void BtnDownload_Click(object sender, EventArgs e)
         {

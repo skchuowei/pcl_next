@@ -17,6 +17,13 @@ namespace PCL
 
         public PageInstanceLeft()
         {
+            InitializeComponent();
+            this.ItemOverall.Check += (p1, p2) => PageCheck((FrameworkElement)p1, (ModBase.RouteEventArgs)p2);
+            this.ItemMod.Check += (p1, p2) => PageCheck((FrameworkElement)p1, (ModBase.RouteEventArgs)p2);
+            this.ItemModDisabled.Check += (p1, p2) => PageCheck((FrameworkElement)p1, (ModBase.RouteEventArgs)p2);
+            this.ItemSetup.Check += (p1, p2) => PageCheck((FrameworkElement)p1, (ModBase.RouteEventArgs)p2);
+            this.ItemModify.Check += (p1, p2) => PageCheck((FrameworkElement)p1, (ModBase.RouteEventArgs)p2);
+            this.ItemExport.Check += (p1, p2) => PageCheck((FrameworkElement)p1, (ModBase.RouteEventArgs)p2);
             this.Loaded += PageInstanceLeft_Loaded;
             this.Loaded += (_, __) => RefreshModDisabled();
             this.Loaded += (_, __) => ReloadCurrentJava();

@@ -62,6 +62,8 @@ namespace PCL
 
         public MyHint()
         {
+            InitializeComponent();
+            this.BtnClose.Click += (p1, p2) => BtnClose_Click((object)p1, (EventArgs)p2);
             this.Loaded += (_, __) => UpdateUI();
             this.Loaded += MyHint_Loaded;
             this.MouseLeftButtonUp += MyHint_MouseUp;

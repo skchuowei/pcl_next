@@ -46,6 +46,7 @@ namespace PCL
 
         public MyRadioBox()
         {
+            InitializeComponent();
             this.MouseLeftButtonUp += (_, __) => Radiobox_MouseUp();
             this.MouseLeftButtonDown += (_, __) => Radiobox_MouseDown();
             this.MouseLeave += (_, __) => Radiobox_MouseLeave();
@@ -91,7 +92,9 @@ namespace PCL
                     return;
                 var RadioboxList = new List<MyRadioBox>();
                 int CheckedCount = 0;
-                foreach (var Control in ((dynamic)(IEnumerable)((object)this.Parent)).Children) // 收集控件列表与选中个数
+                // 原文为 For Each Control In CType(Parent, Object).Children（VB 后期绑定取 Parent.Children），
+                // codeconv 误把 Parent 本身强转成 IEnumerable；此处保留后期绑定，只把结果当集合遍历
+                foreach (var Control in (IEnumerable)((dynamic)this.Parent).Children) // 收集控件列表与选中个数
                 {
                     if (Control is MyRadioBox)
                     {

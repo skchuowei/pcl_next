@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Linq;
 using System.Threading;
 using System.Windows;
@@ -109,6 +109,18 @@ namespace PCL
 
         public PageResource()
         {
+            InitializeComponent();
+            this.Load.StateChanged += (p1, p2, p3) => Load_State((object)p1, (MyLoading.MyLoadingState)p2, (MyLoading.MyLoadingState)p3);
+            this.BtnPageFirst.Click += (p1, p2) => BtnPageFirst_Click((object)p1, (RoutedEventArgs)p2);
+            this.BtnPageLeft.Click += (p1, p2) => BtnPageLeft_Click((object)p1, (RoutedEventArgs)p2);
+            this.BtnPageRight.Click += (p1, p2) => BtnPageRight_Click((object)p1, (RoutedEventArgs)p2);
+            this.BtnSearchRun.Click += (p1, p2) => StartNewSearch();
+            this.TextSearchName.KeyDown += (p1, p2) => EnterTrigger((object)p1, (KeyEventArgs)p2);
+            this.TextSearchVersion.KeyDown += (p1, p2) => EnterTrigger((object)p1, (KeyEventArgs)p2);
+            this.BtnSearchReset.Click += (p1, p2) => ResetFilter();
+            this.TextSearchVersion.TextChanged += (p1, p2) => TextSearchVersion_TextChanged();
+            this.TextSearchVersion.DropDownClosed += (p1, p2) => UpdateSearchLoaderVisibility();
+            this.BtnSearchInstallModPack.Click += (p1, p2) => BtnSearchInstallModPack_Click((object)p1, (EventArgs)p2);
             Loader = ResourceProviderSearch.GetLoader(LoaderInput);
             this.Loaded += PageResource_Loaded;
         }

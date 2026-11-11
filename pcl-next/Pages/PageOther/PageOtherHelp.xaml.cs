@@ -14,6 +14,8 @@ namespace PCL
     {
         public PageOtherHelp()
         {
+            InitializeComponent();
+            this.SearchBox.TextChanged += (p1, p2) => SearchRun();
             this.Loaded += PageOther_Loaded;
             this.Initialized += PageOther_Inited;
         }

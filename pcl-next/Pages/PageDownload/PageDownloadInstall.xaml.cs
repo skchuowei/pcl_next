@@ -20,6 +20,33 @@ namespace PCL
     {
         public PageDownloadInstall()
         {
+            InitializeComponent();
+            this.BtnBack.Click += (p1, p2) => ExitSelectPage();
+            this.TextSelectName.TextChanged += (p1, p2) => TextSelectName_TextChanged((object)p1, (TextChangedEventArgs)p2);
+            MyTextBox.ValidateChanged += (p1, p2) => TextSelectName_ValidateChanged((object)p1, (EventArgs)p2);
+            this.CardOptiFine.PreviewSwap += (p1, p2) => CardOptiFine_PreviewSwap((object)p1, (ModBase.RouteEventArgs)p2);
+            this.LoadOptiFine.StateChanged += (p1, p2, p3) => OptiFine_Loaded();
+            this.BtnOptiFineClear.Click += (p1, p2) => OptiFine_Clear((object)p1, (EventArgs)p2);
+            this.CardLiteLoader.PreviewSwap += (p1, p2) => CardLiteLoader_PreviewSwap((object)p1, (ModBase.RouteEventArgs)p2);
+            this.LoadLiteLoader.StateChanged += (p1, p2, p3) => LiteLoader_Loaded();
+            this.BtnLiteLoaderClear.Click += (p1, p2) => LiteLoader_Clear((object)p1, (EventArgs)p2);
+            this.CardForge.PreviewSwap += (p1, p2) => CardForge_PreviewSwap((object)p1, (ModBase.RouteEventArgs)p2);
+            this.LoadForge.StateChanged += (p1, p2, p3) => Forge_Loaded();
+            this.BtnForgeClear.Click += (p1, p2) => Forge_Clear((object)p1, (EventArgs)p2);
+            this.CardNeoForge.PreviewSwap += (p1, p2) => CardNeoForge_PreviewSwap((object)p1, (ModBase.RouteEventArgs)p2);
+            this.LoadNeoForge.StateChanged += (p1, p2, p3) => NeoForge_Loaded();
+            this.BtnNeoForgeClear.Click += (p1, p2) => NeoForge_Clear((object)p1, (EventArgs)p2);
+            this.CardFabric.PreviewSwap += (p1, p2) => CardFabric_PreviewSwap((object)p1, (ModBase.RouteEventArgs)p2);
+            this.LoadFabric.StateChanged += (p1, p2, p3) => Fabric_Loaded();
+            this.BtnFabricClear.Click += (p1, p2) => Fabric_Clear((object)p1, (EventArgs)p2);
+            this.CardFabricApi.PreviewSwap += (p1, p2) => CardFabricApi_PreviewSwap((object)p1, (ModBase.RouteEventArgs)p2);
+            this.LoadFabricApi.StateChanged += (p1, p2, p3) => FabricApi_Loaded();
+            this.BtnFabricApiClear.Click += (p1, p2) => FabricApi_Clear((object)p1, (EventArgs)p2);
+            this.CardOptiFabric.PreviewSwap += (p1, p2) => CardOptiFabric_PreviewSwap((object)p1, (ModBase.RouteEventArgs)p2);
+            this.LoadOptiFabric.StateChanged += (p1, p2, p3) => OptiFabric_Loaded();
+            this.BtnOptiFabricClear.Click += (p1, p2) => OptiFabric_Clear((object)p1, (EventArgs)p2);
+            this.TextSelectName.KeyDown += (p1, p2) => TextSelectName_KeyDown((object)p1, (KeyEventArgs)p2);
+            this.BtnStart.Click += (p1, p2) => BtnStart_Click();
             this.Initialized += (_, __) => LoaderInit();
             this.Loaded += (_, __) => Init();
         }

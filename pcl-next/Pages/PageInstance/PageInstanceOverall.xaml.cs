@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
@@ -21,6 +21,20 @@ namespace PCL
 
         public PageInstanceOverall()
         {
+            InitializeComponent();
+            this.ComboDisplayType.SelectionChanged += (p1, p2) => ComboDisplayType_SelectionChanged((object)p1, (SelectionChangedEventArgs)p2);
+            this.BtnDisplayDesc.Click += (p1, p2) => BtnDisplayDesc_Click((object)p1, (EventArgs)p2);
+            this.BtnDisplayRename.Click += (p1, p2) => BtnDisplayRename_Click((object)p1, (EventArgs)p2);
+            this.ItemDisplayLogoCustom.PreviewMouseLeftButtonUp += (p1, p2) => ComboDisplayLogo_SelectionChanged();
+            this.ComboDisplayLogo.SelectionChanged += (p1, p2) => ComboDisplayLogo_SelectionChanged();
+            this.BtnDisplayStar.Click += (p1, p2) => BtnDisplayStar_Click((object)p1, (EventArgs)p2);
+            this.BtnFolderVersion.Click += (p1, p2) => BtnFolderVersion_Click();
+            this.BtnFolderSaves.Click += (p1, p2) => BtnFolderSaves_Click();
+            this.BtnFolderMods.Click += (p1, p2) => BtnFolderMods_Click();
+            this.BtnFolderScreen.Click += (p1, p2) => BtnFolderScreen_Click((object)p1, (MouseButtonEventArgs)p2);
+            this.BtnManageScript.Click += (p1, p2) => BtnManageScript_Click();
+            this.BtnManageCheck.Click += (p1, p2) => BtnManageCheck_Click((object)p1, (EventArgs)p2);
+            this.BtnManageDelete.Click += (p1, p2) => BtnManageDelete_Click((object)p1, (EventArgs)p2);
             this.Loaded += PageSetupLaunch_Loaded;
         }
         private void PageSetupLaunch_Loaded(object sender, RoutedEventArgs e)

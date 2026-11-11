@@ -30,6 +30,25 @@ $ErrorActionPreference = 'Stop'
 
 if (-not (Test-Path -LiteralPath $ExePath)) { return }
 
+# 只接受真正的本机 apphost：扩展名必须是 .exe，且 PE 里不能有 CLR 头（托管程序集的特征）。
+# 起因：C# 工程的 $(TargetPath) 指向 pcl-next.dll，误传进来会把 dll 改名成 exe，
+# 得到一个双击就跑不起来的假 exe（曾累积两个 2.9 MB 的假产物）。
+if ([IO.Path]::GetExtension($ExePath) -ne '.exe') {
+    throw "Copy-VersionedArtifact: 拒绝复制 $ExePath —— 只能是 .exe（apphost），不能是 .dll。"
+}
+$bytes = [IO.File]::ReadAllBytes($ExePath)
+if ($bytes.Length -lt 0x40 -or $bytes[0] -ne 0x4D -or $bytes[1] -ne 0x5A) {
+    throw "Copy-VersionedArtifact: 拒绝复制 $ExePath —— 不是有效的 PE 文件（缺 MZ 头）。"
+}
+$peOffset = [BitConverter]::ToInt32($bytes, 0x3C)
+$optStart = $peOffset + 24
+$magic = [BitConverter]::ToUInt16($bytes, $optStart)
+$dirStart = if ($magic -eq 0x20B) { $optStart + 112 } else { $optStart + 96 }
+$clrRva = [BitConverter]::ToUInt32($bytes, $dirStart + 14 * 8)  # DataDirectory[14] = CLR Runtime Header
+if ($clrRva -ne 0) {
+    throw "Copy-VersionedArtifact: 拒绝复制 $ExePath —— 它是 .NET 托管程序集（含 CLR 头），不是可执行入口；请传 <AssemblyName>.exe apphost。"
+}
+
 # 版本名：读产物自己的 FileVersion（= AssemblyFileVersion，由 Set-VersionInfo.ps1 写入）
 $version = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($ExePath).FileVersion
 if ([string]::IsNullOrWhiteSpace($version)) { $version = '0.0.0.0' }

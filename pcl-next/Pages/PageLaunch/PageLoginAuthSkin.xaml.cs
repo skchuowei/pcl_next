@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Windows;
 using System.Windows.Input;
 using MeloongCore;
@@ -11,6 +11,10 @@ namespace PCL
         public PageLoginAuthSkin()
         {
             this.InitializeComponent();
+            this.PanData.MouseEnter += (p1, p2) => PageLoginAuthSkin_MouseEnter((object)p1, (MouseEventArgs)p2);
+            this.PanData.MouseLeave += (p1, p2) => PageLoginAuthSkin_MouseLeave((object)p1, (MouseEventArgs)p2);
+            this.BtnEdit.Click += (p1, p2) => BtnEdit_Click((object)p1, (EventArgs)p2);
+            this.Skin.Click += (p1, p2) => Skin_Click((object)p1, (MouseButtonEventArgs)p2);
             this.Skin.Loader = PageLaunchLeft.SkinAuth;
             this.Loaded += (_, __) => PageLoginLegacy_Loaded();
         }

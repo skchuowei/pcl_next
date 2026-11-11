@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -14,6 +14,9 @@ namespace PCL
 
         public MySearchBox()
         {
+            InitializeComponent();
+            this.TextBox.TextChanged += (p1, p2) => Text_TextChanged((object)p1, (TextChangedEventArgs)p2);
+            this.BtnClear.Click += (p1, p2) => BtnClear_Click((object)p1, (EventArgs)p2);
             Loaded += MySearchBox_Loaded;
             KeyUp += MySearchBox_KeyUp;
         }

@@ -439,6 +439,7 @@ namespace PCL
 
         public MyListItem()
         {
+            InitializeComponent();
             this.SizeChanged += (_, __) => OnSizeChanged();
             this.PreviewMouseLeftButtonUp += Button_MouseUp;
             this.PreviewMouseLeftButtonDown += Button_MouseDown;
@@ -544,7 +545,9 @@ namespace PCL
                     var RadioboxList = new List<MyListItem>();
                     int CheckedCount = 0;
                     // 收集控件列表与选中个数
-                    foreach (var Control_Iter in ((dynamic)(IEnumerable)((object)this.Parent)).Children)
+                    // 原文为 For Each Control In CType(Parent, Object).Children（VB 后期绑定取 Parent.Children），
+                    // codeconv 误把 Parent 本身强转成 IEnumerable；此处保留后期绑定，只把结果当集合遍历
+                    foreach (var Control_Iter in (IEnumerable)((dynamic)this.Parent).Children)
                     {
                         var Control = Control_Iter;
                         Control = MyVirtualizingElement.TryInit((FrameworkElement)Control);

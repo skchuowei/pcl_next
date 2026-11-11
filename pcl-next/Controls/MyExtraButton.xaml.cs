@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Controls;
@@ -113,6 +113,16 @@ namespace PCL
 
         public MyExtraButton()
         {
+            InitializeComponent();
+            this.PanClick.MouseLeftButtonUp += (p1, p2) => Button_LeftMouseUp((object)p1, (MouseButtonEventArgs)p2);
+            this.PanClick.MouseRightButtonUp += (p1, p2) => Button_RightMouseUp((object)p1, (MouseButtonEventArgs)p2);
+            this.PanClick.MouseLeftButtonDown += (p1, p2) => Button_LeftMouseDown((object)p1, (MouseButtonEventArgs)p2);
+            this.PanClick.MouseRightButtonDown += (p1, p2) => Button_RightMouseDown((object)p1, (MouseButtonEventArgs)p2);
+            this.PanClick.MouseLeftButtonUp += (p1, p2) => Button_LeftMouseUp((object)p1, (MouseButtonEventArgs)p2);
+            this.PanClick.MouseRightButtonUp += (p1, p2) => Button_RightMouseUp((object)p1, (MouseButtonEventArgs)p2);
+            this.PanClick.MouseLeave += (p1, p2) => Button_MouseLeave();
+            this.PanClick.MouseEnter += (p1, p2) => RefreshColor();
+            this.PanClick.MouseLeave += (p1, p2) => RefreshColor();
             this.Loaded += (_, __) => RefreshColor();
             this.IsEnabledChanged += (_, __) => RefreshColor();
         }

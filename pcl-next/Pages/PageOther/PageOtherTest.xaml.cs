@@ -1,8 +1,13 @@
-
+﻿
 namespace PCL
 {
     public partial class PageOtherTest
     {
+
+        public PageOtherTest()
+        {
+            InitializeComponent();
+        }
 
         public static void StartCustomDownload(string Url, string FileName, string Folder = null)
         {

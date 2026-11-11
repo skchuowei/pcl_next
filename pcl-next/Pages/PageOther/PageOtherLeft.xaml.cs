@@ -59,6 +59,11 @@ namespace PCL
         public PageOtherLeft()
         {
             this.InitializeComponent();
+            this.ItemAbout.Check += (p1, p2) => PageCheck((FrameworkElement)p1, (ModBase.RouteEventArgs)p2);
+            this.ItemHelp.Check += (p1, p2) => PageCheck((FrameworkElement)p1, (ModBase.RouteEventArgs)p2);
+            this.ItemTest.Check += (p1, p2) => PageCheck((FrameworkElement)p1, (ModBase.RouteEventArgs)p2);
+            this.ItemFeedback.Changed += (p1, p2) => TryFeedback((object)p1, (ModBase.RouteEventArgs)p2);
+            this.ItemVote.Changed += (p1, p2) => TryVote((object)p1, (ModBase.RouteEventArgs)p2);
             // 选择第一个未被禁用的子页面
             if (!Settings.Get<bool>("UiHiddenOtherHelp"))
             {

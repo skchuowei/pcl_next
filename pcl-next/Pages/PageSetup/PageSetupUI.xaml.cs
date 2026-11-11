@@ -22,6 +22,48 @@ namespace PCL
 
         public PageSetupUI()
         {
+            InitializeComponent();
+            this.BtnBackgroundOpen.Click += (p1, p2) => BtnUIBgOpen_Click((object)p1, (EventArgs)p2);
+            this.BtnBackgroundRefresh.Click += (p1, p2) => BtnBackgroundRefresh_Click((object)p1, (EventArgs)p2);
+            this.BtnBackgroundClear.Click += (p1, p2) => BtnBackgroundClear_Click((object)p1, (EventArgs)p2);
+            this.BtnLogoChange.Click += (p1, p2) => BtnLogoChange_Click((object)p1, (EventArgs)p2);
+            this.RadioLogoType3.PreviewCheck += (p1, p2) => RadioLogoType3_Check((object)p1, (ModBase.RouteEventArgs)p2);
+            this.BtnLogoDelete.Click += (p1, p2) => BtnLogoDelete_Click((object)p1, (EventArgs)p2);
+            this.BtnMusicOpen.Click += (p1, p2) => BtnMusicOpen_Click((object)p1, (EventArgs)p2);
+            this.BtnMusicRefresh.Click += (p1, p2) => BtnMusicRefresh_Click((object)p1, (EventArgs)p2);
+            this.BtnMusicClear.Click += (p1, p2) => BtnMusicClear_Click((object)p1, (EventArgs)p2);
+            this.CheckMusicStart.Change += (p1, p2) => CheckMusicStart_Change();
+            this.CheckMusicStop.Change += (p1, p2) => CheckMusicStop_Change();
+            this.BtnCustomFile.Click += (p1, p2) => BtnCustomFile_Click((object)p1, (EventArgs)p2);
+            this.BtnCustomRefresh.Click += (p1, p2) => BtnCustomRefresh_Click();
+            this.BtnCustomTutorial.Click += (p1, p2) => BtnCustomTutorial_Click((object)p1, (EventArgs)p2);
+            this.BtnCustomFolder.Click += (p1, p2) => BtnCustomFolder_Click((object)p1, (MouseButtonEventArgs)p2);
+            this.LabLauncherTheme5Unlock.MouseLeftButtonUp += (p1, p2) => LabLauncherTheme5Unlock_MouseLeftButtonUp((object)p1, (MouseButtonEventArgs)p2);
+            this.LabLauncherTheme11Click.MouseLeftButtonUp += (p1, p2) => LabLauncherTheme11Click_MouseLeftButtonUp();
+            this.RadioLauncherTheme11.MouseRightButtonUp += (p1, p2) => LabLauncherTheme11Click_MouseLeftButtonUp();
+            this.LabLauncherTheme8Copy.MouseRightButtonUp += (p1, p2) => LabLauncherTheme8Copy_MouseRightButtonUp();
+            this.RadioLauncherTheme8.MouseRightButtonUp += (p1, p2) => LabLauncherTheme8Copy_MouseRightButtonUp();
+            this.LabLauncherTheme9Copy.MouseRightButtonUp += (p1, p2) => LabLauncherTheme9Copy_MouseRightButtonUp();
+            this.RadioLauncherTheme9.MouseRightButtonUp += (p1, p2) => LabLauncherTheme9Copy_MouseRightButtonUp();
+            this.RadioLauncherTheme14.Changed += (p1, p2) => RadioLauncherTheme14_Change((object)p1, (ModBase.RouteEventArgs)p2);
+            this.SliderLauncherHue.Change += (p1, p2) => HSL_Change();
+            this.SliderLauncherLight.Change += (p1, p2) => HSL_Change();
+            this.SliderLauncherSat.Change += (p1, p2) => HSL_Change();
+            this.SliderLauncherDelta.Change += (p1, p2) => HSL_Change();
+            this.CheckHiddenPageSetup.Change += (p1, p2) => HiddenSetupMain();
+            this.CheckHiddenSetupLaunch.Change += (p1, p2) => HiddenSetupSub();
+            this.CheckHiddenSetupSystem.Change += (p1, p2) => HiddenSetupSub();
+            this.CheckHiddenSetupLink.Change += (p1, p2) => HiddenSetupSub();
+            this.CheckHiddenSetupUI.Change += (p1, p2) => HiddenSetupSub();
+            this.CheckHiddenPageOther.Change += (p1, p2) => HiddenOtherMain();
+            this.CheckHiddenOtherHelp.Change += (p1, p2) => HiddenOtherSub((object)p1, (bool)p2);
+            this.CheckHiddenOtherAbout.Change += (p1, p2) => HiddenOtherSub((object)p1, (bool)p2);
+            this.CheckHiddenOtherTest.Change += (p1, p2) => HiddenOtherSub((object)p1, (bool)p2);
+            this.CheckHiddenOtherFeedback.Change += (p1, p2) => HiddenOtherNet((object)p1, (bool)p2);
+            this.CheckHiddenOtherVote.Change += (p1, p2) => HiddenOtherNet((object)p1, (bool)p2);
+            this.CheckHiddenFunctionHidden.Change += (p1, p2) => HiddenHint((object)p1, (bool)p2);
+            this.CheckHiddenPageSetup.Change += (p1, p2) => HiddenHint((object)p1, (bool)p2);
+            this.CheckHiddenSetupUI.Change += (p1, p2) => HiddenHint((object)p1, (bool)p2);
             this.Loaded += PageSetupUI_Loaded;
             this.Loaded += (_, __) => HiddenRefresh();
         }

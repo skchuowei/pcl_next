@@ -67,6 +67,8 @@ namespace PCL
 
         public MyResourceItem()
         {
+            InitializeComponent();
+            this.LabInfo.MouseEnter += (p1, p2) => LabInfo_MouseEnter((object)p1, (MouseEventArgs)p2);
             this.PreviewMouseLeftButtonUp += Button_MouseUp;
             Click += MyResourceItem_Click;
             this.PreviewMouseLeftButtonDown += Button_MouseDown;

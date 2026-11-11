@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Windows;
 using MeloongCore;
 using MeloongCore.Extensions;
@@ -13,6 +13,7 @@ namespace PCL
 
         public PageOtherHelpDetail()
         {
+            InitializeComponent();
             this.Loaded += PageOtherHelpDetail_Loaded;
         }
 

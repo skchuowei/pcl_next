@@ -20,6 +20,10 @@ namespace PCL
     {
         public PageSelectRight()
         {
+            InitializeComponent();
+            this.Load.Click += (p1, p2) => Load_Click((object)p1, (MouseButtonEventArgs)p2);
+            this.BtnEmptyDownload.Click += (p1, p2) => BtnDownload_Click((object)p1, (EventArgs)p2);
+            this.BtnEmptyDownload.Loaded += (p1, p2) => BtnEmptyDownload_Loaded();
             this.Loaded += PageSelectRight_Loaded;
             this.Initialized += (_, __) => LoaderInit();
         }

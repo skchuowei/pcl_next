@@ -438,6 +438,9 @@ namespace PCL
         public MyLocalModItem()
         {
             this.InitializeComponent();
+            this.BtnUpdate.PreviewMouseRightButtonUp += (p1, p2) => BtnUpdate_PreviewMouseRightButtonUp((object)p1, (MouseButtonEventArgs)p2);
+            this.BtnUpdate.Click += (p1, p2) => BtnUpdate_Click((object)p1, (EventArgs)p2);
+            this.PanTitle.SizeChanged += (p1, p2) => PanTitle_SizeChanged();
             LazyLoadBehavior.OnFirstEnterScrollViewerViewport(this, this.FirstEnterScrollViewerViewport);
             this.PreviewMouseLeftButtonUp += Button_MouseUp;
             this.PreviewMouseLeftButtonDown += Button_MouseDown;

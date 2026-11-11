@@ -69,6 +69,10 @@ namespace PCL
         public PageSetupLeft()
         {
             this.InitializeComponent();
+            this.ItemLaunch.Check += (p1, p2) => PageCheck((MyListItem)p1, (EventArgs)p2);
+            this.ItemSystem.Check += (p1, p2) => PageCheck((MyListItem)p1, (EventArgs)p2);
+            this.ItemUI.Check += (p1, p2) => PageCheck((MyListItem)p1, (EventArgs)p2);
+            this.ItemLink.Check += (p1, p2) => PageCheck((MyListItem)p1, (EventArgs)p2);
             // 选择第一个未被禁用的子页面
             if (!Settings.Get<bool>("UiHiddenSetupLaunch"))
             {

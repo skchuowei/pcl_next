@@ -451,6 +451,15 @@ namespace PCL
             this.AddHandler(DragDrop.DragOverEvent, new DragEventHandler(HandleDrag), handledEventsToo: true);
             // 加载 UI
             this.InitializeComponent();
+            this.PanTitle.MouseLeftButtonDown += (p1, p2) => FormDragMove((object)p1, (MouseButtonEventArgs)p2);
+            this.PanMsg.MouseLeftButtonDown += (p1, p2) => FormDragMove((object)p1, (MouseButtonEventArgs)p2);
+            this.BtnTitleSelect0.Check += (p1, p2) => BtnTitleSelect_Click((MyRadioButton)p1, (bool)p2);
+            this.BtnTitleSelect1.Check += (p1, p2) => BtnTitleSelect_Click((MyRadioButton)p1, (bool)p2);
+            this.BtnTitleSelect2.Check += (p1, p2) => BtnTitleSelect_Click((MyRadioButton)p1, (bool)p2);
+            this.BtnTitleSelect3.Check += (p1, p2) => BtnTitleSelect_Click((MyRadioButton)p1, (bool)p2);
+            this.BtnTitleSelect4.Check += (p1, p2) => BtnTitleSelect_Click((MyRadioButton)p1, (bool)p2);
+            this.PanMainLeft.SizeChanged += (p1, p2) => PanMainLeft_SizeChanged((object)p1, (SizeChangedEventArgs)p2);
+            this.PanBack.MouseMove += (p1, p2) => DragDoing();
             this.Opacity = 0d;
             // 开启管理员权限下的文件拖拽
             if (WindowsUtils.HasAdminRole())
@@ -1934,7 +1943,10 @@ namespace PCL
         {
             if (IsChangingPage)
                 return;
-            PageChangeActual((PageStackData)((dynamic)sender).Tag);
+            // 原文为 PageChangeActual(Val(sender.Tag))：Tag 在 XAML 里是字符串 "0".."4"，
+            // VB 先 Val 成数字、再隐式转成 PageType，最后由 PageStackData 的隐式运算符包一层；
+            // 不能把 Tag 直接当 PageStackData 硬转（string → class 必抛 InvalidCastException）
+            PageChangeActual((PageType)Conversions.ToInteger(sender.Tag));
         }
         /// <summary>
     /// 通过点击返回按钮或手动触发返回来改变页面。

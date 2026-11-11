@@ -26,6 +26,7 @@ namespace PCL
     {
         public Application()
         {
+            InitializeComponent();
             this.Startup += Application_Startup;
             this.SessionEnding += Application_SessionEnding;
             this.DispatcherUnhandledException += Application_DispatcherUnhandledException;

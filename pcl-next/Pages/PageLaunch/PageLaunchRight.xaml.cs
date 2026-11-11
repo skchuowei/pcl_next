@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Linq;
 using System.Net;
 using System.Windows;
@@ -16,6 +16,7 @@ namespace PCL
     {
         public PageLaunchRight()
         {
+            InitializeComponent();
             OnlineLoader = new ModLoader.LoaderTask<(string Address, bool ShouldRefresh), int>("下载主页", OnlineLoaderSub) { ReloadTimeout = 10 * 60 * 1000 };
             this.Loaded += (_, __) => Init();
             this.Loaded += (_, __) => Refresh();

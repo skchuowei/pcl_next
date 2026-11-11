@@ -27,6 +27,27 @@ namespace PCL
 
         public PageInstanceMod()
         {
+            InitializeComponent();
+            this.Load.Click += (p1, p2) => Load_Click((object)p1, (MouseButtonEventArgs)p2);
+            this.BtnManageOpen.Click += (p1, p2) => BtnManageOpen_Click((object)p1, (EventArgs)p2);
+            this.BtnHintOpen.Click += (p1, p2) => BtnManageOpen_Click((object)p1, (EventArgs)p2);
+            this.BtnManageSelectAll.Click += (p1, p2) => BtnManageSelectAll_Click((object)p1, (MouseButtonEventArgs)p2);
+            this.BtnManageInstall.Click += (p1, p2) => BtnManageInstall_Click((object)p1, (MouseButtonEventArgs)p2);
+            this.BtnHintInstall.Click += (p1, p2) => BtnManageInstall_Click((object)p1, (MouseButtonEventArgs)p2);
+            this.BtnManageDownload.Click += (p1, p2) => BtnManageDownload_Click((object)p1, (MouseButtonEventArgs)p2);
+            this.BtnHintDownload.Click += (p1, p2) => BtnManageDownload_Click((object)p1, (MouseButtonEventArgs)p2);
+            this.Load.StateChanged += (p1, p2, p3) => UnselectedAllWithAnimation();
+            this.SearchBox.PreviewKeyDown += (p1, p2) => SearchBox_PreviewKeyDown((object)p1, (KeyEventArgs)p2);
+            this.BtnFilterAll.Check += (p1, p2) => ChangeFilter((MyRadioButton)p1, (bool)p2);
+            this.BtnFilterCanUpdate.Check += (p1, p2) => ChangeFilter((MyRadioButton)p1, (bool)p2);
+            this.BtnFilterDisabled.Check += (p1, p2) => ChangeFilter((MyRadioButton)p1, (bool)p2);
+            this.BtnFilterEnabled.Check += (p1, p2) => ChangeFilter((MyRadioButton)p1, (bool)p2);
+            this.BtnSelectEnable.Click += (p1, p2) => BtnSelectED_Click((MyIconTextButton)p1, (ModBase.RouteEventArgs)p2);
+            this.BtnSelectDisable.Click += (p1, p2) => BtnSelectED_Click((MyIconTextButton)p1, (ModBase.RouteEventArgs)p2);
+            this.BtnSelectUpdate.Click += (p1, p2) => BtnSelectUpdate_Click();
+            this.BtnSelectDelete.Click += (p1, p2) => BtnSelectDelete_Click();
+            this.BtnSelectCancel.Click += (p1, p2) => BtnSelectCancel_Click();
+            this.SearchBox.TextChanged += (p1, p2) => SearchRun();
             this.Loaded += (_, __) => PageOther_Loaded();
             this.Initialized += (_, __) => LoaderInit();
             this.PageExit += UnselectedAllWithAnimation;

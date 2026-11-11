@@ -32,6 +32,12 @@ namespace PCL
 
         public PageDownloadResourceDetail()
         {
+            InitializeComponent();
+            this.Load.StateChanged += (p1, p2, p3) => Load_State((object)p1, (MyLoading.MyLoadingState)p2, (MyLoading.MyLoadingState)p3);
+            this.BtnIntroWeb.Click += (p1, p2) => BtnIntroWeb_Click((object)p1, (EventArgs)p2);
+            this.BtnIntroWiki.Click += (p1, p2) => BtnIntroWiki_Click((object)p1, (EventArgs)p2);
+            this.BtnIntroCopy.Click += (p1, p2) => BtnIntroCopy_Click((object)p1, (EventArgs)p2);
+            this.HintAlternative.Click += (p1, p2) => HintAlternative_Click();
             ResourceFileLoader = new ModLoader.LoaderTask<int, List<ResourceVersion>>("Resource File", Task =>
             {
                 LoadPageArguments();

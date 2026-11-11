@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Windows;
 using System.Windows.Controls;
@@ -13,6 +13,13 @@ namespace PCL
 
         public PageLoginAuth()
         {
+            InitializeComponent();
+            this.ComboName.TextChanged += (p1, p2) => ComboName_TextChanged((object)p1, (TextChangedEventArgs)p2);
+            this.TextPass.PasswordChanged += (p1, p2) => TextPass_PasswordChanged((object)p1, (RoutedEventArgs)p2);
+            this.ComboName.SelectionChanged += (p1, p2) => ComboName_SelectionChanged((MyComboBox)p1, (SelectionChangedEventArgs)p2);
+            this.CheckRemember.Change += (p1, p2) => CheckBoxChange((MyCheckBox)p1, (object)p2);
+            this.ComboName.TextChanged += (p1, p2) => ComboName_TextChanged((object)p1, (TextChangedEventArgs)p2);
+            this.BtnLink.Click += (p1, p2) => Btn_Click((object)p1, (EventArgs)p2);
             this.Loaded += (_, __) => ReloadRegisterButton();
         }
         /// <summary>

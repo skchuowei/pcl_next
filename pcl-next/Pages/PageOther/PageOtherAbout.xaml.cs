@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Windows;
 using System.Windows.Input;
 using MeloongCore.Extensions;
@@ -12,6 +12,10 @@ namespace PCL
 
         public PageOtherAbout()
         {
+            InitializeComponent();
+            this.BtnDonateInput.Click += (p1, p2) => BtnDonateCodeInput_Click();
+            this.BtnDonateOutput.Click += (p1, p2) => BtnDonateOutput_Click((object)p1, (EventArgs)p2);
+            this.BtnAboutUpdate.Click += (p1, p2) => BtnAboutUpdate_Click((object)p1, (MouseButtonEventArgs)p2);
             this.Loaded += PageOtherAbout_Loaded;
         }
         private void PageOtherAbout_Loaded(object sender, RoutedEventArgs e)

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Windows;
 using MeloongCore;
 
@@ -12,6 +12,7 @@ namespace PCL
 
         public PageSetupLink()
         {
+            InitializeComponent();
             this.Loaded += PageSetupLink_Loaded;
         }
 

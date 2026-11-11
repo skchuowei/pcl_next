@@ -21,6 +21,31 @@ namespace PCL
 
         public PageInstanceSetup()
         {
+            InitializeComponent();
+            this.SliderRamCustom.Change += (p1, p2) => RefreshRam((bool)p1);
+            this.RadioRamType0.Check += (p1, p2) => RefreshRam((bool)p1);
+            this.RadioRamType1.Check += (p1, p2) => RefreshRam((bool)p1);
+            this.RadioRamType2.Check += (p1, p2) => RefreshRam((bool)p1);
+            this.RectRamGame.SizeChanged += (p1, p2) => RefreshRamText();
+            this.RectRamEmpty.SizeChanged += (p1, p2) => RefreshRamText();
+            this.LabRamGame.SizeChanged += (p1, p2) => RefreshRamText();
+            this.TextServerEnter.TextChanged += (p1, p2) => TextServerEnter_Change();
+            this.ComboServerLogin.SelectionChanged += (p1, p2) => ComboServerLogin_Changed();
+            this.TextServerNide.ValidatedTextChanged += (p1, p2) => ComboServerLogin_Changed();
+            this.TextServerAuthServer.ValidatedTextChanged += (p1, p2) => ComboServerLogin_Changed();
+            this.TextServerAuthRegister.ValidatedTextChanged += (p1, p2) => ComboServerLogin_Changed();
+            this.BtnServerAuthLittle.Click += (p1, p2) => BtnServerAuthLittle_Click((object)p1, (EventArgs)p2);
+            this.ComboArgumentJava.SelectionChanged += (p1, p2) => ReloadCurrentJava();
+            this.TextArgumentJavaRange.ValidatedTextChanged += (p1, p2) => ReloadCurrentJava();
+            this.ComboArgumentJava.SelectionChanged += (p1, p2) => UpdateJavaRelatedUi();
+            this.TextArgumentJavaRange.TextChanged += (p1, p2) => UpdateJavaRelatedUi();
+            this.HintArgumentJava.Click += (p1, p2) => HintArgumentJava_Click((object)p1, (MouseButtonEventArgs)p2);
+            this.BtnArgumentJavaSearch.Click += (p1, p2) => BtnAdvanceJavaSearch_Click();
+            this.ComboArgumentIndieV2.SelectionChanged += (p1, p2) => ComboArgumentIndieV2_SelectionChanged((object)p1, (SelectionChangedEventArgs)p2);
+            this.TextAdvanceRun.TextChanged += (p1, p2) => TextAdvanceRun_TextChanged((object)p1, (TextChangedEventArgs)p2);
+            this.BtnSwitch.Click += (p1, p2) => BtnSwitch_Click((object)p1, (MouseButtonEventArgs)p2);
+            this.TextAdvanceJvm.TextChanged += (p1, p2) => ReplaceEnter((MyTextBox)p1, (TextChangedEventArgs)p2);
+            this.TextAdvanceGame.TextChanged += (p1, p2) => ReplaceEnter((MyTextBox)p1, (TextChangedEventArgs)p2);
             this.Loaded += PageSetupSystem_Loaded;
         }
         private void PageSetupSystem_Loaded(object sender, RoutedEventArgs e)

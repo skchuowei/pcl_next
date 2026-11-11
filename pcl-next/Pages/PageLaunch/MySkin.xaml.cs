@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -41,6 +41,11 @@ namespace PCL
 
         public MySkin()
         {
+            InitializeComponent();
+            this.BtnSkinSave.Click += (p1, p2) => BtnSkinSave_Click();
+            this.BtnSkinSave.Checked += (p1, p2) => BtnSkinSave_Checked((MyMenuItem)p1, (RoutedEventArgs)p2);
+            this.BtnSkinRefresh.Click += (p1, p2) => RefreshClick();
+            this.BtnSkinCape.Click += (p1, p2) => BtnSkinCape_Click();
             this.MouseEnter += PanSkin_MouseEnter;
             this.MouseLeave += PanSkin_MouseLeave;
             this.MouseLeftButtonDown += PanSkin_MouseLeftButtonDown;

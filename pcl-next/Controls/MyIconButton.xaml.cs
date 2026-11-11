@@ -84,6 +84,7 @@ namespace PCL
 
         public MyIconButton()
         {
+            InitializeComponent();
             this.MouseLeftButtonUp += Button_MouseUp;
             this.MouseLeftButtonDown += Button_MouseDown;
             this.MouseLeftButtonUp += (_, __) => Button_MouseUp();
