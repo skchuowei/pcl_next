@@ -453,6 +453,13 @@ namespace PCL
             this.InitializeComponent();
             this.PanTitle.MouseLeftButtonDown += (p1, p2) => FormDragMove((object)p1, (MouseButtonEventArgs)p2);
             this.PanMsg.MouseLeftButtonDown += (p1, p2) => FormDragMove((object)p1, (MouseButtonEventArgs)p2);
+            // 标题栏关闭 / 最小化：VB 原版靠 Handles BtnTitleClose.Click / BtnTitleMin.Click 绑定，
+            // 迁移后 XAML 与构造函数都没有订阅，导致点关闭、最小化完全无反应（2026-11-11 修复）。
+            this.BtnTitleClose.Click += (p1, p2) => BtnTitleClose_Click(p1, p2);
+            this.BtnTitleMin.Click += (p1, p2) => BtnTitleMin_Click(p1, p2);
+            // 左上角返回箭头：VB 原版是 Public Sub PageBack() Handles BtnTitleInner.Click，
+            // 迁移后漏了订阅，导致所有子页面（版本设置、Mod 管理等）点返回没反应（2026-11-11 修复）。
+            this.BtnTitleInner.Click += (p1, p2) => PageBack();
             this.BtnTitleSelect0.Check += (p1, p2) => BtnTitleSelect_Click((MyRadioButton)p1, (bool)p2);
             this.BtnTitleSelect1.Check += (p1, p2) => BtnTitleSelect_Click((MyRadioButton)p1, (bool)p2);
             this.BtnTitleSelect2.Check += (p1, p2) => BtnTitleSelect_Click((MyRadioButton)p1, (bool)p2);
@@ -512,6 +519,14 @@ namespace PCL
             PageSetupUI.BackgroundRefresh(false, true);
             ModMusic.MusicRefreshPlay(false, true);
             // 扩展按钮
+            this.BtnExtraDownload.Click += (p1, p2) => BtnExtraDownload_Click(p1, p2);
+            this.BtnExtraMusic.Click += (p1, p2) => BtnExtraMusic_Click(p1, p2);
+            this.BtnExtraMusic.RightClick += (p1, p2) => BtnExtraMusic_RightClick(p1, p2);
+            // 以下三个同样是 VB 的 Handles 在迁移时被丢弃的（2026-11-11 补）：
+            // 回到顶部的浮动按钮、愚人节彩蛋按钮、关机按钮此前点了完全没反应。
+            this.BtnExtraBack.Click += (p1, p2) => BackToTop();
+            this.BtnExtraApril.Click += (p1, p2) => AprilGiveup();
+            this.BtnExtraShutdown.Click += (p1, p2) => BtnExtraShutdown_Click();
             this.BtnExtraDownload.ShowCheck = this.BtnExtraDownload_ShowCheck;
             this.BtnExtraBack.ShowCheck = this.BtnExtraBack_ShowCheck;
             this.BtnExtraApril.ShowCheck = this.BtnExtraApril_ShowCheck;
@@ -891,7 +906,9 @@ namespace PCL
                 // 同上，日志或配置文件无写权限：仅影响日志落盘，退出继续。
             }
         }
-        private void BtnTitleClose_Click(object sender, RoutedEventArgs e)
+        // 签名必须是 (object, EventArgs)：MyIconButton.Check 的自定义委托是 ClickEventHandler(object, EventArgs)，
+        // VB 原版用 Handles 宽松绑定，C# 里 RoutedEventArgs 更具体、无法直接方法组转换（2026-11-11 修正）。
+        private void BtnTitleClose_Click(object sender, EventArgs e)
         {
             EndProgram(true);
         }
@@ -936,7 +953,8 @@ namespace PCL
         }
 
         // 最小化
-        private void BtnTitleMin_Click()
+        // VB 原版签名是无参的（Handles 允许），C# 委托要求 (object, EventArgs)，否则无法订阅（2026-11-11 修正）。
+        private void BtnTitleMin_Click(object sender, EventArgs e)
         {
             this.WindowState = WindowState.Minimized;
         }
@@ -2265,17 +2283,19 @@ namespace PCL
         #region 附加按钮
 
         // 音乐
-        private void BtnExtraMusic_Click(object sender, EventArgs e)
+        // 签名须为 MouseButtonEventArgs：MyExtraButton 的自定义委托是 ClickEventHandler(object, MouseButtonEventArgs)，
+        // VB 原版用 Handles 宽松绑定，C# 必须精确匹配（2026-11-11 修正）。
+        private void BtnExtraMusic_Click(object sender, MouseButtonEventArgs e)
         {
             ModMusic.MusicControlPause();
         }
-        private void BtnExtraMusic_RightClick(object sender, EventArgs e)
+        private void BtnExtraMusic_RightClick(object sender, MouseButtonEventArgs e)
         {
             ModMusic.MusicControlNext();
         }
 
         // 任务管理
-        private void BtnExtraDownload_Click(object sender, EventArgs e)
+        private void BtnExtraDownload_Click(object sender, MouseButtonEventArgs e)
         {
             PageChange((PageStackData)PageType.TaskManager);
         }

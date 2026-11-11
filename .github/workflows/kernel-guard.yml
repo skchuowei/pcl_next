@@ -82,7 +82,7 @@ jobs:
       run: dotnet build PCL.Cli/PCL.Cli.csproj -c Release -r linux-x64
 
     - name: Unit tests
-      run: dotnet test PCL.Download.Tests/PCL.Download.Tests.csproj -c Release
+      run: dotnet test PCL.Download.Tests/PCL.Download.Tests.csproj -c Release -r linux-x64
 
     - name: CLI offline selftest
       shell: bash

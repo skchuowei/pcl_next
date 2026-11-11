@@ -17,7 +17,9 @@ namespace PCL
             InitializeComponent();
             this.SearchBox.TextChanged += (p1, p2) => SearchRun();
             this.Loaded += PageOther_Loaded;
-            this.Initialized += PageOther_Inited;
+            // Initialized 在 InitializeComponent() 内部就已触发，事后订阅收不到，
+            // 导致 PageLoaderInit 从未执行、PanBack/PanLoad 一直 Collapsed —— 帮助页整页空白（2026-11-11 修复）。
+            PageOther_Inited(this, EventArgs.Empty);
         }
 
         #region 初始化

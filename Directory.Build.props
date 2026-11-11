@@ -23,18 +23,20 @@
   <!-- ── 1. 渠道与版本默认值 ─────────────────────────────────────────────── -->
 
   <PropertyGroup>
-    <!-- 与 pcl-next.vbproj 的 PclChannel 大小写规则保持一致（Dev / Slush / Alpha / Beta / Rc / Snapshot） -->
+    <!-- 与 pcl-next.csproj 的 PclChannel 大小写规则保持一致（Dev / Slush / Alpha / Beta / Rc / Snapshot） -->
     <PclChannel Condition="'$(PclChannel)' == '' AND '$(Configuration)' == 'Snapshot'">Snapshot</PclChannel>
     <PclChannel Condition="'$(PclChannel)' == ''">Dev</PclChannel>
 
     <!--
-      版本名直接取自 ModBase.vb 的 VersionBaseName，避免各处手抄版本导致漂移。
+      版本名直接取自 ModBase.cs 的 VersionBaseName，避免各处手抄版本导致漂移。
       求值期用属性函数读取并正则抽取。
+      ⚠ 必须读 .cs：pcl-next.csproj 才是实际参与编译的工程，Set-VersionInfo.ps1 也只写 .cs。
+      读 .vb 会让产物目录名与实际 exe 版本长期不一致（2026-11-11 修正）。
     -->
     <!-- 路径片段一律用正斜杠：MSBuild 在 Windows / Linux 都接受 / 作为分隔符，
          而反斜杠在 Linux 上只是普通字符，会让 Exists() 判定为 false，进而 PclVersion 为空。
          （2026-11-07 跨平台护栏实测发现，见 .workbuddy/memory/2026-11-07.md） -->
-    <PclModBaseFile>$(MSBuildThisFileDirectory)pcl-next/Modules/Base/ModBase.vb</PclModBaseFile>
+    <PclModBaseFile>$(MSBuildThisFileDirectory)pcl-next/Modules/Base/ModBase.cs</PclModBaseFile>
     <PclVersion Condition="'$(PclVersion)' == '' AND Exists('$(PclModBaseFile)')">$([System.Text.RegularExpressions.Regex]::Match($([System.IO.File]::ReadAllText('$(PclModBaseFile)')), 'VersionBaseName[^&quot;]*&quot;([0-9][0-9.]*)&quot;').Groups[1].Value)</PclVersion>
 
     <!--

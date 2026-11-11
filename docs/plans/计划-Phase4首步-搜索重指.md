@@ -1,6 +1,6 @@
 # 计划：Phase 4 首步——资源搜索数据源改由 Provider 提供（dev.4 / §2.1 C）
 
-> 依据：《dev.4公布标准.md》§2.1 C、《PCL2_CSharp下载服务迁移计划.md》§5 Phase 4、《AGENTS.md》§3.2。
+> 依据：《公布标准.md》§6.2 C、《PCL2_CSharp下载服务迁移计划.md》§5 Phase 4、《AGENTS.md》§3.2。
 > 状态：已完成（dev.4）。本文件随版本归档；Phase 4 主体（安装流程、任务列表）顺延 dev.5。
 
 ## 1. 目标

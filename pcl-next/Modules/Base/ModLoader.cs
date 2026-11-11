@@ -773,9 +773,54 @@ namespace PCL
                 }
             }
             /// <summary>
+        /// 以反射方式调用 <c>LoaderTask&lt;TIn, TOut&gt;.ShouldStart(ref TIn, bool, bool)</c>。
+        /// </summary>
+            /// <remarks>
+        /// 不能用 dynamic：ShouldStart 的首参是 <c>ref TIn</c>，C# 的 dynamic 调用要求显式写 ref、且实参必须是变量，
+        /// 否则运行时抛 <c>RuntimeBinderException（... has some invalid arguments）</c>；VB 晚绑定没有这条限制。
+        /// 该异常会让 Update 的 foreach 在第一个已完成的子加载器处中断，后续子加载器永远停在 Waiting，
+        /// 表现为外层任务卡在「正在下载」不动（2026-11-11 实测定位）。
+        /// </remarks>
+            private static bool CallShouldStart(LoaderBase Loader, object Input)
+            {
+                var Method = Loader.GetType().GetMethod("ShouldStart", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+                if (Method is null)
+                    return false;
+                var Params = Method.GetParameters();
+                Type TIn = Params[0].ParameterType;
+                if (TIn.IsByRef)
+                    TIn = TIn.GetElementType();
+                object ArgInput;
+                if (Input is not null && TIn.IsInstanceOfType(Input))
+                    ArgInput = Input;
+                else if (TIn.IsValueType)
+                    ArgInput = Activator.CreateInstance(TIn); // VB 的 Nothing 传值类型等价于该类型默认值
+                else
+                    ArgInput = null;
+                var Args = new object[Params.Length];
+                Args[0] = ArgInput;
+                Args[1] = false; // IsForceRestart
+                Args[2] = true; // IgnoreReloadTimeout
+                return Conversions.ToBoolean(Method.Invoke(Loader, Args));
+            }
+            /// <summary>
         /// 触发一次更新，以启动新加载器或完成。
         /// </summary>
             private void Update()
+            {
+                try
+                {
+                    UpdateCore();
+                }
+                catch (Exception ex)
+                {
+                    // 原 VB 下这里的异常会被 UI 线程的错误框拦下；迁移后它落在工作线程里被静默丢弃，
+                    // 表现成「任务永远卡在加载中」，因此显式失败并留日志。
+                    Logger.Error(ex, $"[LoaderCombo] {Name} 子任务调度异常");
+                    Failed(ex);
+                }
+            }
+            private void UpdateCore()
             {
                 if (State == ModBase.LoadState.Finished || State == ModBase.LoadState.Failed || State == ModBase.LoadState.Canceled)
                     return;
@@ -791,7 +836,7 @@ namespace PCL
                                 // 检查 LoaderTask 是否需要重启
                                 if (GeneralUtils.IsGenericInstanceOf(Loader, typeof(LoaderTask<,>)))
                                 {
-                                    if (Conversions.ToBoolean(((dynamic)((object)Loader)).ShouldStart(Input is not null && ReferenceEquals(Loader.GetType().GenericTypeArguments.First(), Input.GetType()) ? Input : null, IgnoreReloadTimeout: true)))
+                                    if (CallShouldStart(Loader, Input is not null && ReferenceEquals(Loader.GetType().GenericTypeArguments.First(), Input.GetType()) ? Input : null))
                                     {
                                         Logger.Info($"由于输入条件变更，重启已完成的加载器 {Loader.Name}");
                                         goto default;
@@ -809,7 +854,7 @@ namespace PCL
                                 // 检查 LoaderTask 是否需要重启
                                 if (GeneralUtils.IsGenericInstanceOf(Loader, typeof(LoaderTask<,>)))
                                 {
-                                    if (Conversions.ToBoolean(((dynamic)((object)Loader)).ShouldStart(Input is not null && ReferenceEquals(Loader.GetType().GenericTypeArguments.First(), Input.GetType()) ? Input : null, IgnoreReloadTimeout: true)))
+                                    if (CallShouldStart(Loader, Input is not null && ReferenceEquals(Loader.GetType().GenericTypeArguments.First(), Input.GetType()) ? Input : null))
                                     {
                                         Logger.Warn($"由于输入条件变更，重启进行中的加载器 {Loader.Name}");
                                         goto default;

@@ -18,9 +18,9 @@
        用于 dev / slush 等不对外分发的渠道。
 
     写入位置：
-      · pcl-next/Modules/Base/ModBase.vb         → VersionBaseName / VersionCode / CommitHash
-      · pcl-next/Modules/Base/ModBuildChannel.vb → ChannelVersionCodeBase（周期基址）
-      · pcl-next/My Project/AssemblyInfo.vb      → AssemblyVersion / AssemblyFileVersion
+      · pcl-next/Modules/Base/ModBase.cs         → VersionBaseName / VersionCode / CommitHash
+      · pcl-next/Modules/Base/ModBuildChannel.cs → ChannelVersionCodeBase（周期基址）
+      · pcl-next/My Project/AssemblyInfo.cs      → AssemblyVersion / AssemblyFileVersion
 
 .PARAMETER Channel
     渠道：Dev / Slush / Alpha / Beta / Rc / Snapshot。
@@ -44,12 +44,12 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-# 仓库根 = 含 pcl-next\pcl-next.vbproj 的目录
+# 仓库根 = 含 pcl-next\pcl-next.csproj 的目录
 $Root = $PSScriptRoot
-while ($Root -and -not (Test-Path (Join-Path $Root 'pcl-next\pcl-next.vbproj'))) {
+while ($Root -and -not (Test-Path (Join-Path $Root 'pcl-next\pcl-next.csproj'))) {
     $Root = Split-Path -Parent $Root
 }
-if (-not $Root) { throw '未找到仓库根目录（应包含 pcl-next\pcl-next.vbproj）' }
+if (-not $Root) { throw '未找到仓库根目录（应包含 pcl-next\pcl-next.csproj）' }
 
 # ── 号段表（《分支与发布规范》§5.2）：base + 偏移 ──────────────────────────────
 # 号段按代号阶梯严格递增，且每个代号占独立区间：
@@ -108,9 +108,9 @@ if ($Tag) {
     $Sequence = if ($m.Groups['seq'].Success) { [int]$m.Groups['seq'].Value } else { 1 }
 }
 else {
-    $base = Read-TextFile (Join-Path $Root 'pcl-next\Modules\Base\ModBase.vb')
-    $m = [regex]::Match($base.Text, 'Public Const VersionBaseName As String = "(?<ver>[\d\.]+)"')
-    if (-not $m.Success) { throw "无法从 ModBase.vb 读取 VersionBaseName" }
+    $base = Read-TextFile (Join-Path $Root 'pcl-next\Modules\Base\ModBase.cs')
+    $m = [regex]::Match($base.Text, 'VersionBaseName = "(?<ver>[\d\.]+)"')
+    if (-not $m.Success) { throw "无法从 ModBase.cs 读取 VersionBaseName" }
     $VersionName = $m.Groups['ver'].Value
     $parts = $VersionName.Split('.')
     $cycle = [int]$parts[1] - $FirstCycleMinor
@@ -134,27 +134,29 @@ switch ($Channel) {
 
 Write-Host "渠道：$Channel    版本名：$VersionName    版本号：$VersionCode    号段基址：$Base"
 
-# ── 写入 ModBase.vb ──────────────────────────────────────────────────────────
-$path = Join-Path $Root 'pcl-next\Modules\Base\ModBase.vb'
+# ── 写入 ModBase.cs ──────────────────────────────────────────────────────────
+# 注意：C# 工程才是实际参与编译的工程（pcl-next.csproj），.vb 那套已不参与构建。
+# 只改 .vb 会导致 exe 内的版本名 / VersionCode 永远停在旧值。
+$path = Join-Path $Root 'pcl-next\Modules\Base\ModBase.cs'
 $f = Read-TextFile $path
 $text = $f.Text
-$text = Replace-Once $text 'Public Const VersionBaseName As String = "[^"]*"' "Public Const VersionBaseName As String = `"$VersionName`"" 'VersionBaseName'
-$text = Replace-Once $text 'Public Const VersionCode As Integer = [^\r\n]*' "Public Const VersionCode As Integer = $VersionCode" 'VersionCode'
-$text = Replace-Once $text 'Public Const CommitHash As String = "[^"]*"' "Public Const CommitHash As String = `"$CommitHash`"" 'CommitHash'
+$text = Replace-Once $text 'public const string VersionBaseName = "[^"]*"' "public const string VersionBaseName = `"$VersionName`"" 'VersionBaseName'
+$text = Replace-Once $text 'public const int VersionCode = [^;]*;' "public const int VersionCode = $VersionCode;" 'VersionCode'
+$text = Replace-Once $text 'public const string CommitHash = "[^"]*"' "public const string CommitHash = `"$CommitHash`"" 'CommitHash'
 Write-TextFile $path $text $f.Bom
 
-# ── 写入 ModBuildChannel.vb（周期基址）──────────────────────────────────────
-$path = Join-Path $Root 'pcl-next\Modules\Base\ModBuildChannel.vb'
+# ── 写入 ModBuildChannel.cs（周期基址）──────────────────────────────────────
+$path = Join-Path $Root 'pcl-next\Modules\Base\ModBuildChannel.cs'
 $f = Read-TextFile $path
-$text = Replace-Once $f.Text 'Public Const ChannelVersionCodeBase As Integer = \d+' "Public Const ChannelVersionCodeBase As Integer = $Base" 'ChannelVersionCodeBase'
+$text = Replace-Once $f.Text 'public const int ChannelVersionCodeBase = \d+;' "public const int ChannelVersionCodeBase = $Base;" 'ChannelVersionCodeBase'
 Write-TextFile $path $text $f.Bom
 
-# ── 写入 AssemblyInfo.vb ─────────────────────────────────────────────────────
-$path = Join-Path $Root 'pcl-next\My Project\AssemblyInfo.vb'
+# ── 写入 AssemblyInfo.cs ─────────────────────────────────────────────────────
+$path = Join-Path $Root 'pcl-next\My Project\AssemblyInfo.cs'
 $f = Read-TextFile $path
 $text = $f.Text
-$text = Replace-Once $text '<Assembly: AssemblyVersion\("[^"]*"\)>' "<Assembly: AssemblyVersion(`"$VersionName`")>" 'AssemblyVersion'
-$text = Replace-Once $text '<Assembly: AssemblyFileVersion\("[^"]*"\)>' "<Assembly: AssemblyFileVersion(`"$VersionName`")>" 'AssemblyFileVersion'
+$text = Replace-Once $text '\[assembly: AssemblyVersion\("[^"]*"\)\]' "[assembly: AssemblyVersion(`"$VersionName`")]" 'AssemblyVersion'
+$text = Replace-Once $text '\[assembly: AssemblyFileVersion\("[^"]*"\)\]' "[assembly: AssemblyFileVersion(`"$VersionName`")]" 'AssemblyFileVersion'
 Write-TextFile $path $text $f.Bom
 
 Write-Host "版本常量已写入。"

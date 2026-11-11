@@ -47,8 +47,10 @@ namespace PCL
                 Task.Output = Result;
             });
             this.Loaded += (_, __) => LoadPageArguments();
-            this.Initialized += PageDownloadResourceDetail_Inited;
             this.PageEnter += Init;
+            // Initialized 在 InitializeComponent() 内部就已触发，事后订阅收不到 → PageLoaderInit 不执行、
+            // 下载详情页的加载环与内容层不会切换（2026-11-11 修复）。此时 PageCurrent 已由 PageChange 设好。
+            PageDownloadResourceDetail_Inited(this, EventArgs.Empty);
         }
         public void LoadPageArguments()
         {

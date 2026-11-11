@@ -134,7 +134,7 @@ namespace PCL
             string Logo;
             // 原 VB 为 Select Case Entry("type")，转换器误把选择子写成常量 "type"，导致下方三个分支被判定为不可达（CS0162）；
             // 这里是转换错误而非死代码，故按原逻辑改为读取 Entry 的 type 字段
-            switch (Entry["type"].ToString())
+            switch (Entry["type"]?.ToString() ?? "")
             {
                 case "release":
                     {
@@ -159,16 +159,22 @@ namespace PCL
                     }
             }
             // 建立控件
-            var NewItem = new MyListItem() { Logo = Logo, SnapsToDevicePixels = true, Title = Entry["id"].ToString(), Height = 42d, Type = MyListItem.CheckType.Clickable, Tag = Entry };
+            var NewItem = new MyListItem() { Logo = Logo, SnapsToDevicePixels = true, Title = Entry["id"]?.ToString() ?? "", Height = 42d, Type = MyListItem.CheckType.Clickable, Tag = Entry };
             if (Entry["lore"] is null)
             {
-                NewItem.Info = Entry["releaseTime"].Value<DateTime>().ToString("yyyy'/'MM'/'dd HH':'mm");
+                JToken rtToken = Entry["releaseTime"];
+                DateTime rtDate = default;
+                if (rtToken is not null && rtToken.Type != JTokenType.Null)
+                {
+                    try { rtDate = rtToken.ToObject<DateTime>(); } catch { rtDate = default; }
+                }
+                NewItem.Info = rtDate == default ? "" : rtDate.ToString("yyyy'/'MM'/'dd HH':'mm");
             }
             else
             {
                 NewItem.Info = Entry["lore"].ToString();
             }
-            if (Entry["url"].ToString().Contains("pcl"))
+            if ((Entry["url"]?.ToString() ?? "").Contains("pcl"))
                 NewItem.Info = "[PCL Next 特供下载] " + NewItem.Info;
             NewItem.Click += OnClick;
             // 建立菜单
@@ -240,7 +246,7 @@ namespace PCL
             try
             {
                 string Id = Version.Title;
-                string JsonUrl = ((dynamic)Version.Tag)["url"].ToString();
+                string JsonUrl = (Version.Tag is JObject menuTag ? menuTag["url"]?.ToString() : null) ?? "";
                 string VersionFolder = Dialogs.SelectFolder("选择目标文件夹", false).FirstOrDefault();
                 if (VersionFolder is null)
                     return;
@@ -330,7 +336,7 @@ pause";
             try
             {
                 string Id = Version.Title;
-                string JsonUrl = ((dynamic)Version.Tag)["url"].ToString();
+                string JsonUrl = (Version.Tag is JObject menuTag ? menuTag["url"]?.ToString() : null) ?? "";
                 string VersionFolder = Dialogs.SelectFolder("选择目标文件夹", false).FirstOrDefault();
                 if (VersionFolder is null)
                     return;
@@ -372,7 +378,7 @@ pause";
         public static void McUpdateLogShow(JToken InstanceJson)
         {
             string WikiName;
-            string Id = InstanceJson["id"].ToString().Lower();
+            string Id = InstanceJson["id"]?.ToString().Lower() ?? "";
             if (Id == "3d shareware v1.34")
             {
                 WikiName = "3D_Shareware_v1.34";
@@ -812,7 +818,7 @@ pause";
                 Logger.Info($"检测为旧版 OptiFine：{DownloadInfo.Inherit}");
                 // 复制 Jar 文件
                 // 建立 Json 文件
-                Loaders.Add(new ModLoader.LoaderTask<List<ModNet.NetFile>, bool>("安装 OptiFine（方式 B）", (Task) => { try { FileUtils.Copy(McFolder + @"versions\" + DownloadInfo.Inherit + @"\" + DownloadInfo.Inherit + ".jar", VersionFolder + Id + ".jar"); Task.Progress = 0.7d; var InheritInstance = new ModMinecraft.McInstance(McFolder + @"versions\" + DownloadInfo.Inherit); string Json = Download.OptiFineProfile.BuildLegacyProfileJson(new Download.OptiFineLegacyProfile(Id, DownloadInfo.Inherit, DownloadInfo.FileName, DownloadInfo.ReleaseTime, InheritInstance.ReleaseTime.ToString("yyyy'-'MM'-'dd"), InheritInstance.IsOldJson, InheritInstance.IsOldJson ? InheritInstance.JsonObject["minecraftArguments"].ToString() : null)); FileUtils.Write(VersionFolder + Id + ".json", Json); } catch (Exception ex) { throw new Exception("安装 OptiFine（方式 B）失败", ex); } }) { ProgressWeight = 1d });
+                Loaders.Add(new ModLoader.LoaderTask<List<ModNet.NetFile>, bool>("安装 OptiFine（方式 B）", (Task) => { try { FileUtils.Copy(McFolder + @"versions\" + DownloadInfo.Inherit + @"\" + DownloadInfo.Inherit + ".jar", VersionFolder + Id + ".jar"); Task.Progress = 0.7d; var InheritInstance = new ModMinecraft.McInstance(McFolder + @"versions\" + DownloadInfo.Inherit); string Json = Download.OptiFineProfile.BuildLegacyProfileJson(new Download.OptiFineLegacyProfile(Id, DownloadInfo.Inherit, DownloadInfo.FileName, DownloadInfo.ReleaseTime, InheritInstance.ReleaseTime.ToString("yyyy'-'MM'-'dd"), InheritInstance.IsOldJson, InheritInstance.IsOldJson ? InheritInstance.JsonObject["minecraftArguments"]?.ToString() : null)); FileUtils.Write(VersionFolder + Id + ".json", Json); } catch (Exception ex) { throw new Exception("安装 OptiFine（方式 B）失败", ex); } }) { ProgressWeight = 1d });
             }
 
             return Loaders;
@@ -1018,7 +1024,7 @@ pause";
             // 安装
             // 版本 json 的字段顺序与「追加 liteloader 库」规则已迁至 C#
             // 输出 Json 文件，同时会新建该文件夹
-            Loaders.Add(new ModLoader.LoaderTask<string, string>("安装 LiteLoader", (Task) => { try { string VersionName = DownloadInfo.Inherit + Download.LiteLoaderProfile.InstanceSuffix; string VersionFolder = McFolder + @"versions\" + VersionName + @"\"; string Json = Download.LiteLoaderProfile.BuildVersionJson(DownloadInfo.JsonToken.ToString(), DownloadInfo.Inherit, DownloadInfo.ReleaseTime); FileUtils.Write(VersionFolder + VersionName + ".json", Json); } catch (Exception ex) { throw new Exception("安装新 LiteLoader 版本失败", ex); } }) { ProgressWeight = 1d });
+            Loaders.Add(new ModLoader.LoaderTask<string, string>("安装 LiteLoader", (Task) => { try { string VersionName = DownloadInfo.Inherit + Download.LiteLoaderProfile.InstanceSuffix; string VersionFolder = McFolder + @"versions\" + VersionName + @"\"; string Json = Download.LiteLoaderProfile.BuildVersionJson(DownloadInfo.JsonToken?.ToString() ?? "", DownloadInfo.Inherit, DownloadInfo.ReleaseTime); FileUtils.Write(VersionFolder + VersionName + ".json", Json); } catch (Exception ex) { throw new Exception("安装新 LiteLoader 版本失败", ex); } }) { ProgressWeight = 1d });
 
             return Loaders;
         }
@@ -1421,29 +1427,40 @@ pause";
                 // 解压并获取、合并两个 Json 的信息
                 Installer = FileUtils.OpenZip(InstallerAddress);
                 Task.Progress = 0.2d;
-                JObject Json = (JObject)Installer.GetEntry("install_profile.json").Open().ReadString().DeserializeJson();
-                JObject Json2 = (JObject)Installer.GetEntry("version.json").Open().ReadString().DeserializeJson();
+                var profileEntry = Installer.GetEntry("install_profile.json");
+                var versionEntry = Installer.GetEntry("version.json");
+                if (profileEntry is null || versionEntry is null)
+                    throw new Exception("安装包缺少 install_profile.json 或 version.json，安装包可能已损坏");
+                JObject Json = (JObject)profileEntry.Open().ReadString().DeserializeJson();
+                JObject Json2 = (JObject)versionEntry.Open().ReadString().DeserializeJson();
                 Json.Merge(Json2);
                 // 获取 Lib 下载信息
                 Libs = ModMinecraft.McLibListGetWithJson(Json, true, CurrentMcFolder);
                 // 添加 Mappings 下载信息
-                if (Json["data"] is not null && Json["data"]["MOJMAPS"] is not null)
+                var mojmaps = Json["data"]?["MOJMAPS"];
+                var mappingsClient = mojmaps?["client"];
+                if (mojmaps is not null && mappingsClient is not null)
                 {
                     // 下载原版 Json 文件
                     Task.Progress = 0.4d;
                     JObject RawJson = (JObject)ModNet.NetRequestByLoader(ModDownload.DlSourceLauncherOrMetaGet(Conversions.ToString(ModDownload.DlClientListGet(Inherit))), IsJson: true).DeserializeJson();
                     // [net.minecraft:client:1.17.1-20210706.113038:mappings@txt] 或 @tsrg]
-                    string OriginalName = Json["data"]["MOJMAPS"]["client"].ToString().Trim("[]".ToCharArray()).BeforeFirst("@");
-                    string Address = Path.ChangeExtension(ModMinecraft.McLibGet(OriginalName, CustomMcFolder: CurrentMcFolder), "." + Json["data"]["MOJMAPS"]["client"].ToString().Trim("[]".ToCharArray()).Split("@")[1]);
-                    var ClientMappings = RawJson["downloads"]["client_mappings"];
+                    string clientRaw = mappingsClient.ToString().Trim("[]".ToCharArray());
+                    string OriginalName = clientRaw.BeforeFirst("@");
+                    string[] clientParts = clientRaw.Split("@");
+                    string mappingSuffix = clientParts.Length > 1 ? clientParts[1] : "txt";
+                    string Address = Path.ChangeExtension(ModMinecraft.McLibGet(OriginalName, CustomMcFolder: CurrentMcFolder), "." + mappingSuffix);
+                    var ClientMappings = RawJson["downloads"]?["client_mappings"];
+                    if (ClientMappings is null)
+                        throw new Exception("原版 JSON 缺少 client_mappings 信息，安装包可能已损坏");
                     Libs.Add(new ModMinecraft.McLibEntry()
                     {
                         IsNatives = false,
                         LocalPath = Address,
                         OriginalName = OriginalName,
-                        Url = (string)ClientMappings["url"],
-                        Size = (long)ClientMappings["size"],
-                        SHA1 = (string)ClientMappings["sha1"]
+                        Url = (string)ClientMappings["url"] ?? "",
+                        Size = (long?)ClientMappings["size"] ?? -1L,
+                        SHA1 = (string)ClientMappings["sha1"] ?? ""
                     });
                     Logger.Info($"需要下载 Mappings：{ClientMappings["url"]} (SHA1: {ClientMappings["sha1"]})");
                 }
@@ -1479,7 +1496,8 @@ pause";
             #region Forgelike 文件
             foreach (ModMinecraft.McLibEntry LibFile in Libs)
             {
-                string RealPath = Path.Combine(McFolder, LibFile.LocalPath.Substring(CurrentMcFolder.Length));
+                string relativePath = LibFile.LocalPath.StartsWith(CurrentMcFolder) ? LibFile.LocalPath.Substring(CurrentMcFolder.Length) : LibFile.LocalPath;
+                string RealPath = Path.Combine(McFolder, relativePath);
                 if (!FileUtils.Exists(RealPath))
                     FileUtils.Copy(LibFile.LocalPath, RealPath);
                 Logger.Trace($"复制的 {LoaderName} 支持库文件：{LibFile.LocalPath}");
@@ -1594,9 +1612,17 @@ pause";
                 {
                     ;
                     // [VB Port] restore Dim dropped by codeconv (CommonConversions NRE)
-                    FileInfo JsonFile = DeltaList[0].EnumerateFiles().First();
-                    FileUtils.Copy(JsonFile.FullName, VersionFolder + NewInstanceName + ".json");
-                    Logger.Info($"已复制新增的版本 JSON 文件：{JsonFile.FullName} -> {VersionFolder}{NewInstanceName}.json");
+                    var jsonFiles = DeltaList[0].EnumerateFiles().ToList();
+                    if (jsonFiles.Count == 0)
+                    {
+                        Logger.Warn($"新增版本文件夹为空：{DeltaList[0].FullName}");
+                    }
+                    else
+                    {
+                        FileInfo JsonFile = jsonFiles[0];
+                        FileUtils.Copy(JsonFile.FullName, VersionFolder + NewInstanceName + ".json");
+                        Logger.Info($"已复制新增的版本 JSON 文件：{JsonFile.FullName} -> {VersionFolder}{NewInstanceName}.json");
+                    }
                 }
                 else if (DeltaList.Count > 1)
                 {
@@ -1641,7 +1667,10 @@ pause";
                 // 解压并获取信息
                 Installer = FileUtils.OpenZip(InstallerAddress);
                 Task.Progress = 0.2d;
-                JObject Json = (JObject)Installer.GetEntry("install_profile.json").Open().ReadString().DeserializeJson();
+                var legacyProfileEntry = Installer.GetEntry("install_profile.json");
+                if (legacyProfileEntry is null)
+                    throw new Exception("安装包缺少 install_profile.json，安装包可能已损坏");
+                JObject Json = (JObject)legacyProfileEntry.Open().ReadString().DeserializeJson();
                 Task.Progress = 0.4d;
                 // 新建版本文件夹
                 DirectoryUtils.Create(VersionFolder);
@@ -1651,7 +1680,13 @@ pause";
                     // 中版：Legacy 方式 1
                     Logger.Info($"开始进行 Forge 安装，Legacy 方式 1：{InstallerAddress}");
                     // 建立 Json 文件
-                    JObject JsonVersion = (JObject)Installer.GetEntry(Json["json"].ToString().TrimStart('/')).Open().ReadString().DeserializeJson();
+                    string legacyJsonName = Json["json"]?.ToString().TrimStart('/');
+                    if (string.IsNullOrEmpty(legacyJsonName))
+                        throw new Exception("install_profile.json 缺少 json 字段，安装包可能已损坏");
+                    var legacyJsonEntry = Installer.GetEntry(legacyJsonName);
+                    if (legacyJsonEntry is null)
+                        throw new Exception($"安装包缺少版本条目 {legacyJsonName}，安装包可能已损坏");
+                    JObject JsonVersion = (JObject)legacyJsonEntry.Open().ReadString().DeserializeJson();
                     JsonVersion["id"] = NewInstanceName;
                     FileUtils.Write(VersionFolder + NewInstanceName + ".json", JsonVersion.ToString());
                     Task.Progress = 0.6d;
@@ -1667,14 +1702,25 @@ pause";
                     // 旧版：Legacy 方式 2
                     Logger.Info($"开始进行 Forge 安装，Legacy 方式 2：{InstallerAddress}");
                     // 解压 Jar 文件
-                    string JarAddress = ModMinecraft.McLibGet((string)Json["install"]["path"], CustomMcFolder: McFolder);
-                    FileUtils.Write(JarAddress, Installer.GetEntry((string)Json["install"]["filePath"]).Open());
+                    var installNode = Json["install"];
+                    string installPath = installNode?["path"]?.ToString();
+                    string installFile = installNode?["filePath"]?.ToString();
+                    if (string.IsNullOrEmpty(installPath) || string.IsNullOrEmpty(installFile))
+                        throw new Exception("install_profile.json 缺少 install.path/filePath，安装包可能已损坏");
+                    string JarAddress = ModMinecraft.McLibGet(installPath, CustomMcFolder: McFolder);
+                    var legacyJarEntry = Installer.GetEntry(installFile);
+                    if (legacyJarEntry is null)
+                        throw new Exception($"安装包缺少条目 {installFile}，安装包可能已损坏");
+                    FileUtils.Write(JarAddress, legacyJarEntry.Open());
                     Task.Progress = 0.9d;
                     // 建立 Json 文件
-                    Json["versionInfo"]["id"] = NewInstanceName;
-                    if (Json["versionInfo"]["inheritsFrom"] is null)
-                        ((JObject)Json["versionInfo"]).Add("inheritsFrom", Inherit);
-                    FileUtils.Write(VersionFolder + NewInstanceName + ".json", Json["versionInfo"].ToString());
+                    var versionInfo = Json["versionInfo"] as JObject;
+                    if (versionInfo is null)
+                        throw new Exception("install_profile.json 缺少 versionInfo，安装包可能已损坏");
+                    versionInfo["id"] = NewInstanceName;
+                    if (versionInfo["inheritsFrom"] is null)
+                        versionInfo.Add("inheritsFrom", Inherit);
+                    FileUtils.Write(VersionFolder + NewInstanceName + ".json", versionInfo.ToString());
                 }
             }
             catch (Exception ex)
@@ -1984,9 +2030,9 @@ pause";
         {
             try
             {
-                string Url = DownloadInfo["url"].ToString();
+                string Url = DownloadInfo["url"]?.ToString() ?? "";
                 string FileName = PathUtils.GetLastPart(Url);
-                string Version = PathUtils.GetLastPart(DownloadInfo["version"].ToString());
+                string Version = PathUtils.GetLastPart(DownloadInfo["version"]?.ToString() ?? "");
                 string Target = Dialogs.SaveFile("选择保存位置", FileName, filter: new[] { ("jar", "Fabric 安装器") });
                 if (Target is null)
                     return;
@@ -2056,12 +2102,12 @@ pause";
         {
             var NewItem = new MyListItem()
             {
-                Title = Entry["version"].ToString().Replace("+build", ""),
+                Title = Entry["version"]?.ToString().Replace("+build", "") ?? "",
                 SnapsToDevicePixels = true,
                 Height = 42d,
                 Type = MyListItem.CheckType.Clickable,
                 Tag = Entry,
-                Info = Entry["stable"].ToObject<bool>() ? "稳定版" : "测试版",
+                Info = (Entry["stable"] is not null && Entry["stable"].Type != JTokenType.Null && Entry["stable"].ToObject<bool>()) ? "稳定版" : "测试版",
                 Logo = ModBase.PathImage + "Blocks/Fabric.png"
             };
             NewItem.Click += OnClick;
@@ -2077,7 +2123,7 @@ pause";
         {
             var NewItem = new MyListItem()
             {
-                Title = Entry.Display.Split("]")[1].Replace("Fabric API ", "").Replace(" build ", ".").BeforeFirst("+").Trim(),
+                Title = ((Entry.Display ?? "").Split("]") is var displayParts && displayParts.Length > 1 ? displayParts[1] : Entry.Display ?? "").Replace("Fabric API ", "").Replace(" build ", ".").BeforeFirst("+").Trim(),
                 SnapsToDevicePixels = true,
                 Height = 42d,
                 Type = MyListItem.CheckType.Clickable,

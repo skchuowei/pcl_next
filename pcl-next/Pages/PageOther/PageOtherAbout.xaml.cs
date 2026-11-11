@@ -14,6 +14,8 @@ namespace PCL
         {
             InitializeComponent();
             this.BtnDonateInput.Click += (p1, p2) => BtnDonateCodeInput_Click();
+            // VB 的 Handles BtnDonateCopy.Click 迁移时被丢弃 → 关于页「复制识别码」点了没反应（2026-11-11 补）。
+            this.BtnDonateCopy.Click += (p1, p2) => CopyIdentify();
             this.BtnDonateOutput.Click += (p1, p2) => BtnDonateOutput_Click((object)p1, (EventArgs)p2);
             this.BtnAboutUpdate.Click += (p1, p2) => BtnAboutUpdate_Click((object)p1, (MouseButtonEventArgs)p2);
             this.Loaded += PageOtherAbout_Loaded;

@@ -43,12 +43,25 @@ namespace PCL
             this.LoadFabricApi.StateChanged += (p1, p2, p3) => FabricApi_Loaded();
             this.BtnFabricApiClear.Click += (p1, p2) => FabricApi_Clear((object)p1, (EventArgs)p2);
             this.CardOptiFabric.PreviewSwap += (p1, p2) => CardOptiFabric_PreviewSwap((object)p1, (ModBase.RouteEventArgs)p2);
+            // VB 原文是 Handles CardOptiFine.Swap, CardForge.Swap, ... → ReloadSelected()，
+            // 迁移后只保留了 PreviewSwap（用于拦截错误），Swap（展开后真正重算预览）全部丢失，
+            // 表现为展开组件卡片后右侧/底部的已选组件预览不刷新（2026-11-11 补）。
+            this.CardOptiFine.Swap += (p1, p2) => ReloadSelected();
+            this.CardLiteLoader.Swap += (p1, p2) => ReloadSelected();
+            this.CardForge.Swap += (p1, p2) => ReloadSelected();
+            this.CardNeoForge.Swap += (p1, p2) => ReloadSelected();
+            this.CardFabric.Swap += (p1, p2) => ReloadSelected();
+            this.CardFabricApi.Swap += (p1, p2) => ReloadSelected();
+            this.CardOptiFabric.Swap += (p1, p2) => ReloadSelected();
             this.LoadOptiFabric.StateChanged += (p1, p2, p3) => OptiFabric_Loaded();
             this.BtnOptiFabricClear.Click += (p1, p2) => OptiFabric_Clear((object)p1, (EventArgs)p2);
             this.TextSelectName.KeyDown += (p1, p2) => TextSelectName_KeyDown((object)p1, (KeyEventArgs)p2);
             this.BtnStart.Click += (p1, p2) => BtnStart_Click();
-            this.Initialized += (_, __) => LoaderInit();
             this.Loaded += (_, __) => Init();
+            // Initialized 在 InitializeComponent() 内部就已触发，事后订阅收不到，LoaderInit 从不执行：
+            // 下载页的加载环没有绑定加载器 → 进度永远停在 0%，直到整批加载结束才一次跳到完成（2026-11-11 修复）。
+            // 同时这对派生类 PageDownloadModify（override LoaderInit）也生效。
+            LoaderInit();
         }
 
         public void ControlInit()
@@ -336,7 +349,13 @@ namespace PCL
                 }
             }
             // NeoForge
-            if (VanillaData["releaseTime"].ToObject<DateTime>() < new DateTime(2023, 6, 11)) // 匹配 1.20.1+ 与一些愚人节版本
+            DateTime vanillaReleaseTime = default;
+            var vanillaRt = VanillaData["releaseTime"];
+            if (vanillaRt is not null && vanillaRt.Type != JTokenType.Null)
+            {
+                try { vanillaReleaseTime = vanillaRt.ToObject<DateTime>(); } catch { vanillaReleaseTime = default; }
+            }
+            if (vanillaReleaseTime < new DateTime(2023, 6, 11)) // 匹配 1.20.1+ 与一些愚人节版本
             {
                 this.CardNeoForge.Visibility = Visibility.Collapsed;
             }
@@ -415,7 +434,9 @@ namespace PCL
                 {
                     this.BtnFabricApiClear.Visibility = Visibility.Visible;
                     this.ImgFabricApi.Visibility = Visibility.Visible;
-                    this.LabFabricApi.Text = SelectedFabricApi.Display.Split("]")[1].Replace("Fabric API ", "").Replace(" build ", ".").Split("+").First().Trim();
+                    var apiDisplay = SelectedFabricApi.Display ?? "";
+                    var apiParts = apiDisplay.Split("]");
+                    this.LabFabricApi.Text = (apiParts.Length > 1 ? apiParts[1] : apiDisplay).Replace("Fabric API ", "").Replace(" build ", ".").Split("+").First().Trim();
                     this.LabFabricApi.Foreground = ModSecret.ColorGray1;
                 }
             }
@@ -610,6 +631,7 @@ namespace PCL
                 {
                     // 确定分类
                     string Type = (string)Version["type"];
+                    string versionId = Version["id"]?.ToString() ?? "";
                     switch (Type ?? "")
                     {
                         case "release":
@@ -621,13 +643,13 @@ namespace PCL
                             {
                                 Type = "预览版";
                                 // Mojang 误分类
-                                if (Version["id"].ToString().StartsWithF("1.") && !Version["id"].ToString().Lower().Contains("combat") && !Version["id"].ToString().Lower().Contains("rc") && !Version["id"].ToString().Lower().Contains("experimental") && !Version["id"].ToString().Lower().Contains("pre"))
+                                if (versionId.StartsWithF("1.") && !versionId.Lower().Contains("combat") && !versionId.Lower().Contains("rc") && !versionId.Lower().Contains("experimental") && !versionId.Lower().Contains("pre"))
                                 {
                                     Type = "正式版";
                                     Version["type"] = "release";
                                 }
                                 // 愚人节版本
-                                switch (Version["id"].ToString().Lower() ?? "")
+                                switch (versionId.Lower() ?? "")
                                 {
                                     case "20w14infinite":
                                     case "20w14∞":
@@ -635,7 +657,7 @@ namespace PCL
                                             Type = "愚人节版";
                                             Version["id"] = "20w14∞";
                                             Version["type"] = "special";
-                                            Version.Add("lore", ModMinecraft.GetMcFoolName((string)Version["id"]));
+                                            Version.Add("lore", ModMinecraft.GetMcFoolName(versionId));
                                             break;
                                         }
                                     case "3d shareware v1.34":
@@ -650,14 +672,19 @@ namespace PCL
                                         {
                                             Type = "愚人节版";
                                             Version["type"] = "special";
-                                            Version.Add("lore", ModMinecraft.GetMcFoolName((string)Version["id"])); // 4/1 自动视作愚人节版
+                                            Version.Add("lore", ModMinecraft.GetMcFoolName(versionId)); // 4/1 自动视作愚人节版
                                             break;
                                         }
 
                                     default:
                                         {
-                                            var ReleaseDate = Version["releaseTime"].Value<DateTime>().ToUniversalTime().AddHours(2d);
-                                            if (ReleaseDate.Month == 4 && ReleaseDate.Day == 1)
+                                            DateTime releaseDate = default;
+                                            var rtToken = Version["releaseTime"];
+                                            if (rtToken is not null && rtToken.Type != JTokenType.Null)
+                                            {
+                                                try { releaseDate = rtToken.Value<DateTime>().ToUniversalTime().AddHours(2d); } catch { releaseDate = default; }
+                                            }
+                                            if (releaseDate.Month == 4 && releaseDate.Day == 1)
                                             {
                                                 Type = "愚人节版";
                                                 Version["type"] = "special";
@@ -687,20 +714,46 @@ namespace PCL
                 }
                 // 排序
                 foreach (var Pair in Dict.ToList())
-                    Dict[Pair.Key] = Pair.Value.OrderByDescending(j => j["releaseTime"].Value<DateTime>()).ToList();
+                    Dict[Pair.Key] = Pair.Value.OrderByDescending(j =>
+                    {
+                        var jrt = j["releaseTime"];
+                        if (jrt is not null && jrt.Type != JTokenType.Null)
+                        {
+                            try { return jrt.Value<DateTime>(); } catch { }
+                        }
+                        return default;
+                    }).ToList();
                 // 清空当前
                 this.PanMinecraft.Children.Clear();
                 // 添加最新版本
                 var CardInfo = new MyCard() { Title = "最新版本", Margin = new Thickness(0d, 15d, 0d, 15d) };
                 var PinnedVersions = new List<JObject>();
-                JObject Release = (JObject)Dict["正式版"][0].DeepClone();
-                Release["lore"] = "最新正式版，发布于 " + Release["releaseTime"].Value<DateTime>().ToString("yyyy'/'MM'/'dd HH':'mm");
-                PinnedVersions.Add(Release);
-                if (Dict["正式版"][0]["releaseTime"].Value<DateTime>() < Dict["预览版"][0]["releaseTime"].Value<DateTime>())
+                if (Dict["正式版"].Count > 0)
                 {
-                    JObject Snapshot = (JObject)Dict["预览版"][0].DeepClone();
-                    Snapshot["lore"] = "最新预览版，发布于 " + Snapshot["releaseTime"].Value<DateTime>().ToString("yyyy'/'MM'/'dd HH':'mm");
-                    PinnedVersions.Add(Snapshot);
+                    JObject Release = (JObject)Dict["正式版"][0].DeepClone();
+                    DateTime releaseDate = default;
+                    var releaseRt = Release["releaseTime"];
+                    if (releaseRt is not null && releaseRt.Type != JTokenType.Null)
+                    {
+                        try { releaseDate = releaseRt.Value<DateTime>(); } catch { releaseDate = default; }
+                    }
+                    Release["lore"] = "最新正式版，发布于 " + releaseDate.ToString("yyyy'/'MM'/'dd HH':'mm");
+                    PinnedVersions.Add(Release);
+                    if (Dict["预览版"].Count > 0)
+                    {
+                        DateTime previewDate = default;
+                        var previewRt = Dict["预览版"][0]["releaseTime"];
+                        if (previewRt is not null && previewRt.Type != JTokenType.Null)
+                        {
+                            try { previewDate = previewRt.Value<DateTime>(); } catch { previewDate = default; }
+                        }
+                        if (releaseDate < previewDate)
+                        {
+                            JObject Snapshot = (JObject)Dict["预览版"][0].DeepClone();
+                            Snapshot["lore"] = "最新预览版，发布于 " + previewDate.ToString("yyyy'/'MM'/'dd HH':'mm");
+                            PinnedVersions.Add(Snapshot);
+                        }
+                    }
                 }
                 var PanInfo = new StackPanel() { Margin = new Thickness(20d, MyCard.SwapedHeight, 18d, 0d), VerticalAlignment = VerticalAlignment.Top, RenderTransform = new TranslateTransform(0d, 0d) };
                 CardInfo.Children.Add(PanInfo);
@@ -734,7 +787,7 @@ namespace PCL
                 return;
             foreach (JObject Version in MinecraftVersions)
             {
-                if ((Version["id"].ToString() ?? "") != (VersionWaitingSelect ?? ""))
+                if ((Version["id"]?.ToString() ?? "") != (VersionWaitingSelect ?? ""))
                     continue;
                 Logger.Info($"自动选择 MC 版本：{VersionWaitingSelect}");
                 MinecraftSelected(ModDownloadLib.McDownloadListItem(Version, null, false).Init(), null);
@@ -926,7 +979,10 @@ namespace PCL
                     return;
                 // 获取版本列表
                 var Versions = new List<ModDownload.DlLiteLoaderListEntry>();
-                foreach (ModDownload.DlLiteLoaderListEntry Version in ModDownload.DlLiteLoaderListLoader.Output.Value)
+                var liteLoaderOutput = ModDownload.DlLiteLoaderListLoader.Output;
+                if (liteLoaderOutput?.Value is null)
+                    return;
+                foreach (ModDownload.DlLiteLoaderListEntry Version in liteLoaderOutput.Value)
                 {
                     if ((Version.Inherit ?? "") == (VanillaName ?? ""))
                         Versions.Add(Version);
@@ -1143,9 +1199,15 @@ namespace PCL
             if (this.GetLoaderError(this.LoadFabric) is not null)
                 return this.GetLoaderError(this.LoadFabric);
             // 检查版本
-            foreach (JObject Version in ModDownload.DlFabricListLoader.Output.Value["game"])
+            var fabricOutput = ModDownload.DlFabricListLoader.Output;
+            if (fabricOutput?.Value is null)
+                return "无";
+            var gameNode = fabricOutput.Value["game"];
+            if (gameNode is null)
+                return "无";
+            foreach (JObject Version in gameNode)
             {
-                if ((Version["version"].ToString() ?? "") == (VanillaName.Replace("∞", "infinite").Replace("Combat Test 7c", "1.16_combat-3") ?? ""))
+                if ((Version["version"]?.ToString() ?? "") == (VanillaName.Replace("∞", "infinite").Replace("Combat Test 7c", "1.16_combat-3") ?? ""))
                 {
                     if (SelectedForge is not null)
                         return "与 Forge 不兼容";
@@ -1174,8 +1236,11 @@ namespace PCL
                 if (ModDownload.DlFabricListLoader.State != ModBase.LoadState.Finished)
                     return;
                 // 获取版本列表
-                JArray Versions = (JArray)ModDownload.DlFabricListLoader.Output.Value["loader"];
-                if (!Versions.Any())
+                var fabricOutput = ModDownload.DlFabricListLoader.Output;
+                if (fabricOutput?.Value is null)
+                    return;
+                JArray Versions = fabricOutput.Value["loader"] as JArray;
+                if (Versions is null || !Versions.Any())
                     return;
                 // 可视化
                 this.PanFabric.Children.Clear();
@@ -1193,7 +1258,8 @@ namespace PCL
         // 选择与清除
         public void Fabric_Selected(MyListItem sender, EventArgs e)
         {
-            SelectedFabric = ((dynamic)sender.Tag)["version"].ToString();
+            var fabricTag = sender.Tag as JObject;
+            SelectedFabric = fabricTag?["version"]?.ToString();
             FabricApi_Loaded();
             OptiFabric_Loaded();
             this.CardFabric.IsSwapped = true;
@@ -1335,7 +1401,8 @@ namespace PCL
                 if (!AutoSelectedFabricApi)
                 {
                     AutoSelectedFabricApi = true;
-                    MyListItem Item = (MyListItem)MyVirtualizingElement.TryInit((FrameworkElement)this.PanFabricApi.Children[0]);
+                    if (MyVirtualizingElement.TryInit((FrameworkElement)this.PanFabricApi.Children[0]) is not MyListItem Item)
+                        return;
                     Logger.Info($"已自动选择 Fabric API：{Item.Title}");
                     FabricApi_Selected(Item, null);
                 }
@@ -1459,7 +1526,8 @@ namespace PCL
                 if (AutoSelectedOptiFabric || VanillaDrop >= 140 && VanillaDrop <= 150)
                     return; // 1.14~15 不自动选择
                 AutoSelectedOptiFabric = true;
-                MyListItem Item = (MyListItem)MyVirtualizingElement.TryInit((FrameworkElement)this.PanOptiFabric.Children[0]);
+                if (MyVirtualizingElement.TryInit((FrameworkElement)this.PanOptiFabric.Children[0]) is not MyListItem Item)
+                    return;
                 Logger.Info($"已自动选择 OptiFabric：{Item.Title}");
                 OptiFabric_Selected(Item, null);
             }
@@ -1492,7 +1560,7 @@ namespace PCL
     /// </summary>
         public McComponents GetSelectedComponents()
         {
-            return new McComponents(minecraftVersion: VanillaName, optiFineEntry: SelectedOptiFine is null ? null : JObject.FromObject(SelectedOptiFine), forgeVersion: SelectedForge?.VersionName, neoForgeVersion: SelectedNeoForge?.VersionName, fabricVersion: SelectedFabric, fabricApiVersion: (SelectedFabricApi?.Version) ?? (SelectedFabricApi?.Id) ?? (SelectedFabricApi?.Display), optiFabricVersion: (SelectedOptiFabric?.Version) ?? (SelectedOptiFabric?.Id) ?? (SelectedOptiFabric?.Display), liteLoaderVersion: SelectedLiteLoader?.JsonToken?["version"].ToString());
+            return new McComponents(minecraftVersion: VanillaName, optiFineEntry: SelectedOptiFine is null ? null : JObject.FromObject(SelectedOptiFine), forgeVersion: SelectedForge?.VersionName, neoForgeVersion: SelectedNeoForge?.VersionName, fabricVersion: SelectedFabric, fabricApiVersion: (SelectedFabricApi?.Version) ?? (SelectedFabricApi?.Id) ?? (SelectedFabricApi?.Display), optiFabricVersion: (SelectedOptiFabric?.Version) ?? (SelectedOptiFabric?.Id) ?? (SelectedOptiFabric?.Display), liteLoaderVersion: SelectedLiteLoader?.JsonToken?["version"]?.ToString() ?? "");
         }
 
         private void TextSelectName_KeyDown(object sender, KeyEventArgs e)
@@ -1509,7 +1577,7 @@ namespace PCL
                 NewInstanceName = InstanceName,
                 InstanceFolder = $@"{ModMinecraft.McFolderSelected}versions\{InstanceName}\",
                 Components = GetSelectedComponents(),
-                MinecraftJson = VanillaData["url"].ToString(),
+                MinecraftJson = VanillaData?["url"]?.ToString() ?? "",
                 ForgeEntry = SelectedForge,
                 NeoForgeEntry = SelectedNeoForge,
                 FabricApi = SelectedFabricApi,

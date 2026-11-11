@@ -51,9 +51,10 @@ namespace PCL
             this.CheckAdvancedInclude.Change += (p1, p2) => CheckAdvancedInclude_Change((object)p1, (bool)p2);
             this.CheckAdvancedModrinth.Change += (p1, p2) => CheckAdvancedModrinth_Change((object)p1, (bool)p2);
             this.CheckOptionsPcl.Change += (p1, p2) => CheckAdvancedModrinth_Change((object)p1, (bool)p2);
-            this.Initialized += PageInstanceExport_Initialized;
             this.Loaded += (_, __) => PageInstanceExport_Loaded();
             this.Loaded += (_, __) => RefreshJavaInfo();
+            // Initialized 在 InitializeComponent() 内部就已触发，事后订阅收不到（2026-11-11 修复）。
+            PageInstanceExport_Initialized(this, EventArgs.Empty);
         }
         private void PageInstanceExport_Initialized(object sender, EventArgs e)
         {

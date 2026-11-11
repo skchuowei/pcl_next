@@ -108,8 +108,20 @@ namespace PCL
                 return;
             try
             {
-                // 获取实际加载器列表
-                List<ModLoader.LoaderBase> LoaderList = ((dynamic)(List<ModLoader.LoaderBase>)((object)Loader)).GetLoaderList();
+                // 获取实际加载器列表。VB 原文是 CType(Loader, Object).GetLoaderList() 的晚绑定调用
+                // （只有 LoaderCombo 才有这个方法）；迁移器把它写成了 ((dynamic)(List<LoaderBase>)((object)Loader))
+                // .GetLoaderList()，多插的强转在 LoaderCombo 上必然抛 InvalidCastException，
+                // 导致任务管理页整页空白并弹出错误框（2026-11-11 修复）。
+                List<ModLoader.LoaderBase> LoaderList;
+                if (GeneralUtils.IsGenericInstanceOf(Loader, typeof(ModLoader.LoaderCombo<>)))
+                {
+                    LoaderList = ((dynamic)Loader).GetLoaderList(true);
+                }
+                else
+                {
+                    // 非 LoaderCombo（如 LoaderTask）没有子加载器，卡片就显示自己。
+                    LoaderList = new List<ModLoader.LoaderBase> { Loader };
+                }
                 if (RightCards.ContainsKey(Loader.Name))
                 {
                     // 已有此卡片

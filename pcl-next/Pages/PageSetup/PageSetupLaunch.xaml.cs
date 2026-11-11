@@ -37,6 +37,16 @@ namespace PCL
             this.TextAdvanceJvm.ValidatedTextChanged += (p1, p2) => TextAdvanceJvm_TextChanged();
             this.TextAdvanceJvm.TextChanged += (p1, p2) => ReplaceEnter((MyTextBox)p1, (TextChangedEventArgs)p2);
             this.TextAdvanceGame.TextChanged += (p1, p2) => ReplaceEnter((MyTextBox)p1, (TextChangedEventArgs)p2);
+            // VB 原版全部靠 Handles 绑定，迁移后一个都没订阅：离线皮肤四个按钮、JVM 参数重设、
+            // 「版本独立设置」跳转全部点了无反应（2026-11-11 修复）。
+            this.BtnSkinChange.Click += (p1, p2) => BtnSkinChange_Click(p1, p2);
+            this.BtnSkinDelete.Click += (p1, p2) => BtnSkinDelete_Click(p1, p2);
+            this.BtnSkinSave.Click += (p1, p2) => BtnSkinSave_Click(p1, p2);
+            this.BtnSkinCache.Click += (p1, p2) => BtnSkinCache_Click(p1, p2);
+            this.BtnAdvanceJvmReset.Click += (p1, p2) => BtnAdvanceJvmReset_Click(p1, p2);
+            this.BtnSwitch.Click += (p1, p2) => BtnSwitch_Click(p1, p2);
+            // VB 的 Handles BtnAdvanceJavaSearch.Click 迁移时被丢弃 → 设置里「手动搜索 Java」点了没反应（2026-11-11 补）。
+            this.BtnAdvanceJavaSearch.Click += (p1, p2) => BtnAdvanceJavaSearch_Click();
             this.Loaded += PageSetupLaunch_Loaded;
         }
 
@@ -99,7 +109,7 @@ namespace PCL
 
         #region 离线皮肤
 
-        private void BtnSkinChange_Click(object sender, EventArgs e)
+        private void BtnSkinChange_Click(object sender, MouseButtonEventArgs e)
         {
             var SkinInfo = ModMinecraft.McSkinSelect();
             if (!SkinInfo.IsVaild)
@@ -159,7 +169,7 @@ namespace PCL
                 PageLaunchLeft.SkinLegacy.Start(IsForceRestart: true);
             }
         }
-        private void BtnSkinDelete_Click(object sender, EventArgs e)
+        private void BtnSkinDelete_Click(object sender, MouseButtonEventArgs e)
         {
             try
             {
@@ -172,11 +182,11 @@ namespace PCL
                 Logger.Error(ex, "清空离线皮肤失败", LogBehavior.Alert);
             }
         }
-        private void BtnSkinSave_Click(object sender, EventArgs e)
+        private void BtnSkinSave_Click(object sender, MouseButtonEventArgs e)
         {
             MySkin.Save(PageLaunchLeft.SkinLegacy);
         }
-        private void BtnSkinCache_Click(object sender, EventArgs e)
+        private void BtnSkinCache_Click(object sender, MouseButtonEventArgs e)
         {
             MySkin.RefreshCache(null);
         }

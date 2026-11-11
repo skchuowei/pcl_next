@@ -1,7 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
-		<TargetFramework>net48</TargetFramework>
+		<!-- 必须是 net10.0-windows：被测的 MeloongCore 是 net10.0、MeloongCore.Wpf 是 net10.0-windows。
+		     原值 net48 与 net10.0 工程不兼容（NU1201），整套测试根本编译不起来（2026-11-11 修正）。 -->
+		<TargetFramework>net10.0-windows</TargetFramework>
+		<UseWPF>true</UseWPF>
 		<OutputType>Exe</OutputType>
 		<AllowUnsafeBlocks>True</AllowUnsafeBlocks>
 		<Deterministic>true</Deterministic>
@@ -9,6 +12,11 @@
 		<LangVersion>13.0</LangVersion>
 		<Nullable>enable</Nullable>
 		<ImplicitUsings>enable</ImplicitUsings>
+		<!-- TUnit 走 Microsoft.Testing.Platform。.NET 10 SDK 的 dotnet test 默认仍是 VSTest，
+		     需要本目录的 dotnet.config 指定 runner 才认。
+		     因为 dotnet.config 按「当前工作目录向上查找」，运行方式为：
+		         cd MeloongCore/Tests && dotnet test -c Release -r win-x64
+		     这样只影响本目录，不波及仓库根仍用 xunit/VSTest 的 PCL.Download.Tests。 -->
 	</PropertyGroup>
 
 	<ItemGroup>
@@ -23,7 +31,8 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<PackageReference Include="System.IO.Compression" Version="4.3.0" />
+		<!-- 不再引用 System.IO.Compression 4.3.0：.NET 10 已内置该程序集，
+		     引这个 netstandard1.x 老包只会产生 NU1701 兼容性警告。 -->
 		<PackageReference Include="TUnit" Version="1.43.38" />
 		<PackageReference Include="PolySharp" Version="1.15.0">
 			<PrivateAssets>all</PrivateAssets>
@@ -61,6 +70,9 @@
 		<Using Include="System.Collections.Generic" />
 		<Using Include="System.Collections.Concurrent" />
 		<Using Include="System.Text" />
+		<!-- UseWPF 会把隐式 using 换成 WPF 那一套，默认不再包含 System.IO；
+		     测试里大量用 Path/File/Directory，必须显式补上。 -->
+		<Using Include="System.IO" />
 		<Using Include="System.Net" />
 		<Using Include="System.Runtime.CompilerServices" />
 		<Using Include="System.Runtime.InteropServices" />
@@ -72,10 +84,6 @@
 	<ItemGroup>
 		<ProjectReference Include="..\Shared\MeloongCore.csproj" />
 		<ProjectReference Include="..\Wpf\MeloongCore.Wpf.csproj" />
-	</ItemGroup>
-
-	<ItemGroup>
-		<Reference Include="PresentationFramework" />
 	</ItemGroup>
 
 </Project>

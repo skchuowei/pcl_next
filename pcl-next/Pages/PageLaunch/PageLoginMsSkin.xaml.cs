@@ -19,6 +19,11 @@ namespace PCL
             this.InitializeComponent();
             this.PanData.MouseEnter += (p1, p2) => ShowPanel((object)p1, (MouseEventArgs)p2);
             this.PanData.MouseLeave += (p1, p2) => HidePanel((object)p1, (EventArgs)p2);
+            // VB 原版靠 Handles BtnEdit.Click / BtnExit.Click / BtnSkin.Click 绑定，
+            // 迁移后完全没订阅，导致「修改账号信息」「退出登录」「展开皮肤」三个按钮点了没反应（2026-11-11 修复）。
+            this.BtnEdit.Click += (p1, p2) => BtnEdit_Click(p1, p2);
+            this.BtnExit.Click += (p1, p2) => BtnExit_Click(p1, p2);
+            this.BtnSkin.Click += (p1, p2) => BtnSkin_Click(p1, p2);
             this.Skin.Loader = PageLaunchLeft.SkinMs;
             this.Loaded += PageLoginLegacy_Loaded;
         }
@@ -71,7 +76,8 @@ namespace PCL
         }
 
         // 退出登录
-        private void BtnExit_Click()
+        // VB 原版无参（Handles 允许），C# 委托要求 (object, EventArgs)（2026-11-11 修正）。
+        private void BtnExit_Click(object sender, EventArgs e)
         {
             Settings.Set("CacheMsV2OAuthRefresh", "");
             Settings.Set("CacheMsV2Access", "");
@@ -88,7 +94,7 @@ namespace PCL
         #region 皮肤/披风
 
         // 展开
-        private void BtnSkin_Click(object sender, RoutedEventArgs e)
+        private void BtnSkin_Click(object sender, EventArgs e)
         {
             this.BtnSkin.ContextMenu.IsOpen = true;
         }

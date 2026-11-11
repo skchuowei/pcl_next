@@ -38,7 +38,7 @@ namespace PCL
                                              // 号段按代号阶梯严格递增，且每个代号都占独立区间——
                                              // dev 与 slush 若共用同一号段，切换时代会被判成版本倒退而误弹降级提示。
                                              // 本值由 scripts\Set-VersionInfo.ps1 依据标签写入，不可手工填写。
-        public const int VersionCode = 5005;
+        public const int VersionCode = 5006;
 
         // 版本信息
         /// <summary>
@@ -306,17 +306,19 @@ namespace PCL
             }
             public static bool operator ==(MyColor a, MyColor b)
             {
-                if (a == null && b == null)
+                // 注意：此处必须用 is null（引用比较），不能用 a == null。
+                // 在 operator == 内部写 a == null 会再次调用本运算符，导致无限递归栈溢出（VB 原文为 IsNothing）。
+                if (a is null && b is null)
                     return true;
-                if (a == null || b == null)
+                if (a is null || b is null)
                     return false;
                 return a.A == b.A && a.R == b.R && a.G == b.G && a.B == b.B;
             }
             public static bool operator !=(MyColor a, MyColor b)
             {
-                if (a == null && b == null)
+                if (a is null && b is null)
                     return false;
-                if (a == null || b == null)
+                if (a is null || b is null)
                     return true;
                 return !(a.A == b.A && a.R == b.R && a.G == b.G && a.B == b.B);
             }
@@ -496,7 +498,14 @@ namespace PCL
             }
             public override bool Equals(object obj)
             {
-                return Operators.ConditionalCompareObjectEqual(this, obj, false);
+                // VB 原文是 Me = obj（走自定义 Operator =）。这里直接复用本类型的 == 重载；
+                // 绝不能再用 Operators.ConditionalCompareObjectEqual——VB 运行时会回调本运算符/本方法，造成递归栈溢出。
+                return obj is MyColor other && this == other;
+            }
+            public override int GetHashCode()
+            {
+                // 必须与 == / Equals 的取值保持一致，否则在 HashSet/Dictionary/Distinct 中会失效。
+                return HashCode.Combine(A, R, G, B);
             }
 
         }

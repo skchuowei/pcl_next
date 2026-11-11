@@ -1,6 +1,6 @@
 # 计划：Phase 3 联网半边（dev.4 / §2.1 A）
 
-> 依据：《dev.4公布标准.md》§2.1 A、《PCL2_CSharp下载服务迁移计划.md》§5 Phase 3、《AGENTS.md》§3。
+> 依据：《公布标准.md》§6.2 A、《PCL2_CSharp下载服务迁移计划.md》§5 Phase 3、《AGENTS.md》§3。
 > 状态：进行中（dev.4）。本文件为专项计划，完成后随版本归档，不作为长期规则入口。
 
 ## 1. 目标

@@ -28,10 +28,10 @@ $ErrorActionPreference = 'Stop'
 
 # ── 定位仓库根 ──────────────────────────────────────────────────────────────
 $Root = $PSScriptRoot
-while ($Root -and -not (Test-Path (Join-Path $Root 'pcl-next\pcl-next.vbproj'))) {
+while ($Root -and -not (Test-Path (Join-Path $Root 'pcl-next\pcl-next.csproj'))) {
     $Root = Split-Path -Parent $Root
 }
-if (-not $Root) { throw '未找到仓库根目录（应包含 pcl-next\pcl-next.vbproj）' }
+if (-not $Root) { throw '未找到仓库根目录（应包含 pcl-next\pcl-next.csproj）' }
 $Script = Join-Path $Root 'scripts\Set-VersionInfo.ps1'
 if (-not (Test-Path $Script)) { throw "未找到版本脚本：$Script" }
 
@@ -70,11 +70,11 @@ New-Item -ItemType Directory -Path (Join-Path $Tmp 'scripts') -Force | Out-Null
 New-Item -ItemType Directory -Path (Join-Path $Tmp 'pcl-next\Modules\Base') -Force | Out-Null
 New-Item -ItemType Directory -Path (Join-Path $Tmp 'pcl-next\My Project') -Force | Out-Null
 Copy-Item $Script (Join-Path $Tmp 'scripts\Set-VersionInfo.ps1') -Force
-Copy-Item (Join-Path $Root 'pcl-next\Modules\Base\ModBase.vb') (Join-Path $Tmp 'pcl-next\Modules\Base\ModBase.vb') -Force
-Copy-Item (Join-Path $Root 'pcl-next\Modules\Base\ModBuildChannel.vb') (Join-Path $Tmp 'pcl-next\Modules\Base\ModBuildChannel.vb') -Force
-Copy-Item (Join-Path $Root 'pcl-next\My Project\AssemblyInfo.vb') (Join-Path $Tmp 'pcl-next\My Project\AssemblyInfo.vb') -Force
-# vbproj 只用于让脚本识别出仓库根，内容无需有效
-Set-Content -Path (Join-Path $Tmp 'pcl-next\pcl-next.vbproj') -Value '<Project />' -Encoding UTF8
+Copy-Item (Join-Path $Root 'pcl-next\Modules\Base\ModBase.cs') (Join-Path $Tmp 'pcl-next\Modules\Base\ModBase.cs') -Force
+Copy-Item (Join-Path $Root 'pcl-next\Modules\Base\ModBuildChannel.cs') (Join-Path $Tmp 'pcl-next\Modules\Base\ModBuildChannel.cs') -Force
+Copy-Item (Join-Path $Root 'pcl-next\My Project\AssemblyInfo.cs') (Join-Path $Tmp 'pcl-next\My Project\AssemblyInfo.cs') -Force
+# csproj 只用于让脚本识别出仓库根，内容无需有效
+Set-Content -Path (Join-Path $Tmp 'pcl-next\pcl-next.csproj') -Value '<Project />' -Encoding UTF8
 
 $Failed = 0
 $Rows = New-Object System.Collections.Generic.List[object]
@@ -82,8 +82,8 @@ $Rows = New-Object System.Collections.Generic.List[object]
 try {
     foreach ($c in $Cases) {
         & (Join-Path $Tmp 'scripts\Set-VersionInfo.ps1') -Tag $c.Tag -CommitHash 'matrix-test' *> $null
-        $text = [System.IO.File]::ReadAllText((Join-Path $Tmp 'pcl-next\Modules\Base\ModBase.vb'))
-        $m = [regex]::Match($text, 'Public Const VersionCode As Integer = (\d+)')
+        $text = [System.IO.File]::ReadAllText((Join-Path $Tmp 'pcl-next\Modules\Base\ModBase.cs'))
+        $m = [regex]::Match($text, 'public const int VersionCode = (\d+)')
         if (-not $m.Success) { throw "用例 $($c.Tag) 未能读回 VersionCode" }
         $actual = [int]$m.Groups[1].Value
         $ok = ($actual -eq $c.Expect)

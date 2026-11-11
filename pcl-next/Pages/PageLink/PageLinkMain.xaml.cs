@@ -44,6 +44,8 @@ namespace PCL
             InitializeComponent();
             this.PanSelectCreate.MouseLeftButtonUp += (p1, p2) => Create_MouseLeftButtonUp();
             this.PanSelectJoin.Loaded += (p1, p2) => PanSelectJoin_Loaded();
+            // VB 的 Handles PanSelectJoin.MouseLeftButtonUp 迁移时被丢弃 → 联机页「加入房间」点了没反应（2026-11-11 补）。
+            this.PanSelectJoin.MouseLeftButtonUp += (p1, p2) => Join();
             this.BtnLoadCancel.Click += (p1, p2) => BtnLoadCancel_Click();
             this.CardLoad.MouseLeftButtonUp += (p1, p2) => CardLoad_MouseLeftButtonUp();
             this.CardLoad.SizeChanged += (p1, p2) => CardLoad_SizeChanged();
@@ -54,10 +56,12 @@ namespace PCL
             // 转换器误写成 object[]，这里改回 ModLoader.LoaderBase[] 以匹配构造函数的 IEnumerable<LoaderBase> 形参
             LinkLoader = new ModLoader.LoaderCombo<int>("联机", new ModLoader.LoaderBase[]{ new ModLoader.LoaderTask<int, int>("获取配置", InitConfig) { ProgressWeight = 8d }, new ModLoader.LoaderTask<int, List<ModNet.NetFile>>("准备下载联机模块", InitPrepareDownload) { ProgressWeight = 2d }, new ModNet.LoaderDownload("下载联机模块", new List<ModNet.NetFile>()) { ProgressWeight = 40d }, new ModLoader.LoaderTask<int, int>("启动联机模块", InitLaunch) { ProgressWeight = 50d } });
             RefreshPeerLoader = new ModLoader.LoaderTask<int, List<Peer>>("EasyTier CLI", (_) => RefreshPeer());
-            this.Initialized += (_, __) => LoaderInit();
             this.PageEnter += UpdatePanelVisibility;
             this.Loaded += (_, __) => StartTimerThread();
             this.Loaded += (_, __) => Update();
+            // Initialized 在 InitializeComponent() 内部就已触发，事后订阅收不到，PageLoaderInit 不会被执行；
+            // 这里放到构造末尾显式调用（此时 LinkLoader 等字段已赋值，2026-11-11 修复）。
+            LoaderInit();
         }
 
         /// <summary>

@@ -4,11 +4,11 @@
 
 .DESCRIPTION
     产物固定输出到 pcl-next\bin-net10\<开发代号>\<版本名>\<运行环境>\ 三段路径，
-    版本名自动从 pcl-next/Modules/Base/ModBase.vb 的 VersionBaseName 读取，
+    版本名自动从 pcl-next/Modules/Base/ModBase.cs 的 VersionBaseName 读取，
     OutputPath 传绝对路径，避免各依赖项目相对解析导致产物散落（§5.3 反模式）。
 
     注意：.NET 10 不允许在 sln 级别指定 -r <RID>（NETSDK1134），
-    因此本脚本对主项目 pcl-next.vbproj 构建，依赖项目经 ProjectReference 自动带上。
+    因此本脚本对主项目 pcl-next.csproj 构建，依赖项目经 ProjectReference 自动带上。
 
     用法示例：
       .\scripts\Build.ps1                        # Dev 渠道，win-x64（默认）
@@ -26,7 +26,7 @@
     运行环境 RID：win-x64 / win-arm64。默认 win-x64。
 
 .PARAMETER Version
-    版本名（如 2.100.0.2）。默认自动读取 ModBase.vb 的 VersionBaseName。
+    版本名（如 2.100.0.2）。默认自动读取 ModBase.cs 的 VersionBaseName。
 
 .PARAMETER Configuration
     构建配置，默认 Release。渠道常量随 -Channel 传入（PclChannel）。
@@ -59,18 +59,18 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $RepoRoot = Split-Path -Parent $PSScriptRoot   # pcl-next.sln 所在目录（PCL2\）
-$ModBase  = Join-Path $RepoRoot 'pcl-next\Modules\Base\ModBase.vb'
-$MainProj = Join-Path $RepoRoot 'pcl-next\pcl-next.vbproj'
+$ModBase  = Join-Path $RepoRoot 'pcl-next\Modules\Base\ModBase.cs'
+$MainProj = Join-Path $RepoRoot 'pcl-next\pcl-next.csproj'
 
 # --- 1. 解析版本名 -----------------------------------------------------------
 if (-not $Version) {
     if (-not (Test-Path $ModBase)) {
         throw "找不到 $ModBase，无法自动读取版本名；请用 -Version 显式指定。"
     }
-    $line = Select-String -Path $ModBase -Pattern 'VersionBaseName As String = "([^"]+)"' |
+    $line = Select-String -Path $ModBase -Pattern 'VersionBaseName = "([^"]+)"' |
         Select-Object -First 1
     if (-not $line) {
-        throw "无法从 ModBase.vb 解析 VersionBaseName；请用 -Version 显式指定。"
+        throw "无法从 ModBase.cs 解析 VersionBaseName；请用 -Version 显式指定。"
     }
     $Version = $line.Matches[0].Groups[1].Value
 }

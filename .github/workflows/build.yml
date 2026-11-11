@@ -157,13 +157,15 @@ jobs:
       if: matrix.configuration == 'Release'
       shell: pwsh
       run: |
-        dotnet test "PCL.Download.Tests\PCL.Download.Tests.csproj" -c ${{ matrix.configuration }}
+        # 必须显式带 -r win-x64：PclRidGuard 在求值期要求真实 RID，
+        # 不带直接报「运行环境护栏：本次编译未指定真实 RID」（2026-11-11 实测）。
+        dotnet test "PCL.Download.Tests\PCL.Download.Tests.csproj" -c ${{ matrix.configuration }} -r win-x64
         if ($LASTEXITCODE -ne 0) { throw "内核单测失败，退出码 $LASTEXITCODE" }
 
     - name: Publish (self-contained single file)
       # 同 release.yml：pubxml 内的 RuntimeIdentifier 不能被 PclRidGuard 在求值期读到，
       # 必须显式传 -r win-x64，否则发布流水线在 restore 后直接报 RID 护栏错误。
-      run: dotnet publish "pcl-next\pcl-next.vbproj" -c ${{ matrix.configuration }} -r win-x64 -p:PclChannel=${{ steps.channel.outputs.channel }} -p:PublishProfile=win-x64-single
+      run: dotnet publish "pcl-next\pcl-next.csproj" -c ${{ matrix.configuration }} -r win-x64 -p:PclChannel=${{ steps.channel.outputs.channel }} -p:PublishProfile=win-x64-single
 
     - name: Upload a Build Artifact
       uses: actions/upload-artifact@v7

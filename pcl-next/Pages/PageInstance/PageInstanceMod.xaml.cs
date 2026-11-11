@@ -49,8 +49,10 @@ namespace PCL
             this.BtnSelectCancel.Click += (p1, p2) => BtnSelectCancel_Click();
             this.SearchBox.TextChanged += (p1, p2) => SearchRun();
             this.Loaded += (_, __) => PageOther_Loaded();
-            this.Initialized += (_, __) => LoaderInit();
             this.PageExit += UnselectedAllWithAnimation;
+            // Initialized 在 InitializeComponent() 内部就已触发，事后订阅收不到，PageLoaderInit 不会被执行
+            // （Mod 管理页因此一直停在加载态，2026-11-11 修复）。
+            LoaderInit();
         }
         public void PageOther_Loaded()
         {

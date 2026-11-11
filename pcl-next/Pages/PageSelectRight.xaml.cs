@@ -25,7 +25,13 @@ namespace PCL
             this.BtnEmptyDownload.Click += (p1, p2) => BtnDownload_Click((object)p1, (EventArgs)p2);
             this.BtnEmptyDownload.Loaded += (p1, p2) => BtnEmptyDownload_Loaded();
             this.Loaded += PageSelectRight_Loaded;
-            this.Initialized += (_, __) => LoaderInit();
+            // 注意：WPF 的 Initialized 在 InitializeComponent() 内部的 EndInit 阶段就已触发，
+            // 所以「先 InitializeComponent 再 += Initialized」的写法永远收不到事件。VB 原版用
+            // Handles Me.Initialized，是编译期在构造函数最前面挂上的，才会命中。
+            // 这里改成显式调用：等价于 XAML 解析完成后的那一刻。
+            // 曾经漏掉它 → PageLoaderInit 从未执行 → PanLoad 与 PanEmpty 同时可见（页面重叠）、
+            // 「正在获取版本列表」卡片永不消失、版本列表一直是空白（2026-11-11 修复）。
+            LoaderInit();
         }
 
         // 窗口基础

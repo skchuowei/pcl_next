@@ -21,6 +21,9 @@ namespace PCL
         {
             this.InitializeComponent();
             this.ItemInstall.Check += (p1, p2) => PageCheck((FrameworkElement)p1, (ModBase.RouteEventArgs)p2);
+            // VB 原版 Handles ItemInstall.Click：再次点击已选中的「原版游戏」要退出选择页，
+            // 迁移后没订阅，导致安装流程里点这个条目无法返回（2026-11-11 修复）。
+            this.ItemInstall.Click += (p1, p2) => ItemInstall_Click(p1, p2);
             this.ItemMod.Check += (p1, p2) => PageCheck((FrameworkElement)p1, (ModBase.RouteEventArgs)p2);
             this.ItemPack.Check += (p1, p2) => PageCheck((FrameworkElement)p1, (ModBase.RouteEventArgs)p2);
             this.ItemResourcePack.Check += (p1, p2) => PageCheck((FrameworkElement)p1, (ModBase.RouteEventArgs)p2);

@@ -14,6 +14,8 @@ namespace PCL
             this.PanData.MouseEnter += (p1, p2) => PageLoginAuthSkin_MouseEnter((object)p1, (MouseEventArgs)p2);
             this.PanData.MouseLeave += (p1, p2) => PageLoginAuthSkin_MouseLeave((object)p1, (MouseEventArgs)p2);
             this.BtnEdit.Click += (p1, p2) => BtnEdit_Click((object)p1, (EventArgs)p2);
+            // VB 的 Handles BtnExit.Click 迁移时被丢弃 → 皮肤登录页的「退出登录」点了没反应（2026-11-11 补）。
+            this.BtnExit.Click += (p1, p2) => ExitLogin();
             this.Skin.Click += (p1, p2) => Skin_Click((object)p1, (MouseButtonEventArgs)p2);
             this.Skin.Loader = PageLaunchLeft.SkinAuth;
             this.Loaded += (_, __) => PageLoginLegacy_Loaded();
