@@ -72,30 +72,31 @@ namespace PCL
         }
         private void UpdateUI()
         {
+            bool IsDark = ModSecret.ThemeNow == ModSecret.ThemeDarkId;
             switch (Theme)
             {
                 case Themes.Blue:
                     {
-                        this.Background = new ModBase.MyColor("#d9ecff");
-                        this.BorderBrush = new ModBase.MyColor("#1172D4");
-                        this.LabText.Foreground = new ModBase.MyColor("#0F64B8");
-                        this.BtnClose.Foreground = new ModBase.MyColor("#0F64B8");
+                        this.Background = new ModBase.MyColor(IsDark ? "#1B2A3A" : "#d9ecff");
+                        this.BorderBrush = new ModBase.MyColor(IsDark ? "#3E7FBF" : "#1172D4");
+                        this.LabText.Foreground = new ModBase.MyColor(IsDark ? "#8CC0F0" : "#0F64B8");
+                        this.BtnClose.Foreground = new ModBase.MyColor(IsDark ? "#8CC0F0" : "#0F64B8");
                         break;
                     }
                 case Themes.Red:
                     {
-                        this.Background = new ModBase.MyColor("#ffdddf");
-                        this.BorderBrush = new ModBase.MyColor("#d82929");
-                        this.LabText.Foreground = new ModBase.MyColor("#bf0b0b");
-                        this.BtnClose.Foreground = new ModBase.MyColor("#bf0b0b");
+                        this.Background = new ModBase.MyColor(IsDark ? "#3A1F22" : "#ffdddf");
+                        this.BorderBrush = new ModBase.MyColor(IsDark ? "#C24A4A" : "#d82929");
+                        this.LabText.Foreground = new ModBase.MyColor(IsDark ? "#F09A9A" : "#bf0b0b");
+                        this.BtnClose.Foreground = new ModBase.MyColor(IsDark ? "#F09A9A" : "#bf0b0b");
                         break;
                     }
                 case Themes.Yellow:
                     {
-                        this.Background = new ModBase.MyColor("#ffebd7");
-                        this.BorderBrush = new ModBase.MyColor("#f57a00");
-                        this.LabText.Foreground = new ModBase.MyColor("#d86c00");
-                        this.BtnClose.Foreground = new ModBase.MyColor("#d86c00");
+                        this.Background = new ModBase.MyColor(IsDark ? "#3A2F1E" : "#ffebd7");
+                        this.BorderBrush = new ModBase.MyColor(IsDark ? "#C9832B" : "#f57a00");
+                        this.LabText.Foreground = new ModBase.MyColor(IsDark ? "#E8AE63" : "#d86c00");
+                        this.BtnClose.Foreground = new ModBase.MyColor(IsDark ? "#E8AE63" : "#d86c00");
                         break;
                     }
             }

@@ -157,7 +157,7 @@ namespace PCL
                                 }
                             case Themes.Black:
                                 {
-                                    this.Path.Fill = new ModBase.MyColor(160d, 0d, 0d, 0d);
+                                    this.Path.SetResourceReference(Shape.FillProperty, "ColorBrushInk");
                                     break;
                                 }
                             case Themes.Custom:
@@ -193,7 +193,7 @@ namespace PCL
                                 }
                             case Themes.Black:
                                 {
-                                    AnimList.Add(ModAnimation.AaColor(this.Path, Shape.FillProperty, new ModBase.MyColor(230d, 0d, 0d, 0d) - this.Path.Fill, AnimationColorIn));
+                                    AnimList.Add(ModAnimation.AaColor(this.Path, Shape.FillProperty, "ColorBrushInkHover", AnimationColorIn));
                                     break;
                                 }
                             case Themes.Custom:
@@ -215,7 +215,7 @@ namespace PCL
                                 }
                             case Themes.White:
                                 {
-                                    AnimList.Add(ModAnimation.AaColor(this.Path, Shape.FillProperty, "ColorBrush8", AnimationColorOut));
+                                    AnimList.Add(ModAnimation.AaColor(this.Path, Shape.FillProperty, "ColorBrushOnAccent", AnimationColorOut));
                                     AnimList.Add(ModAnimation.AaColor(this.PanBack, Border.BackgroundProperty, new ModBase.MyColor(0d, 255d, 255d, 255d) - this.PanBack.Background, AnimationColorOut));
                                     break;
                                 }
@@ -227,7 +227,7 @@ namespace PCL
                                 }
                             case Themes.Black:
                                 {
-                                    AnimList.Add(ModAnimation.AaColor(this.Path, Shape.FillProperty, new ModBase.MyColor(160d, 0d, 0d, 0d) - this.Path.Fill, AnimationColorOut));
+                                    AnimList.Add(ModAnimation.AaColor(this.Path, Shape.FillProperty, "ColorBrushInk", AnimationColorOut));
                                     this.PanBack.Background = new ModBase.MyColor(0d, 255d, 255d, 255d);
                                     break;
                                 }
@@ -255,7 +255,7 @@ namespace PCL
                                 }
                             case Themes.White:
                                 {
-                                    this.Path.SetResourceReference(Shape.FillProperty, "ColorBrush8");
+                                    this.Path.SetResourceReference(Shape.FillProperty, "ColorBrushOnAccent");
                                     break;
                                 }
                             case Themes.Red:
@@ -265,7 +265,7 @@ namespace PCL
                                 }
                             case Themes.Black:
                                 {
-                                    this.Path.Fill = new ModBase.MyColor(160d, 0d, 0d, 0d);
+                                    this.Path.SetResourceReference(Shape.FillProperty, "ColorBrushInk");
                                     break;
                                 }
                             case Themes.Custom:

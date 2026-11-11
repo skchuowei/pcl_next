@@ -100,9 +100,10 @@ namespace PCL
         public MyCard()
         {
             MainChrome = new MyDropShadow() { Margin = new Thickness(-3, -3, -3, -3 - ModBase.GetWPFSize(1d)), ShadowRadius = 3d, Opacity = DropShadowIdleOpacity, CornerRadius = new CornerRadius(5d) };
-            MainChrome.SetResourceReference(MyDropShadow.ColorProperty, "ColorObject1");
+            MainChrome.SetResourceReference(MyDropShadow.ColorProperty, "ColorObjectShadow");
             Children.Insert(0, MainChrome);
-            MainBorder = new Border() { Background = new SolidColorBrush(Color.FromArgb(245, 255, 255, 255)), CornerRadius = new CornerRadius(5d), IsHitTestVisible = false };
+            MainBorder = new Border() { CornerRadius = new CornerRadius(5d), IsHitTestVisible = false };
+            MainBorder.SetResourceReference(Border.BackgroundProperty, "ColorBrushCard");
             Children.Insert(1, MainBorder);
             MainGrid = new Grid();
             Children.Add(MainGrid);
@@ -215,7 +216,7 @@ namespace PCL
                 AniList.Add(ModAnimation.AaColor(MainTextBlock, TextBlock.ForegroundProperty, "ColorBrush1", 90));
             if (!(MainSwap == null))
                 AniList.Add(ModAnimation.AaColor(MainSwap, System.Windows.Shapes.Shape.FillProperty, "ColorBrush1", 90));
-            AniList.AddRange(new[] { ModAnimation.AaColor(MainChrome, MyDropShadow.ColorProperty, "ColorObject1", 90), ModAnimation.AaOpacity(MainChrome, DropShadowIdleOpacity - MainChrome.Opacity, 90) });
+            AniList.AddRange(new[] { ModAnimation.AaColor(MainChrome, MyDropShadow.ColorProperty, "ColorObjectShadow", 90), ModAnimation.AaOpacity(MainChrome, DropShadowIdleOpacity - MainChrome.Opacity, 90) });
             ModAnimation.AniStart(AniList, "MyCard Mouse " + Uuid);
         }
 

@@ -30,6 +30,8 @@
 | 🟩 低 | 8 | 约 44 | **约 52** | 多为上游 VB 同构遗留的健壮性/并发/资源释放问题，见第五节 |
 | 上游已知留痕 | — | — | 30+ 行 | 已登记在《PCL2上游遗留问题清单.md》，C# 侧复核仍在，不计新 bug，见第六节 |
 
+> 本轮（J1/J3/J4）已落地的中危补丁见第九节；最终 Release 编译 **0 错误**，警告维持基线技术债清单（第八节）。
+
 > 编号前缀来源：`A1/A2` 外壳与主窗体组，`B1/B2` 主模块事件与音乐备忘密钥组，`C1/C2/C3/C4` 网络/基础/加载器校验/动画组，`MA` 为 MainAgent 自审。各子报告原文在 `docs/bugscan/`。
 
 ### 1.4 总体结论
@@ -373,7 +375,34 @@
 
 ---
 
-## 九、附录：分组覆盖清单
+## 九、本轮（J1/J3/J4）中危修复落地记录
+
+> 编译佐证：`dotnet build pcl-next\pcl-next.csproj -c Release -r win-x64 --self-contained -p:PclChannel=Dev`，**0 错误 / 30 警告**，回到基线；产物 `pcl-next\bin-net10\Dev\2.100.0.6-0.82\win-x64\pcl-next.dll`。
+> 口径：C# 迁移回归（空容忍丢失、事件订阅模型差异、行为漂移）优先补空判/防护；上游 VB 同构继承的健壮性缺口补轻量空判；低危与内核/网络项不在本轮修复前提内。
+
+### 10.1 已落地补丁文件（相对 `pcl-next\`）
+
+| 文件 | 缺陷类型 | 修复口径 |
+|---|---|---|
+| `Pages\PageDownload\ModDownloadLib.cs` | 列表条目 `type/id/url/releaseTime` 空容忍丢失；zip 缺 `install_profile.json`/`version.json` 条目判空；MOJMAPS `client/mappings` 字段与 `Split("@")[1]` 越界；Legacy Forge 缺字段/zip 条目链式 NRE；Fabric `version/stable/Display.Split("]")[1]` 防护；多处 `JsonToken/url/version/id/minecraftArguments/Substring/First()` 空判 | 键值统一 `?.ToString() ?? ""`；zip 条目 `is null` 早退并抛损坏包异常；`Split` 结果先判 `Length>1` 再取下标；缺字段链式访问前判空 |
+| `Pages\PageDownload\PageDownloadInstall.xaml.cs` | `releaseTime/id/version` 缺键 NRE；正式/预览空列表 `[0]` 越界；Fabric `game/loader` 节点与 `Tag`、`TryInit`、LiteLoader `version`、原版 `url` 空判 | 日期/版本取值前判空，空列表早退；节点/标签空判后再取子项；缺失键走安全日期与空守卫 |
+| `Pages\PageDownload\PageDownloadModify.cs` | 属性 setter 匿名 lambda `-=` 无法移除旧委托、二次赋值事件泄漏；静态 `MyTextBox.ValidateChanged` 多实例累积；还原已装版本路径缺 `id/version` NRE；各加载器 `Output.Value` 空判 | 改为实例字段缓存 + 三个具名处理器（`OnNameTextChanged`/`OnValidateChanged`/`OnOriginalNameTextChanged`），setter 用同一实例退订重订；`Output` 为 struct 不可空，仅对 `Value`（List/JArray/JObject）判空，去掉误用的 `?.` |
+| `Pages\PageSelectLeft.xaml.cs` | 历史 `LaunchFolders` 不含 `>` 时 `Split(">")[1]` 越界（两处） | 先 `Contains(">")` 判空，再 `Split(">")` 取 `[0]/[1]` |
+| `Pages\PageDownload\Resource\MyResourceItem.xaml.cs` | 五个空桩下载子页静态字段未初始化时 `.Content.Loader...` 空引用 | 字段判空后用 `?.` 贯穿到 `Content?.Loader?.Input`；字段非空时链路安全 |
+| `Pages\PageDownload\Resource\PageResource.xaml.cs` | 结果列表为空 `Index=-1` 致 `GetRange(-1,1)` 越界 | `Count==0` 早退空态渲染，隐藏页码/错误提示后返回 |
+
+### 10.2 核对后无需改动项
+
+- `Pages\PageOther\PageOtherTest.xaml.cs`（J3-1 百宝箱桩）：对照 VB 后确认桩内**已有** `ModMain.Hint("为便于维护，开源内容中不包含百宝箱功能……")`，与 VB 一致；报告判定的"C# 静默空实现、无提示"与现状不符，**未改动**。
+
+### 10.3 未修范围（事实陈述）
+
+- J1 剩余低危（`Task.Input` null、除零不可达、`Substring` 前缀、`Init` null、`Parent` null、空桩、`Content` 未赋值等）；J2 实例页、J3 设置/其他页、J4 资源/登录其余低危；主汇总 M1–M8、S1–S14 内核/网络项尚未逐条复核修复。
+- 内核工程 `PCL.Download/PCL.Cli/PCLCS/MeloongCore` 仅核对签名与 null 语义，未深审内部；`*.vb` 不编译仅作语义对照。
+
+---
+
+## 十、附录：分组覆盖清单
 
 ### 9.1 并行子 agent 分组（8 份子报告，原文在 `docs/bugscan/`）
 

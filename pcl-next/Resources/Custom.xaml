@@ -197,10 +197,10 @@
         <TextBlock TextWrapping="Wrap" Margin="0,0,0,15"
                     Text="你可以用类似 {DynamicResource ColorBrush5} 的格式使用 PCL 当前的主题颜色，修改末尾的数字编号以改变颜色浓度。" />
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="8,4">
-            <TextBlock TextWrapping="Wrap" Text=" 浓度 1 " Margin="5,0" Background="{DynamicResource ColorBrush1}" Foreground="#FFFFFF" />
-            <TextBlock TextWrapping="Wrap" Text=" 浓度 2 " Margin="5,0" Background="{DynamicResource ColorBrush2}" Foreground="#FFFFFF" />
-            <TextBlock TextWrapping="Wrap" Text=" 浓度 3 " Margin="5,0" Background="{DynamicResource ColorBrush3}" Foreground="#FFFFFF" />
-            <TextBlock TextWrapping="Wrap" Text=" 浓度 4 " Margin="5,0" Background="{DynamicResource ColorBrush4}" Foreground="#FFFFFF" />
+            <TextBlock TextWrapping="Wrap" Text=" 浓度 1 " Margin="5,0" Background="{DynamicResource ColorBrush1}" Foreground="{DynamicResource ColorBrush8}" />
+            <TextBlock TextWrapping="Wrap" Text=" 浓度 2 " Margin="5,0" Background="{DynamicResource ColorBrush2}" Foreground="{DynamicResource ColorBrush8}" />
+            <TextBlock TextWrapping="Wrap" Text=" 浓度 3 " Margin="5,0" Background="{DynamicResource ColorBrush3}" Foreground="{DynamicResource ColorBrush8}" />
+            <TextBlock TextWrapping="Wrap" Text=" 浓度 4 " Margin="5,0" Background="{DynamicResource ColorBrush4}" Foreground="{DynamicResource ColorBrush8}" />
         </StackPanel>
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="8,4">
             <TextBlock TextWrapping="Wrap" Text=" 浓度 5 " Margin="5,0" Background="{DynamicResource ColorBrush5}" />

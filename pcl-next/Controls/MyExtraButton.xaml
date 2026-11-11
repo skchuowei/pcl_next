@@ -21,7 +21,7 @@
                 <RectangleGeometry x:Name="RectProgress" Rect="0,5,40,35" />
             </Border.Clip>
         </Border>
-        <Path x:Name="Path" Stretch="Uniform" Margin="12" Fill="{DynamicResource ColorBrush8}" RenderTransformOrigin="0.5,0.5">
+        <Path x:Name="Path" Stretch="Uniform" Margin="12" Fill="{DynamicResource ColorBrushOnAccent}" RenderTransformOrigin="0.5,0.5">
             <Path.RenderTransform>
                 <ScaleTransform />
             </Path.RenderTransform>

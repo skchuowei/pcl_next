@@ -95,6 +95,11 @@ namespace PCL
         public static OneOf<int, int[]> ColorHueTopbarDelta = 0;
         public static int ThemeDontClick = 0;
 
+        /// <summary>
+        /// 深色主题的固定编号。与上游 0~14 号主题号段不冲突，避免后续同步上游主题时撞号。
+        /// </summary>
+        public const int ThemeDarkId = 100;
+
         public static void ThemeRefresh(int NewTheme = -1)
         {
             try
@@ -104,39 +109,127 @@ namespace PCL
                 if (NewTheme >= 0)
                     ThemeNow = NewTheme;
 
-                Color1 = new ModBase.MyColor().FromHSL2(ColorHue, ColorSat * 0.2d, 25d + ColorLightAdjust * 0.3d);
-                Color2 = new ModBase.MyColor().FromHSL2(ColorHue, ColorSat, 45 + ColorLightAdjust);
-                Color3 = new ModBase.MyColor().FromHSL2(ColorHue, ColorSat, 55 + ColorLightAdjust);
-                Color4 = new ModBase.MyColor().FromHSL2(ColorHue, ColorSat, 65 + ColorLightAdjust);
-                Color5 = new ModBase.MyColor().FromHSL2(ColorHue, ColorSat, 80d + ColorLightAdjust * 0.4d);
-                Color6 = new ModBase.MyColor().FromHSL2(ColorHue, ColorSat, 91d + ColorLightAdjust * 0.1d);
-                Color7 = new ModBase.MyColor().FromHSL2(ColorHue, ColorSat, 95d);
-                Color8 = new ModBase.MyColor().FromHSL2(ColorHue, ColorSat, 97d);
-                ColorBg0 = Color4 * 0.4d + Color5 * 0.4d + ColorGray4 * 0.2d;
+                bool IsDark = ThemeNow == ThemeDarkId;
+                if (IsDark)
+                {
+                    // 深色主题：中性面亮度整体反转，强调色略提亮以补偿深底上的对比度
+                    Color1 = new ModBase.MyColor().FromHSL2(ColorHue, ColorSat * 0.15d, 88d);
+                    Color2 = new ModBase.MyColor().FromHSL2(ColorHue, ColorSat, 72d);
+                    Color3 = new ModBase.MyColor().FromHSL2(ColorHue, ColorSat, 62d);
+                    Color4 = new ModBase.MyColor().FromHSL2(ColorHue, ColorSat, 76d);
+                    Color5 = new ModBase.MyColor().FromHSL2(ColorHue, ColorSat * 0.6d, 45d);
+                    Color6 = new ModBase.MyColor().FromHSL2(ColorHue, ColorSat * 0.35d, 21d);
+                    Color7 = new ModBase.MyColor().FromHSL2(ColorHue, ColorSat * 0.3d, 17d);
+                    Color8 = new ModBase.MyColor().FromHSL2(ColorHue, ColorSat * 0.25d, 14d);
+                    ColorBg0 = new ModBase.MyColor().FromHSL2(ColorHue, ColorSat * 0.3d, 30d);
+                    ColorGray1 = new ModBase.MyColor(230d, 230d, 230d);
+                    ColorGray2 = new ModBase.MyColor(184d, 184d, 184d);
+                    ColorGray3 = new ModBase.MyColor(153d, 153d, 153d);
+                    ColorGray4 = new ModBase.MyColor(122d, 122d, 122d);
+                    ColorGray5 = new ModBase.MyColor(77d, 77d, 77d);
+                    ColorGray6 = new ModBase.MyColor(51d, 51d, 51d);
+                    ColorGray7 = new ModBase.MyColor(42d, 42d, 42d);
+                    ColorGray8 = new ModBase.MyColor(36d, 36d, 36d);
+                }
+                else
+                {
+                    Color1 = new ModBase.MyColor().FromHSL2(ColorHue, ColorSat * 0.2d, 25d + ColorLightAdjust * 0.3d);
+                    Color2 = new ModBase.MyColor().FromHSL2(ColorHue, ColorSat, 45 + ColorLightAdjust);
+                    Color3 = new ModBase.MyColor().FromHSL2(ColorHue, ColorSat, 55 + ColorLightAdjust);
+                    Color4 = new ModBase.MyColor().FromHSL2(ColorHue, ColorSat, 65 + ColorLightAdjust);
+                    Color5 = new ModBase.MyColor().FromHSL2(ColorHue, ColorSat, 80d + ColorLightAdjust * 0.4d);
+                    Color6 = new ModBase.MyColor().FromHSL2(ColorHue, ColorSat, 91d + ColorLightAdjust * 0.1d);
+                    Color7 = new ModBase.MyColor().FromHSL2(ColorHue, ColorSat, 95d);
+                    Color8 = new ModBase.MyColor().FromHSL2(ColorHue, ColorSat, 97d);
+                    ColorGray1 = new ModBase.MyColor(64d, 64d, 64d);
+                    ColorGray2 = new ModBase.MyColor(115d, 115d, 115d);
+                    ColorGray3 = new ModBase.MyColor(140d, 140d, 140d);
+                    ColorGray4 = new ModBase.MyColor(166d, 166d, 166d);
+                    ColorGray5 = new ModBase.MyColor(204d, 204d, 204d);
+                    ColorGray6 = new ModBase.MyColor(235d, 235d, 235d);
+                    ColorGray7 = new ModBase.MyColor(240d, 240d, 240d);
+                    ColorGray8 = new ModBase.MyColor(245d, 245d, 245d);
+                    ColorBg0 = Color4 * 0.4d + Color5 * 0.4d + ColorGray4 * 0.2d;
+                }
                 ColorBg1 = new ModBase.MyColor(190d, Color7);
 
                 ColorSemiTransparent = new ModBase.MyColor(1d, Color8);
-                ((dynamic)Application.Current.Resources)["ColorBrush1"] = new SolidColorBrush(Color1);
-                ((dynamic)Application.Current.Resources)["ColorBrush2"] = new SolidColorBrush(Color2);
-                ((dynamic)Application.Current.Resources)["ColorBrush3"] = new SolidColorBrush(Color3);
-                ((dynamic)Application.Current.Resources)["ColorBrush4"] = new SolidColorBrush(Color4);
-                ((dynamic)Application.Current.Resources)["ColorBrush5"] = new SolidColorBrush(Color5);
-                ((dynamic)Application.Current.Resources)["ColorBrush6"] = new SolidColorBrush(Color6);
-                ((dynamic)Application.Current.Resources)["ColorBrush7"] = new SolidColorBrush(Color7);
-                ((dynamic)Application.Current.Resources)["ColorBrush8"] = new SolidColorBrush(Color8);
-                ((dynamic)Application.Current.Resources)["ColorBrushBg0"] = new SolidColorBrush(ColorBg0);
-                ((dynamic)Application.Current.Resources)["ColorBrushBg1"] = new SolidColorBrush(ColorBg1);
-                ((dynamic)Application.Current.Resources)["ColorObject1"] = (Color)Color1;
-                ((dynamic)Application.Current.Resources)["ColorObject2"] = (Color)Color2;
-                ((dynamic)Application.Current.Resources)["ColorObject3"] = (Color)Color3;
-                ((dynamic)Application.Current.Resources)["ColorObject4"] = (Color)Color4;
-                ((dynamic)Application.Current.Resources)["ColorObject5"] = (Color)Color5;
-                ((dynamic)Application.Current.Resources)["ColorObject6"] = (Color)Color6;
-                ((dynamic)Application.Current.Resources)["ColorObject7"] = (Color)Color7;
-                ((dynamic)Application.Current.Resources)["ColorObject8"] = (Color)Color8;
-                ((dynamic)Application.Current.Resources)["ColorObjectBg0"] = (Color)ColorBg0;
-                ((dynamic)Application.Current.Resources)["ColorObjectBg1"] = (Color)ColorBg1;
+                ModBase.MyColor ColorCard, ColorPopup, ColorTooltip, ColorOverlay, ColorSidebar, ColorWindow;
+                if (IsDark)
+                {
+                    ColorCard = new ModBase.MyColor(242d, new ModBase.MyColor().FromHSL2(ColorHue, ColorSat * 0.3d, 20d));
+                    ColorPopup = new ModBase.MyColor().FromHSL2(ColorHue, ColorSat * 0.3d, 18d);
+                    ColorTooltip = new ModBase.MyColor().FromHSL2(ColorHue, ColorSat * 0.28d, 22d);
+                    ColorOverlay = new ModBase.MyColor(221d, new ModBase.MyColor().FromHSL2(ColorHue, ColorSat * 0.2d, 6d));
+                    ColorSidebar = new ModBase.MyColor(241d, new ModBase.MyColor().FromHSL2(ColorHue, ColorSat * 0.28d, 13d));
+                    ColorWindow = new ModBase.MyColor().FromHSL2(ColorHue, ColorSat * 0.3d, 10d);
+                }
+                else
+                {
+                    ColorCard = new ModBase.MyColor(245d, 255d, 255d);
+                    ColorPopup = new ModBase.MyColor(255d, 255d, 255d);
+                    ColorTooltip = new ModBase.MyColor(251d, 251d, 251d);
+                    ColorOverlay = new ModBase.MyColor(221d, 221d, 221d);
+                    ColorSidebar = new ModBase.MyColor(241d, 255d, 255d);
+                    ColorWindow = new ModBase.MyColor(245d, 245d, 245d);
+                }
+
+                var Res = Application.Current.Resources;
+                SetBrush("ColorBrush1", Color1);
+                SetBrush("ColorBrush2", Color2);
+                SetBrush("ColorBrush3", Color3);
+                SetBrush("ColorBrush4", Color4);
+                SetBrush("ColorBrush5", Color5);
+                SetBrush("ColorBrush6", Color6);
+                SetBrush("ColorBrush7", Color7);
+                SetBrush("ColorBrush8", Color8);
+                SetBrush("ColorBrushBg0", ColorBg0);
+                SetBrush("ColorBrushBg1", ColorBg1);
+                SetBrush("ColorBrushGray1", ColorGray1);
+                SetBrush("ColorBrushGray2", ColorGray2);
+                SetBrush("ColorBrushGray3", ColorGray3);
+                SetBrush("ColorBrushGray4", ColorGray4);
+                SetBrush("ColorBrushGray5", ColorGray5);
+                SetBrush("ColorBrushGray6", ColorGray6);
+                SetBrush("ColorBrushGray7", ColorGray7);
+                SetBrush("ColorBrushGray8", ColorGray8);
+                SetBrush("ColorBrushHalfWhite", IsDark ? Color.FromArgb(34, 255, 255, 255) : Color.FromArgb(85, 255, 255, 255));
+                SetBrush("ColorBrushOnAccent", IsDark ? Color.FromArgb(255, 253, 254, 255) : (Color)Color8);
+                SetBrush("ColorBrushCard", ColorCard);
+                SetBrush("ColorBrushPopup", ColorPopup);
+                SetBrush("ColorBrushTooltip", ColorTooltip);
+                SetBrush("ColorBrushOverlay", ColorOverlay);
+                SetBrush("ColorBrushSidebar", ColorSidebar);
+                SetBrush("ColorBrushWindow", ColorWindow);
+                SetBrush("ColorBrushInk", IsDark ? Color.FromArgb(160, 232, 235, 240) : Color.FromArgb(160, 0, 0, 0));
+                SetBrush("ColorBrushInkHover", IsDark ? Color.FromArgb(230, 240, 243, 248) : Color.FromArgb(230, 0, 0, 0));
+                SetBrush("ColorBrushRedBack", IsDark ? Color.FromArgb(128, 64, 32, 32) : Color.FromArgb(128, 251, 221, 221));
+                SetBrush("ColorBrushRedDark", IsDark ? Color.FromArgb(255, 255, 138, 122) : Color.FromArgb(255, 206, 33, 17));
+                SetBrush("ColorBrushRedLight", IsDark ? Color.FromArgb(255, 255, 107, 107) : Color.FromArgb(255, 255, 76, 76));
+                SetBrush("ColorBrushSemiTransparent", ColorSemiTransparent);
+                SetBrush("ColorBrushBackgroundTransparentSidebar", ColorSidebar);
+                Res["ColorObject1"] = (Color)Color1;
+                Res["ColorObject2"] = (Color)Color2;
+                Res["ColorObject3"] = (Color)Color3;
+                Res["ColorObject4"] = (Color)Color4;
+                Res["ColorObject5"] = (Color)Color5;
+                Res["ColorObject6"] = (Color)Color6;
+                Res["ColorObject7"] = (Color)Color7;
+                Res["ColorObject8"] = (Color)Color8;
+                Res["ColorObjectBg0"] = (Color)ColorBg0;
+                Res["ColorObjectBg1"] = (Color)ColorBg1;
+                Res["ColorObjectGray1"] = (Color)ColorGray1;
+                Res["ColorObjectGray2"] = (Color)ColorGray2;
+                Res["ColorObjectGray3"] = (Color)ColorGray3;
+                Res["ColorObjectGray4"] = (Color)ColorGray4;
+                Res["ColorObjectGray5"] = (Color)ColorGray5;
+                Res["ColorObjectGray6"] = (Color)ColorGray6;
+                Res["ColorObjectGray7"] = (Color)ColorGray7;
+                Res["ColorObjectGray8"] = (Color)ColorGray8;
+                Res["ColorObjectShadow"] = IsDark ? Color.FromArgb(255, 0, 0, 0) : (Color)Color1;
                 ThemeRefreshMain();
+
+                void SetBrush(string Key, Color Value) => Res[Key] = new SolidColorBrush(Value);
             }
             catch (Exception ex)
             {
@@ -149,26 +242,32 @@ namespace PCL
         {
             if (!ModMain.FrmMain.IsLoaded)
                 return;
+            bool IsDark = ThemeNow == ThemeDarkId;
             // 顶部条背景
             var Brush = new LinearGradientBrush() { EndPoint = new Point(1d, 0d), StartPoint = new Point(0d, 0d) };
             int[] Deltas = ColorHueTopbarDelta.Switch(d => new int[] { -d, 0, d }, d => d);
-            Brush.GradientStops.Add(new GradientStop() { Offset = 0d, Color = new ModBase.MyColor().FromHSL2(ColorHue + Deltas[0], ColorSat, 48 + ColorLightAdjust) });
-            Brush.GradientStops.Add(new GradientStop() { Offset = 0.5d, Color = new ModBase.MyColor().FromHSL2(ColorHue + Deltas[1], ColorSat, 54 + ColorLightAdjust) });
-            Brush.GradientStops.Add(new GradientStop() { Offset = 1d, Color = new ModBase.MyColor().FromHSL2(ColorHue + Deltas[2], ColorSat, 48 + ColorLightAdjust) });
+            int TopLight = IsDark ? 22 : 48;
+            int TopLightMid = IsDark ? 26 : 54;
+            Brush.GradientStops.Add(new GradientStop() { Offset = 0d, Color = new ModBase.MyColor().FromHSL2(ColorHue + Deltas[0], IsDark ? ColorSat * 0.8d : ColorSat, TopLight + ColorLightAdjust) });
+            Brush.GradientStops.Add(new GradientStop() { Offset = 0.5d, Color = new ModBase.MyColor().FromHSL2(ColorHue + Deltas[1], IsDark ? ColorSat * 0.8d : ColorSat, TopLightMid + ColorLightAdjust) });
+            Brush.GradientStops.Add(new GradientStop() { Offset = 1d, Color = new ModBase.MyColor().FromHSL2(ColorHue + Deltas[2], IsDark ? ColorSat * 0.8d : ColorSat, TopLight + ColorLightAdjust) });
             ModMain.FrmMain.PanTitle.Background = Brush;
             ModMain.FrmMain.PanTitle.Background.Freeze();
             // 主页面背景
             if (Settings.Get<bool>("UiBackgroundColorful"))
             {
                 Brush = new LinearGradientBrush() { EndPoint = new Point(0.1d, 1d), StartPoint = new Point(0.9d, 0d) };
-                Brush.GradientStops.Add(new GradientStop() { Offset = -0.1d, Color = new ModBase.MyColor().FromHSL2(ColorHue - 15, ColorSat * 0.8d, 91d) });
-                Brush.GradientStops.Add(new GradientStop() { Offset = 0.4d, Color = new ModBase.MyColor().FromHSL2(ColorHue, ColorSat * 0.8d, 91d) });
-                Brush.GradientStops.Add(new GradientStop() { Offset = 1.1d, Color = new ModBase.MyColor().FromHSL2(ColorHue + 15, ColorSat * 0.8d, 91d) });
+                double FormLight = IsDark ? 15d : 91d;
+                Brush.GradientStops.Add(new GradientStop() { Offset = -0.1d, Color = new ModBase.MyColor().FromHSL2(ColorHue - 15, ColorSat * 0.8d, FormLight) });
+                Brush.GradientStops.Add(new GradientStop() { Offset = 0.4d, Color = new ModBase.MyColor().FromHSL2(ColorHue, ColorSat * 0.8d, FormLight) });
+                Brush.GradientStops.Add(new GradientStop() { Offset = 1.1d, Color = new ModBase.MyColor().FromHSL2(ColorHue + 15, ColorSat * 0.8d, FormLight) });
                 ModMain.FrmMain.PanForm.Background = Brush;
             }
             else
             {
-                ModMain.FrmMain.PanForm.Background = new ModBase.MyColor(245d, 245d, 245d);
+                ModMain.FrmMain.PanForm.Background = IsDark
+                    ? (ModBase.MyColor)new ModBase.MyColor().FromHSL2(ColorHue, ColorSat * 0.3d, 10d)
+                    : new ModBase.MyColor(245d, 245d, 245d);
             }
             ModMain.FrmMain.PanForm.Background.Freeze();
         });
