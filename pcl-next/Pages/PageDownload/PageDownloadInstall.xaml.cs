@@ -790,7 +790,15 @@ namespace PCL
                 if ((Version["id"]?.ToString() ?? "") != (VersionWaitingSelect ?? ""))
                     continue;
                 Logger.Info($"自动选择 MC 版本：{VersionWaitingSelect}");
-                MinecraftSelected(ModDownloadLib.McDownloadListItem(Version, null, false).Init(), null);
+                var ItemElement = ModDownloadLib.McDownloadListItem(Version, null, false);
+                var Item = ItemElement?.Init();
+                if (Item is null)
+                {
+                    Logger.Warn($"无法初始化 Minecraft 版本列表项：{VersionWaitingSelect}");
+                    VersionWaitingSelect = null;
+                    return;
+                }
+                MinecraftSelected(Item, null);
                 VersionWaitingSelect = null;
                 return;
             }

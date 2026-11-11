@@ -280,7 +280,13 @@ namespace PCL
             // 记录由 PCL 管理的 Mod 信息
             foreach (var Entry in Ctx.ManagedFileSources)
             {
-                string RelativePath = Entry.Value.Substring(Ctx.ModsTempFolder.Length);
+                if (string.IsNullOrWhiteSpace(Ctx.ModsTempFolder) || string.IsNullOrWhiteSpace(Entry.Value))
+                    throw new InvalidDataException($"托管 Mod 文件路径不完整：{Entry.Key}");
+                string TempModsFolder = Path.GetFullPath(Ctx.ModsTempFolder);
+                string SourcePath = Path.GetFullPath(Entry.Value);
+                if (!PathUtils.IsParentOf(TempModsFolder, SourcePath) || PathUtils.IsSame(TempModsFolder, SourcePath))
+                    throw new InvalidDataException($"托管 Mod 文件不在临时 mods 目录中：{SourcePath}");
+                string RelativePath = Path.GetRelativePath(TempModsFolder, SourcePath);
                 string FullPath = PathUtils.ForCompare(Path.Combine(Ctx.TargetFolder, "mods", RelativePath));
                 ManagedFiles.Add(new McInstallManifest.ManagedFile(Download.InstallManifestRules.ManagedModPath(RelativePath), CryptographyUtils.ComputeFileHash(FullPath, CryptographyUtils.HashMethod.Sha1), FileUtils.GetInfo(FullPath).LastWriteTimeUtc, Entry.Key));
             }

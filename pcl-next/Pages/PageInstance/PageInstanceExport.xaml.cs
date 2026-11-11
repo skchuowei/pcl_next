@@ -105,36 +105,48 @@ namespace PCL
         private void ReloadSubOptions(StackPanel Panel, bool AcceptCompressedFile, bool AcceptFolder, params string[] Folders)
         {
             Panel.Children.Clear();
+            if (PageInstanceLeft.Instance is null)
+            {
+                Logger.Warn("重建实例导出子选项时尚未选择 Minecraft 实例");
+                return;
+            }
             foreach (var Folder in Folders)
             {
-                var TargetFolder = DirectoryUtils.GetInfo(PageInstanceLeft.Instance.PathIndie + Folder);
-                if (!TargetFolder.Exists)
-                    continue;
-                // 查找文件夹下的对应项
-                if (AcceptCompressedFile)
+                try
                 {
-                    foreach (var File in TargetFolder.EnumerateFiles("*.zip").Concat(TargetFolder.EnumerateFiles("*.rar")))
+                    var TargetFolder = DirectoryUtils.GetInfo(PageInstanceLeft.Instance.PathIndie + Folder);
+                    if (!TargetFolder.Exists)
+                        continue;
+                    // 查找文件夹下的对应项
+                    if (AcceptCompressedFile)
                     {
-                        if (SubOptionBlackList.Any(b => File.Name.Contains(b)))
-                            continue;
-                        Panel.Children.Add(new MyCheckBox() { Tag = new ExportOption() { Title = File.Name, DefaultChecked = true, Rules = StringUtils.LikePatternEscape($"{Folder}/{File.Name}") } });
+                        foreach (var File in TargetFolder.EnumerateFiles("*.zip").Concat(TargetFolder.EnumerateFiles("*.rar")).ToList())
+                        {
+                            if (SubOptionBlackList.Any(b => File.Name.Contains(b)))
+                                continue;
+                            Panel.Children.Add(new MyCheckBox() { Tag = new ExportOption() { Title = File.Name, DefaultChecked = true, Rules = StringUtils.LikePatternEscape($"{Folder}/{File.Name}") } });
+                        }
+                    }
+                    if (AcceptFolder)
+                    {
+                        foreach (var SubFolder in TargetFolder.EnumerateDirectories().OrderByDescending(f => f.LastWriteTime).ToList())
+                        {
+                            if (SubOptionBlackList.Any(b => SubFolder.Name.Contains(b)))
+                                continue;
+                            if (!SubFolder.EnumerateFileSystemInfos().Any())
+                                continue;
+                            var NewCheckBox = new MyCheckBox() { Tag = new ExportOption() { Title = SubFolder.Name, DefaultChecked = true, Rules = StringUtils.LikePatternEscape($"{Folder}/{SubFolder.Name}/") } };
+                            if (AcceptCompressedFile)
+                                GetExportOption(NewCheckBox).Description = "文件夹";
+                            if (object.ReferenceEquals(Panel, this.PanOptionsSaves))
+                                GetExportOption(NewCheckBox).Description = SubFolder.LastWriteTime.ToString("yyyy'/'MM'/'dd HH':'mm");
+                            Panel.Children.Add(NewCheckBox);
+                        }
                     }
                 }
-                if (AcceptFolder)
+                catch (Exception ex)
                 {
-                    foreach (var SubFolder in TargetFolder.EnumerateDirectories().OrderByDescending(f => f.LastWriteTime))
-                    {
-                        if (SubOptionBlackList.Any(b => SubFolder.Name.Contains(b)))
-                            continue;
-                        if (!SubFolder.EnumerateFileSystemInfos().Any())
-                            continue;
-                        var NewCheckBox = new MyCheckBox() { Tag = new ExportOption() { Title = SubFolder.Name, DefaultChecked = true, Rules = StringUtils.LikePatternEscape($"{Folder}/{SubFolder.Name}/") } };
-                        if (AcceptCompressedFile)
-                            GetExportOption(NewCheckBox).Description = "文件夹";
-                        if (object.ReferenceEquals(Panel, this.PanOptionsSaves))
-                            GetExportOption(NewCheckBox).Description = SubFolder.LastWriteTime.ToString("yyyy'/'MM'/'dd HH':'mm");
-                        Panel.Children.Add(NewCheckBox);
-                    }
+                    Logger.Warn(ex, $"读取实例导出目录失败，已跳过：{Folder}");
                 }
             }
         }
@@ -148,17 +160,47 @@ namespace PCL
     /// </summary>
         private void RefreshAllOptionsUI()
         {
+            if (PageInstanceLeft.Instance is null)
+            {
+                Logger.Warn("刷新实例导出选项时尚未选择 Minecraft 实例");
+                return;
+            }
             // 预先归纳所有至多二级的文件/文件夹
             var AllEntries = new List<string>();
-            bool IsValidDirectory(DirectoryInfo Folder) { try { return Folder.Exists && Folder.EnumerateFileSystemInfos().Any(i => !SubOptionBlackList.Any(b => i.Name.Contains(b))); } catch { return false; } }; // 检查文件夹不为空
-                                                                                                                                                                                                                   // 一般是由于无法访问，或是一个指向已不存在的文件夹的链接（例如使用 mklink 创造的 resource 文件夹链接）
-            var PathInfo = DirectoryUtils.GetInfo(PageInstanceLeft.Instance.PathIndie);
-            AllEntries.AddRange(PathInfo.EnumerateFiles().Select(f => f.Name));
-            foreach (var SubFolder in PathInfo.EnumerateDirectories().Where(IsValidDirectory))
+            bool IsValidDirectory(DirectoryInfo Folder)
             {
-                AllEntries.Add($@"{SubFolder.Name}\");
-                AllEntries.AddRange(SubFolder.EnumerateFiles().Select(f => $@"{SubFolder.Name}\{f.Name}"));
-                AllEntries.AddRange(SubFolder.EnumerateDirectories().Where(IsValidDirectory).Select(d => $@"{SubFolder.Name}\{d.Name}\"));
+                try
+                {
+                    return Folder.Exists && Folder.EnumerateFileSystemInfos().Any(i => !SubOptionBlackList.Any(b => i.Name.Contains(b)));
+                }
+                catch (Exception ex)
+                {
+                    Logger.Warn(ex, $"读取实例导出子目录失败，已跳过：{Folder.FullName}");
+                    return false;
+                }
+            }
+            // 一般是由于无法访问，或是一个指向已不存在的文件夹的链接（例如使用 mklink 创造的 resource 文件夹链接）
+            var PathInfo = DirectoryUtils.GetInfo(PageInstanceLeft.Instance.PathIndie);
+            if (!PathInfo.Exists)
+            {
+                Logger.Warn($"实例目录不存在，跳过导出内容扫描：{PathInfo.FullName}");
+            }
+            else
+            {
+                try
+                {
+                    AllEntries.AddRange(PathInfo.EnumerateFiles().Select(f => f.Name));
+                    foreach (var SubFolder in PathInfo.EnumerateDirectories().Where(IsValidDirectory))
+                    {
+                        AllEntries.Add($@"{SubFolder.Name}\");
+                        AllEntries.AddRange(SubFolder.EnumerateFiles().Select(f => $@"{SubFolder.Name}\{f.Name}"));
+                        AllEntries.AddRange(SubFolder.EnumerateDirectories().Where(IsValidDirectory).Select(d => $@"{SubFolder.Name}\{d.Name}\"));
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Logger.Warn(ex, "扫描实例导出内容失败，已使用已读取到的文件继续");
+                }
             }
             Logger.Info($"共发现 {AllEntries.Count} 个可行的二级文件/文件夹");
             // 确认选项是否应该被显示

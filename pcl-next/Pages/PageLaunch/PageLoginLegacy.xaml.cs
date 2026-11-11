@@ -82,7 +82,9 @@ namespace PCL
         {
             if (e.Key == Key.Space)
             {
-                int Index = ((MyTextBox)this.ComboName.Template.FindName("PART_EditableTextBox", this.ComboName)).CaretIndex;
+                if (this.ComboName.Template.FindName("PART_EditableTextBox", this.ComboName) is not MyTextBox EditableTextBox)
+                    return;
+                int Index = EditableTextBox.CaretIndex;
                 if (Index == this.ComboName.Text.Length || Index == 0)
                     e.Handled = true;
             }

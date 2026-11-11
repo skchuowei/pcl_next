@@ -134,9 +134,15 @@ namespace PCL
         // sender 在方法体内按 MyResourceItem 使用，故就地转换
         private void MyResourceItem_Click(object sender, MouseButtonEventArgs e)
         {
+            var Main = ModMain.FrmMain;
+            if (Main is null)
+            {
+                Logger.Warn("资源列表项被点击时主窗口尚未就绪");
+                return;
+            }
             // 记录当前展开的卡片标题（#2712）
             var Titles = new List<string>();
-            if (ModMain.FrmMain.PageCurrent.Page == FormMain.PageType.ResourceDetail)
+            if (Main.PageCurrent.Page == FormMain.PageType.ResourceDetail && ModMain.FrmDownloadResourceDetail is not null)
             {
                 foreach (MyCard Card in ModMain.FrmDownloadResourceDetail.PanResults.Children)
                 {
@@ -149,52 +155,70 @@ namespace PCL
             var TargetType = default(ResourceTypes);
             string TargetInstance = null;
             var TargetLoader = ModLoaders.None;
-            if (ModMain.FrmMain.PageCurrent.Page == FormMain.PageType.Download)
+            if (Main.PageCurrent.Page == FormMain.PageType.Download)
             {
                 // 从下载页进入
-                switch (ModMain.FrmMain.PageCurrentSub)
+                switch (Main.PageCurrentSub)
                 {
                     case FormMain.PageSubType.DownloadMod:
                         {
                             TargetType = ResourceTypes.Mod;
                             var modPage = ModMain.FrmDownloadMod;
-                            if (modPage is not null)
+                            if (modPage?.Content?.Loader?.Input is not { } ModInput)
                             {
-                                TargetInstance = modPage.Content?.Loader?.Input?.GameVersion;
-                                TargetLoader = modPage.Content?.Loader?.Input?.ModLoaders ?? ModLoaders.None;
+                                WarnDownloadPageNotReady("Mod");
+                                return;
                             }
+                            TargetInstance = ModInput.GameVersion;
+                            TargetLoader = ModInput.ModLoaders;
                             break;
                         }
                     case FormMain.PageSubType.DownloadPack:
                         {
                             TargetType = ResourceTypes.ModPack;
                             var packPage = ModMain.FrmDownloadPack;
-                            if (packPage is not null)
-                                TargetInstance = packPage.Content?.Loader?.Input?.GameVersion;
+                            if (packPage?.Content?.Loader?.Input is not { } PackInput)
+                            {
+                                WarnDownloadPageNotReady("整合包");
+                                return;
+                            }
+                            TargetInstance = PackInput.GameVersion;
                             break;
                         }
                     case FormMain.PageSubType.DownloadDataPack:
                         {
                             TargetType = ResourceTypes.DataPack;
                             var dataPackPage = ModMain.FrmDownloadDataPack;
-                            if (dataPackPage is not null)
-                                TargetInstance = dataPackPage.Content?.Loader?.Input?.GameVersion;
+                            if (dataPackPage?.Content?.Loader?.Input is not { } DataPackInput)
+                            {
+                                WarnDownloadPageNotReady("数据包");
+                                return;
+                            }
+                            TargetInstance = DataPackInput.GameVersion;
                             break;
                         }
                     case FormMain.PageSubType.DownloadResourcePack:
                         {
                             TargetType = ResourceTypes.ResourcePack;
                             var resourcePackPage = ModMain.FrmDownloadResourcePack;
-                            if (resourcePackPage is not null)
-                                TargetInstance = resourcePackPage.Content?.Loader?.Input?.GameVersion;
+                            if (resourcePackPage?.Content?.Loader?.Input is not { } ResourcePackInput)
+                            {
+                                WarnDownloadPageNotReady("资源包");
+                                return;
+                            }
+                            TargetInstance = ResourcePackInput.GameVersion;
                             break;
                         }
                     case FormMain.PageSubType.DownloadShader:
                         {
                             TargetType = ResourceTypes.Shader;
                             var shaderPage = ModMain.FrmDownloadShader;
-                            if (shaderPage is not null)
-                                TargetInstance = shaderPage.Content?.Loader?.Input?.GameVersion;
+                            if (shaderPage?.Content?.Loader?.Input is not { } ShaderInput)
+                            {
+                                WarnDownloadPageNotReady("光影");
+                                return;
+                            }
+                            TargetInstance = ShaderInput.GameVersion;
                             break;
                         }
                 }
@@ -203,14 +227,25 @@ namespace PCL
             {
                 // 从详情页进入（查看前置）
                 TargetType = ResourceTypes.Any; // 允许任意类别
-                TargetInstance = Conversions.ToString(((dynamic)ModMain.FrmMain.PageCurrent.Additional)[2]);
-                TargetLoader = (ModLoaders)Conversions.ToInteger(((dynamic)ModMain.FrmMain.PageCurrent.Additional)[3]);
+                if (Main.PageCurrent.Additional is not object[] Additional || Additional.Length < 4)
+                {
+                    Logger.Warn("资源详情页参数尚未就绪，无法打开前置资源");
+                    return;
+                }
+                TargetInstance = Conversions.ToString(Additional[2]);
+                TargetLoader = (ModLoaders)Conversions.ToInteger(Additional[3]);
             }
-            ModMain.FrmMain.PageChange(new FormMain.PageStackData()
+            Main.PageChange(new FormMain.PageStackData()
             {
                 Page = FormMain.PageType.ResourceDetail,
                 Additional = new[] { ((MyResourceItem)sender).Tag, Titles, TargetInstance, TargetLoader, TargetType }
             });
+        }
+
+        private static void WarnDownloadPageNotReady(string PageName)
+        {
+            Logger.Warn($"下载 {PageName} 页面尚未就绪，无法打开资源详情");
+            ModMain.Hint($"下载 {PageName} 页面尚未就绪，请重新进入后重试。");
         }
 
         // 鼠标点击判定

@@ -239,7 +239,11 @@ namespace PCL
     /// </summary>
         public void RefreshRam(bool ShowAnim)
         {
-            if (this.LabRamGame is null || this.LabRamUsed is null || ModMain.FrmMain.PageCurrent != (FormMain.PageStackData)FormMain.PageType.Setup || ModMain.FrmSetupLeft.PageID != FormMain.PageSubType.SetupLaunch)
+            if (this.LabRamGame is null || this.LabRamUsed is null || this.LabRamTotal is null || this.SliderRamCustom is null ||
+                this.ColumnRamUsed is null || this.ColumnRamGame is null || this.ColumnRamEmpty is null ||
+                ModMain.FrmMain is null || ModMain.FrmSetupLeft is null ||
+                ModMain.FrmMain.PageCurrent != (FormMain.PageStackData)FormMain.PageType.Setup ||
+                ModMain.FrmSetupLeft.PageID != FormMain.PageSubType.SetupLaunch)
                 return;
             // 获取内存情况
             double RamGame = Math.Round(GetRam(ModMinecraft.McInstanceSelected, false), 5);

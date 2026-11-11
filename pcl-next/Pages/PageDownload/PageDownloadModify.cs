@@ -345,6 +345,10 @@ namespace PCL
     /// </summary>
         private void LoadInstance(ModLoader.LoaderTask<ModMinecraft.McInstance, object> Task)
         {
+            if (Task.Input is null)
+                throw new InvalidOperationException("缺少待修改的 Minecraft 实例。");
+            if (Task.Input.Config is null || string.IsNullOrWhiteSpace(Task.Input.PathIndie) || string.IsNullOrWhiteSpace(Task.Input.PathVersion))
+                throw new InvalidOperationException("待修改的 Minecraft 实例信息不完整。");
 
             // 旧状态清理
             ModBase.RunInUiWait(() =>
@@ -530,6 +534,8 @@ namespace PCL
             Files.AddRange(DirectoryUtils.EnumerateFiles(Path.Combine(ModsFolder, MinecraftVersion), searchPattern: "*.jar"));
         }
         var Entries = new List<(FileInfo File, string Sha1)>();
+        if (Files.Count == 0)
+            return Entries;
         foreach (var FilePath in Files)
         {
             if (Task.IsCanceled)
@@ -608,7 +614,11 @@ namespace PCL
                 if (SelectedFile is not null)
                 {
                     SelectedOptiFine = SelectedFile.Value.Version;
-                    string RelativePath = PathUtils.RemoveExtendedPrefix(SelectedFile.Value.File.FullName).Substring(Task.Input.PathIndie.Length).Replace(@"\", "/").Lower();
+                    string InstanceFolder = Path.GetFullPath(PathUtils.RemoveExtendedPrefix(Task.Input.PathIndie));
+                    string SelectedPath = Path.GetFullPath(PathUtils.RemoveExtendedPrefix(SelectedFile.Value.File.FullName));
+                    if (!PathUtils.IsParentOf(InstanceFolder, SelectedPath) || PathUtils.IsSame(InstanceFolder, SelectedPath))
+                        throw new InvalidDataException($"OptiFine 文件不在当前实例目录中：{SelectedPath}");
+                    string RelativePath = Path.GetRelativePath(InstanceFolder, SelectedPath).Replace(@"\", "/").Lower();
                     ManagedFiles.Add(new McInstallManifest.ManagedFile(RelativePath, SelectedFile.Value.Sha1, SelectedFile.Value.File.LastWriteTimeUtc, "OptiFine"));
                 }
             }
@@ -650,6 +660,11 @@ namespace PCL
     /// </summary>
         private void LoadInstanceFinished(ModLoader.LoaderTask<ModMinecraft.McInstance, object> Task)
         {
+            if (Task.Input is null || VanillaData is null)
+            {
+                Logger.Error(new InvalidOperationException("缺少实例或 Minecraft 版本数据，无法初始化修改页。"), "初始化修改页失败");
+                return;
+            }
             // 还原原版信息
             OriginalName = Task.Input.Name;
             CustomLogo = null;
@@ -657,7 +672,13 @@ namespace PCL
             {
                 CustomLogo = Task.Input.Logo.EndsWithF(@"PCL\Logo.png") ? Task.Input.PathVersion + @"PCL\Logo.png" : Task.Input.Logo;
             }
-            var Item = ModDownloadLib.McDownloadListItem(VanillaData, null, false).Init();
+            var ItemElement = ModDownloadLib.McDownloadListItem(VanillaData, null, false);
+            var Item = ItemElement?.Init();
+            if (Item is null)
+            {
+                Logger.Error(new InvalidOperationException("无法初始化要显示的 Minecraft 版本列表项。"), "初始化修改页失败");
+                return;
+            }
             VanillaName = Item.Title;
             VanillaIcon = Item.Logo;
             this.LabMinecraftVersion.Text = VanillaName;
@@ -993,7 +1014,12 @@ namespace PCL
                 try
                 {
                     PendingComponents.Clear();
-                    MinecraftSelected(ModDownloadLib.McDownloadListItem((JObject)Button.Tag, null, false).Init(), null);
+                    if (Button.Tag is not JObject RestoreVersion)
+                        throw new InvalidOperationException("缺少要恢复的 Minecraft 版本数据。");
+                    var RestoreItem = ModDownloadLib.McDownloadListItem(RestoreVersion, null, false);
+                    if (RestoreItem is null || RestoreItem.Init() is not MyListItem InitializedItem)
+                        throw new InvalidOperationException("无法初始化要恢复的 Minecraft 版本列表项。");
+                    MinecraftSelected(InitializedItem, null);
                     if (ForgeVersionLoader is not null)
                         this.LoadForge.State = ForgeVersionLoader;
                     // 恢复初始的组件
@@ -1053,7 +1079,9 @@ namespace PCL
             else if (ReferenceEquals(Button, BtnLiteLoaderRestore))
             {
                 SelectedLiteLoader = Button.Tag as ModDownload.DlLiteLoaderListEntry;
-            } ((MyCard)Button.Parent).IsSwapped = true;
+            }
+            if (Button.Parent is MyCard ParentCard)
+                ParentCard.IsSwapped = true;
             // 刷新组件
             ReloadComponentLists();
         }

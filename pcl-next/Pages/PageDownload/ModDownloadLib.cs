@@ -1496,7 +1496,13 @@ pause";
             #region Forgelike 文件
             foreach (ModMinecraft.McLibEntry LibFile in Libs)
             {
-                string relativePath = LibFile.LocalPath.StartsWith(CurrentMcFolder) ? LibFile.LocalPath.Substring(CurrentMcFolder.Length) : LibFile.LocalPath;
+                if (string.IsNullOrWhiteSpace(CurrentMcFolder) || string.IsNullOrWhiteSpace(LibFile.LocalPath))
+                    throw new InvalidDataException("Forgelike 支持库文件路径不完整。");
+                string SourceRoot = Path.GetFullPath(PathUtils.RemoveExtendedPrefix(CurrentMcFolder));
+                string SourcePath = Path.GetFullPath(PathUtils.RemoveExtendedPrefix(LibFile.LocalPath));
+                if (!PathUtils.IsParentOf(SourceRoot, SourcePath) || PathUtils.IsSame(SourceRoot, SourcePath))
+                    throw new InvalidDataException($"Forgelike 支持库文件不在当前 Minecraft 目录中：{SourcePath}");
+                string relativePath = Path.GetRelativePath(Path.GetFullPath(SourceRoot), Path.GetFullPath(SourcePath));
                 string RealPath = Path.Combine(McFolder, relativePath);
                 if (!FileUtils.Exists(RealPath))
                     FileUtils.Copy(LibFile.LocalPath, RealPath);

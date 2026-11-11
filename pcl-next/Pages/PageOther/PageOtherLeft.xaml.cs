@@ -190,6 +190,11 @@ namespace PCL
         public static void RefreshHelp()
         {
             Settings.Set("SystemHelpVersion", 0); // 强制重新解压文件
+            if (ModMain.FrmOtherHelp is null)
+            {
+                Logger.Info("帮助页尚未创建，稍后将重新加载帮助内容");
+                return;
+            }
             ModMain.FrmOtherHelp.PageLoaderRestart();
             ModMain.FrmOtherHelp.SearchBox.Text = "";
         }

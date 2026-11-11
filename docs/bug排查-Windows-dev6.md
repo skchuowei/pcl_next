@@ -430,3 +430,12 @@
 - `Pages/`、`Controls/` 多数文件未在子 agent 分组内逐一通读（FormMain、登录皮肤页、部分设置/链接页除外）；`ModCrash.cs`(93.9KB)、`ModModpack.cs`(66.2KB)、`ModMinecraft.cs`(138KB) 仅关键片段核对，未逐行全读。
 - 已被 csproj `<Compile Remove>` / `DefaultItemExcludes` 排除的 cs/vb、生成目录 `bin/obj/bin-net10/ReleaseArtifacts/publish/.git/downloads/.screenshots` 均不纳入。
 - 本轮为**只读排查**：未修复任何代码；可疑项建议经运行/反编译/单测复核后再定整改。
+
+## 十一、后续 Windows UI / 下载边界修复补记
+
+> 以下记录发生在上述只读排查报告之后；原第九节的修复范围与版本构建号为历史记录，不代表本次改动。
+
+- 本轮修复下载路径前缀越界、`Task.Input` / 初始化结果 / `Parent` / 页面 `Content` 空值边界；下载任务空文件列表在进度计算前返回。
+- 实例导出、实例切页、RAM 刷新、设置音乐刷新和帮助页面增加生命周期/目录访问守卫；Auth/Nide、Microsoft 登录及皮肤/披风处理增加索引、响应结构、资源释放与有界重试保护。
+- 五个下载详情空桩未复活；`PageOtherTest` 既有下线提示和 `PageResource` 既有空结果处理均未重复改动。
+- 最终验证：标准 Windows `pcl-next.csproj` Release `win-x64` 构建成功，0 错误 / 30 警告；输出为 `pcl-next\bin-net10\Dev\2.100.0.6-0.87\win-x64\`。最后一处 UI 空值守卫后，运行中的 `pcl-next.exe` 锁定输出文件；不结束用户进程，改以 `dotnet build -t:Compile` 完成最终源码编译（0 错误）。`PCL.Download.Tests` 568/568 通过。

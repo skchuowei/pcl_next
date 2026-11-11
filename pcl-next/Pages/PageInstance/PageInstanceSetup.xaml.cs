@@ -159,7 +159,11 @@ namespace PCL
     /// </summary>
         public void RefreshRam(bool ShowAnim)
         {
-            if (this.LabRamGame is null || this.LabRamUsed is null || ModMain.FrmMain.PageCurrent != (FormMain.PageStackData)FormMain.PageType.InstanceSetup || ModMain.FrmInstanceLeft.PageID != FormMain.PageSubType.InstanceSetup)
+            if (this.LabRamGame is null || this.LabRamUsed is null || this.LabRamTotal is null || this.SliderRamCustom is null ||
+                this.ColumnRamUsed is null || this.ColumnRamGame is null || this.ColumnRamEmpty is null ||
+                ModMain.FrmMain is null || ModMain.FrmInstanceLeft is null || PageInstanceLeft.Instance is null ||
+                ModMain.FrmMain.PageCurrent != (FormMain.PageStackData)FormMain.PageType.InstanceSetup ||
+                ModMain.FrmInstanceLeft.PageID != FormMain.PageSubType.InstanceSetup)
                 return;
             // 获取内存情况
             double RamGame = Math.Round(GetRam(PageInstanceLeft.Instance), 5);

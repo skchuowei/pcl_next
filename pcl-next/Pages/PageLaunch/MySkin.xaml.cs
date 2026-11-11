@@ -151,41 +151,63 @@ namespace PCL
                     FileUtils.Delete(Address);
                     return;
                 }
-                this.ImgBack.Tag = Address;
-                // 大小检查
-                int Scale = (int)Math.Round(Image.Pic.Width / 64d);
-                if (Image.Pic.Width < 32 || Image.Pic.Height < 32)
+                try
                 {
-                    this.ImgFore.Source = (ImageSource)null;
-                    this.ImgBack.Source = (ImageSource)null;
-                    throw new Exception("图片大小不足，长为 " + Image.Pic.Height + "，宽为 " + Image.Pic.Width);
-                }
-                // 头发层（附加层）
-                if (Image.Pic.Width >= 64 && Image.Pic.Height >= 32)
-                {
-                    if (Image.Pic.GetPixel(1, 1).A == 0 || Image.Pic.GetPixel(Image.Pic.Width - 1, Image.Pic.Height - 1).A == 0 || Image.Pic.GetPixel(Image.Pic.Width - 2, (int)Math.Round(Image.Pic.Height / 2d - 2d)).A == 0 || Image.Pic.GetPixel(1, 1) != Image.Pic.GetPixel(Scale * 41, Scale * 9) && Image.Pic.GetPixel(Image.Pic.Width - 1, Image.Pic.Height - 1) != Image.Pic.GetPixel(Scale * 41, Scale * 9) && Image.Pic.GetPixel(Image.Pic.Width - 2, (int)Math.Round(Image.Pic.Height / 2d - 2d)) != Image.Pic.GetPixel(Scale * 41, Scale * 9)) // 如果图片中有任何透明像素（避免纯色白底）
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            // 或是头部颜色和透明区均不一样
+                    this.ImgBack.Tag = Address;
+                    // 大小检查
+                    int Scale = (int)Math.Round(Image.Pic.Width / 64d);
+                    if (Image.Pic.Width < 32 || Image.Pic.Height < 32)
                     {
-                        this.ImgFore.Source = Image.Clip(Scale * 40, Scale * 8, Scale * 8, Scale * 8);
+                        this.ImgFore.Source = (ImageSource)null;
+                        this.ImgBack.Source = (ImageSource)null;
+                        throw new Exception("图片大小不足，长为 " + Image.Pic.Height + "，宽为 " + Image.Pic.Width);
+                    }
+                    // 头发层（附加层）
+                    if (Image.Pic.Width >= 64 && Image.Pic.Height >= 32)
+                    {
+                        if (Image.Pic.GetPixel(1, 1).A == 0 || Image.Pic.GetPixel(Image.Pic.Width - 1, Image.Pic.Height - 1).A == 0 || Image.Pic.GetPixel(Image.Pic.Width - 2, (int)Math.Round(Image.Pic.Height / 2d - 2d)).A == 0 || Image.Pic.GetPixel(1, 1) != Image.Pic.GetPixel(Scale * 41, Scale * 9) && Image.Pic.GetPixel(Image.Pic.Width - 1, Image.Pic.Height - 1) != Image.Pic.GetPixel(Scale * 41, Scale * 9) && Image.Pic.GetPixel(Image.Pic.Width - 2, (int)Math.Round(Image.Pic.Height / 2d - 2d)) != Image.Pic.GetPixel(Scale * 41, Scale * 9)) // 如果图片中有任何透明像素（避免纯色白底）
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                // 或是头部颜色和透明区均不一样
+                        {
+                            this.ImgFore.Source = ClipToImageSource(Image, Scale * 40, Scale * 8, Scale * 8, Scale * 8);
+                        }
+                        else
+                        {
+                            this.ImgFore.Source = (ImageSource)null;
+                        }
                     }
                     else
                     {
                         this.ImgFore.Source = (ImageSource)null;
                     }
+                    // 脸层
+                    this.ImgBack.Source = ClipToImageSource(Image, Scale * 8, Scale * 8, Scale * 8, Scale * 8);
+                    Logger.Info($"载入头像成功：{Loader.Name}");
                 }
-                else
+                finally
                 {
-                    this.ImgFore.Source = (ImageSource)null;
+                    if (!Address.StartsWithF(ModBase.PathImage))
+                        Image.Pic.Dispose();
                 }
-                // 脸层
-                this.ImgBack.Source = Image.Clip(Scale * 8, Scale * 8, Scale * 8, Scale * 8);
-                Logger.Info($"载入头像成功：{Loader.Name}");
             }
             catch (Exception ex)
             {
                 Logger.Error(ex, $"载入头像失败（{Address ?? "null"},{Loader.Name}）", LogBehavior.Toast);
             }
         }
+
+        private static ImageSource ClipToImageSource(MyBitmap Image, int X, int Y, int Width, int Height)
+        {
+            MyBitmap ClippedImage = Image.Clip(X, Y, Width, Height);
+            try
+            {
+                return ClippedImage;
+            }
+            finally
+            {
+                ClippedImage.Pic.Dispose();
+            }
+        }
+
         /// <summary>
     /// 清空皮肤。
     /// </summary>
@@ -244,7 +266,7 @@ namespace PCL
         {
             get
             {
-                return this.BtnSkinCape.Visibility == Visibility.Collapsed;
+                return this.BtnSkinCape.Visibility == Visibility.Visible;
             }
             set
             {
@@ -278,11 +300,14 @@ namespace PCL
             // 开始实际获取
             ModBase.RunInNewThread(() =>
         {
+        int AuthenticationRetries = 0;
+        bool RetryPending = false;
         Retry:
             ;
 
             try
             {
+                RetryPending = false;
                 // 获取登录信息
                 if (ModLaunch.McLoginMsLoader.State != ModBase.LoadState.Finished)
                     ModLaunch.McLoginMsLoader.WaitForExit(PageLoginMsSkin.GetLoginData());
@@ -291,19 +316,88 @@ namespace PCL
                     ModMain.Hint("登录失败，无法更改披风！", ModMain.HintType.Red);
                     return;
                 }
+                if (string.IsNullOrWhiteSpace(ModLaunch.McLoginMsLoader.Output.AccessToken))
+                    throw new System.IO.InvalidDataException("Microsoft 登录结果缺少访问令牌。");
                 string AccessToken = ModLaunch.McLoginMsLoader.Output.AccessToken;
-                string Uuid = ModLaunch.McLoginMsLoader.Output.Uuid;
-                JObject SkinData = (JObject)ModLaunch.McLoginMsLoader.Output.ProfileJson.DeserializeJson();
+                if (ModLaunch.McLoginMsLoader.Output.ProfileJson.DeserializeJson() is not JObject SkinData)
+                    throw new System.IO.InvalidDataException("玩家资料不是有效的 JSON 对象。");
+                JArray Capes;
+                if (SkinData["capes"] is null)
+                {
+                    Capes = new JArray();
+                    SkinData["capes"] = Capes;
+                }
+                else if (SkinData["capes"] is JArray CapeArray)
+                {
+                    Capes = CapeArray;
+                }
+                else
+                {
+                    throw new System.IO.InvalidDataException("玩家披风资料不是有效的列表。");
+                }
+                foreach (var Cape in Capes)
+                {
+                    if (Cape is not JObject || string.IsNullOrWhiteSpace(Cape["alias"]?.ToString()))
+                        throw new System.IO.InvalidDataException("玩家披风资料缺少有效的 alias 字段。");
+                }
                 // 获取玩家的所有披风
                 int? SelectedIndex = default;
-                ModBase.RunInUiWait(() => { try { var CapeNames = new Dictionary<string, string>() { { "Migrator", "迁移者披风" }, { "MapMaker", "Realms 地图制作者披风" }, { "Moderator", "Mojira 管理员披风" }, { "Translator-Chinese", "Crowdin 中文翻译者披风" }, { "Translator", "Crowdin 翻译者披风" }, { "Cobalt", "Cobalt 披风" }, { "Vanilla", "原版披风" }, { "Minecon2011", "Minecon 2011 参与者披风" }, { "Minecon2012", "Minecon 2012 参与者披风" }, { "Minecon2013", "Minecon 2013 参与者披风" }, { "Minecon2015", "Minecon 2015 参与者披风" }, { "Minecon2016", "Minecon 2016 参与者披风" }, { "Cherry Blossom", "樱花披风" }, { "15th Anniversary", "15 周年纪念披风" }, { "Purple Heart", "紫色心形披风" }, { "Follower's", "追随者披风" }, { "MCC 15th Year", "MCC 15 周年披风" }, { "Minecraft Experience", "村民救援披风" }, { "Mojang Office", "Mojang 办公室披风" }, { "Home", "家园披风" }, { "Menace", "入侵披风" }, { "Yearn", "渴望披风" }, { "Common", "普通披风" }, { "Pan", "薄煎饼披风" }, { "Founder's", "创始人披风" }, { "Copper", "铜披风" }, { "Zombie Horse", "僵尸马披风" }, { "Builder", "建造者披风" }, { "Crafter", "工匠披风" }, { "Aurora", "极光披风" } }; MyRadioBox @init = new MyRadioBox(); var SelectionControl = new List<IMyRadio>() { (@init.Text = "无披风", @init.Checked = !SkinData["capes"].Any(c => c["state"]?.ToString() == "ACTIVE"), @init).@init }; foreach (var Cape in SkinData["capes"]) { string CapeName = Cape["alias"].ToString(); if (CapeNames.ContainsKey(CapeName)) CapeName = CapeNames[CapeName]; MyRadioBox @init1 = new MyRadioBox(); SelectionControl.Add((@init1.Text = CapeName, @init1.Checked = Cape["state"]?.ToString() == "ACTIVE", @init1).@init1); } SelectedIndex = ModMain.MyMsgBoxSelect(SelectionControl, "选择披风", "确定", "取消"); } catch (Exception ex) { Logger.Error(ex, "获取玩家皮肤列表失败"); } });
+                ModBase.RunInUiWait(() =>
+                {
+                    try
+                    {
+                        var CapeNames = new Dictionary<string, string>()
+                        {
+                            { "Migrator", "迁移者披风" }, { "MapMaker", "Realms 地图制作者披风" }, { "Moderator", "Mojira 管理员披风" },
+                            { "Translator-Chinese", "Crowdin 中文翻译者披风" }, { "Translator", "Crowdin 翻译者披风" }, { "Cobalt", "Cobalt 披风" },
+                            { "Vanilla", "原版披风" }, { "Minecon2011", "Minecon 2011 参与者披风" }, { "Minecon2012", "Minecon 2012 参与者披风" },
+                            { "Minecon2013", "Minecon 2013 参与者披风" }, { "Minecon2015", "Minecon 2015 参与者披风" }, { "Minecon2016", "Minecon 2016 参与者披风" },
+                            { "Cherry Blossom", "樱花披风" }, { "15th Anniversary", "15 周年纪念披风" }, { "Purple Heart", "紫色心形披风" },
+                            { "Follower's", "追随者披风" }, { "MCC 15th Year", "MCC 15 周年披风" }, { "Minecraft Experience", "村民救援披风" },
+                            { "Mojang Office", "Mojang 办公室披风" }, { "Home", "家园披风" }, { "Menace", "入侵披风" }, { "Yearn", "渴望披风" },
+                            { "Common", "普通披风" }, { "Pan", "薄煎饼披风" }, { "Founder's", "创始人披风" }, { "Copper", "铜披风" },
+                            { "Zombie Horse", "僵尸马披风" }, { "Builder", "建造者披风" }, { "Crafter", "工匠披风" }, { "Aurora", "极光披风" }
+                        };
+                        var SelectionControl = new List<IMyRadio>
+                        {
+                            new MyRadioBox { Text = "无披风", Checked = !Capes.Any(c => c["state"]?.ToString() == "ACTIVE") }
+                        };
+                        foreach (var Cape in Capes)
+                        {
+                            string CapeName = Cape["alias"]?.ToString();
+                            if (string.IsNullOrWhiteSpace(CapeName))
+                                throw new System.IO.InvalidDataException("披风资料缺少 alias 字段。");
+                            if (CapeNames.TryGetValue(CapeName, out string LocalizedCapeName))
+                                CapeName = LocalizedCapeName;
+                            SelectionControl.Add(new MyRadioBox
+                            {
+                                Text = CapeName,
+                                Checked = Cape["state"]?.ToString() == "ACTIVE"
+                            });
+                        }
+                        SelectedIndex = ModMain.MyMsgBoxSelect(SelectionControl, "选择披风", "确定", "取消");
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Error(ex, "获取玩家皮肤列表失败", LogBehavior.Toast);
+                        ModMain.Hint("获取披风列表失败，请稍后重试。", ModMain.HintType.Red);
+                    }
+                });
                 if (SelectedIndex is null)
                     return;
+                if (SelectedIndex.Value < 0 || SelectedIndex.Value > Capes.Count)
+                    throw new System.IO.InvalidDataException("所选披风索引无效。");
+                if (SelectedIndex.Value > 0 &&
+                    (SelectedIndex.Value - 1 >= Capes.Count || string.IsNullOrWhiteSpace(Capes[SelectedIndex.Value - 1]?["id"]?.ToString())))
+                    throw new System.IO.InvalidDataException("所选披风资料缺少有效的 id 字段。");
                 // 发送请求
                 string Result = ModNet.NetRequestByClientRetry("https://api.minecraftservices.com/minecraft/profile/capes/active", SelectedIndex.HasValue && SelectedIndex.Value == 0 ? HttpMethod.Delete : HttpMethod.Put, Content: SelectedIndex.HasValue && SelectedIndex.Value == 0 ? "" : new JObject(new JProperty("capeId", SkinData["capes"][SelectedIndex - 1]["id"])).ToString(0), ContentType: "application/json", Headers: new[,] { { "Authorization", "Bearer " + AccessToken } });
-                if (Result.Contains("\"errorMessage\""))
+                string ErrorMessage = null;
+                if (!string.IsNullOrWhiteSpace(Result) && Result.Contains("\"errorMessage\""))
+                    ErrorMessage = (Result.DeserializeJson() as JObject)?["errorMessage"]?.ToString();
+                if (!string.IsNullOrEmpty(ErrorMessage))
                 {
-                    ModMain.Hint("更改披风失败：" + Result.DeserializeJson()["errorMessage"].ToString(), ModMain.HintType.Red);
+                    ModMain.Hint("更改披风失败：" + ErrorMessage, ModMain.HintType.Red);
                     return;
                 }
                 else
@@ -344,8 +438,14 @@ namespace PCL
                         case HttpStatusCode.Unauthorized:
                             {
                                 Logger.Warn(ex, "更改披风时遭遇 401 错误");
+                                if (AuthenticationRetries++ >= 1)
+                                {
+                                    ModMain.Hint("重新登录后仍无法更改披风，请稍后重试。", ModMain.HintType.Red);
+                                    return;
+                                }
                                 ModMain.Hint("正在重新登录，将在登录后自动更改披风……");
                                 ModLaunch.McLoginMsLoader.Start(PageLoginMsSkin.GetLoginData(), IsForceRestart: true);
+                                RetryPending = true;
                                 goto Retry;
                                 // 原 VB 为 GoTo Retry，转换后追加的 break 永不执行（CS0162），故删除
                             }
@@ -362,7 +462,8 @@ namespace PCL
             }
             finally
             {
-                IsChanging = false;
+                if (!RetryPending)
+                    IsChanging = false;
             }
         }, "Cape Change");
         }

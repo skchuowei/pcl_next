@@ -60,6 +60,11 @@ namespace PCL
     /// </summary>
         private void Reload()
         {
+            if (PageInstanceLeft.Instance is null)
+            {
+                Logger.Warn("刷新实例总览时尚未选择 Minecraft 实例");
+                return;
+            }
             ModAnimation.AniControlEnabled += 1;
 
             // 刷新设置项目
@@ -197,6 +202,11 @@ namespace PCL
         {
             if (!(IsLoad && ModAnimation.AniControlEnabled == 0))
                 return;
+            if (this.ComboDisplayLogo.SelectedItem is null || PageInstanceLeft.Instance is null)
+            {
+                Logger.Warn("更改实例图标时，选择项或实例尚未就绪");
+                return;
+            }
             // 选择 自定义 时修改图片
             try
             {

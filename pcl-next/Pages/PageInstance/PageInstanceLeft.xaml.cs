@@ -149,11 +149,13 @@ namespace PCL
             if (Target.Parent is not null)
                 Target.SetValue(ContentPresenter.ContentProperty, null);
             ModMain.FrmMain.PageRight = Target;
-            ((MyPageRight)ModMain.FrmMain.PanMainRight.Child).PageOnExit();
+            if (ModMain.FrmMain.PanMainRight.Child is MyPageRight CurrentPage)
+                CurrentPage.PageOnExit();
             ModAnimation.AniStart(new[] {
             ModAnimation.AaCode(() =>
                 {
-                       ((MyPageRight)ModMain.FrmMain.PanMainRight.Child).PageOnForceExit();
+                       if (ModMain.FrmMain.PanMainRight.Child is MyPageRight PreviousPage)
+                           PreviousPage.PageOnForceExit();
                        ModMain.FrmMain.PanMainRight.Child = ModMain.FrmMain.PageRight;
                        ModMain.FrmMain.PageRight.Opacity = 0d;
                    }, 130),

@@ -19,6 +19,11 @@ namespace PCL
 
         public void Refresh()
         {
+            if (Entry is null)
+            {
+                Logger.Warn("刷新帮助详情时尚未初始化帮助条目");
+                return;
+            }
             Init(new ModMain.HelpEntry(Entry.RawPath));
         }
 
@@ -32,6 +37,11 @@ namespace PCL
     /// </summary>
         public bool Init(ModMain.HelpEntry Entry)
         {
+            if (Entry is null)
+            {
+                Logger.Warn("无法初始化空的帮助条目");
+                return false;
+            }
             string Content = Entry.XamlContent ?? "";
             if (string.IsNullOrEmpty(Content))
                 throw new Exception("帮助 xaml 文件为空");
@@ -42,9 +52,10 @@ namespace PCL
                 while (Content.Contains("xmlns"))
                     Content = Content.RegexReplace("xmlns[^\"']*(\"|')[^\"']*(\"|')", "").Replace("xmlns", ""); // 禁止声明命名空间
                 Content = "<StackPanel xmlns=\"http://schemas.microsoft.com/winfx/2006/xaml/presentation\" xmlns:sys=\"clr-namespace:System;assembly=mscorlib\" xmlns:x=\"http://schemas.microsoft.com/winfx/2006/xaml\" xmlns:local=\"clr-namespace:PCL;assembly=pcl-next\" xmlns:core=\"clr-namespace:MeloongCore;assembly=MeloongCore\" xmlns:corewpf=\"clr-namespace:MeloongCore.Wpf;assembly=MeloongCore.Wpf\">" + Content + "</StackPanel>";
-                this.Entry = Entry;
+                var ContentElement = (UIElement)ModBase.GetObjectFromXML(Content);
                 this.PanCustom.Children.Clear();
-                this.PanCustom.Children.Add((UIElement)ModBase.GetObjectFromXML(Content));
+                this.PanCustom.Children.Add(ContentElement);
+                this.Entry = Entry;
                 return true;
             }
             catch (Exception ex)

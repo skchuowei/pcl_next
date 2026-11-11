@@ -192,6 +192,16 @@ namespace PCL
             else
             {
                 // 构造请求
+                if (ModMain.HelpLoader.State != ModBase.LoadState.Finished || ModMain.HelpLoader.Output is null)
+                {
+                    Logger.Warn("帮助列表尚未加载完成，跳过搜索");
+                    this.PanSearch.Title = ModMain.HelpLoader.State == ModBase.LoadState.Failed
+                        ? "帮助列表加载失败，请刷新后重试"
+                        : "帮助列表正在加载，请稍后重试";
+                    this.PanSearchList.Children.Clear();
+                    this.PanSearchList.Visibility = Visibility.Collapsed;
+                    return;
+                }
                 var QueryList = new List<ModBase.SearchEntry<ModMain.HelpEntry>>();
                 foreach (ModMain.HelpEntry Entry in ModMain.HelpLoader.Output)
                 {

@@ -21,6 +21,7 @@ namespace PCL
         private string UserCode; // 需要用户在网页上输入的设备代码
         private string DeviceCode; // 用于轮询的设备代码
         private string Website; // 验证网页的网址
+        private int PollInterval;
 
         #region 弹窗
 
@@ -47,6 +48,8 @@ namespace PCL
             catch (Exception ex)
             {
                 Logger.Error(ex, "登录弹窗初始化失败", LogBehavior.Toast);
+                if (MyConverter is not null)
+                    Finished(new InvalidOperationException("无法初始化微软设备码登录。", ex));
             }
 
             base.Loaded += Load;
@@ -115,9 +118,14 @@ namespace PCL
 
         private void Init()
         {
-            UserCode = (string)Data["user_code"];
-            DeviceCode = (string)Data["device_code"];
-            Website = (string)Data["verification_uri"];
+            UserCode = Data?["user_code"]?.ToString();
+            DeviceCode = Data?["device_code"]?.ToString();
+            Website = Data?["verification_uri"]?.ToString();
+            if (string.IsNullOrWhiteSpace(UserCode) || string.IsNullOrWhiteSpace(DeviceCode) ||
+                string.IsNullOrWhiteSpace(Website) ||
+                !int.TryParse(Data?["interval"]?.ToString(), out PollInterval) ||
+                PollInterval < 1 || PollInterval > int.MaxValue / 1000)
+                throw new System.IO.InvalidDataException("微软设备码响应缺少有效的 user_code、device_code、verification_uri 或 interval。");
             // 设置 UI
             this.LabTitle.Text = "登录 Minecraft";
             this.LabCaption.Text = $"登录网页将自动开启，请在网页中输入 {UserCode}（已自动复制）。" + Constants.vbCrLf + Constants.vbCrLf + $"如果网络环境不佳，网页可能一直加载不出来，届时请使用加速器或 VPN 改善网络环境。" + Constants.vbCrLf + $"你也可以用其他设备打开 {Website} 并输入上述代码。";
@@ -134,7 +142,7 @@ namespace PCL
                 return;
             ModBase.OpenWebsite(Website);
             ModBase.ClipboardSet(UserCode);
-            Thread.Sleep((Data["interval"].ToObject<int>() - 1) * 1000);
+            Thread.Sleep((PollInterval - 1) * 1000);
             // 轮询
             int UnknownFailureCount = 0;
             while (!MyConverter.IsExited)
@@ -143,18 +151,28 @@ namespace PCL
                 {
                     string Result = ModNet.NetRequestByClient("https://login.microsoftonline.com/consumers/oauth2/v2.0/token", HttpMethod.Post, Content: "grant_type=urn:ietf:params:oauth:grant-type:device_code" + "&" + "client_id=" + ModSecret.OAuthClientId + "&" + "device_code=" + DeviceCode + "&" + "scope=XboxLive.signin%20offline_access", ContentType: "application/x-www-form-urlencoded", Timeout: 5000 + UnknownFailureCount * 5000, MakeLog: false, RequireJson: true);
                     // 获取结果
-                    JObject ResultJson = (JObject)Result.DeserializeJson();
+                    if (Result.DeserializeJson() is not JObject ResultJson)
+                        throw new System.IO.InvalidDataException("微软令牌响应不是有效的 JSON 对象。");
+                    string AccessToken = ResultJson["access_token"]?.ToString();
+                    string RefreshToken = ResultJson["refresh_token"]?.ToString();
+                    if (string.IsNullOrWhiteSpace(AccessToken) || string.IsNullOrWhiteSpace(RefreshToken))
+                        throw new System.IO.InvalidDataException("微软令牌响应缺少 access_token 或 refresh_token。");
                     ModLaunch.McLaunchLog($"令牌过期时间：{ResultJson["expires_in"]} 秒");
                     ModMain.Hint("网页登录成功！", ModMain.HintType.Green);
-                    Finished(new[] { ResultJson["access_token"].ToString(), ResultJson["refresh_token"].ToString() });
+                    Finished(new[] { AccessToken, RefreshToken });
                     return;
                 }
                 catch (Exception ex)
                 {
+                    if (ex is System.IO.InvalidDataException)
+                    {
+                        Finished(new Exception("微软设备码登录响应无效", ex));
+                        return;
+                    }
                     // 修改错误列表时，同时修改 ModLaunch.MsLoginStep1Refresh 中的对应代码
                     if (ex is HttpRequestCodeException)
                     {
-                        string Response = ((HttpRequestCodeException)ex).Response;
+                        string Response = ((HttpRequestCodeException)ex).Response ?? "";
                         if (Response.Contains("authorization_declined"))
                         {
                             Finished(new Exception("$你拒绝了 PCL Next 申请的权限……"));

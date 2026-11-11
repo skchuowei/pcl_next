@@ -109,7 +109,7 @@ namespace PCL
                 ModMain.Hint("正在更改皮肤中，请稍候！");
                 return;
             }
-            if (ModLaunch.McLoginLoader.State == ModBase.LoadState.Failed)
+            if (ModLaunch.McLoginMsLoader.State == ModBase.LoadState.Failed)
             {
                 ModMain.Hint("登录失败，无法更改皮肤！", ModMain.HintType.Red);
                 return;
@@ -124,34 +124,49 @@ namespace PCL
         }
         private void EditSkin(ModMinecraft.McSkinInfo SkinInfo)
         {
+        int AuthenticationRetries = 0;
+        bool RetryPending = false;
         Retry:
             ;
 
             try
             {
+                RetryPending = false;
                 while (ModLaunch.McLoginMsLoader.State == ModBase.LoadState.Loading) // 等待登录结束
                     Thread.Sleep(10);
                 if (ModLaunch.McLoginMsLoader.State == ModBase.LoadState.Failed)
                     throw new Exception("登录失败", ModLaunch.McLoginMsLoader.Error);
+                if (string.IsNullOrWhiteSpace(Settings.Get<string>("CacheMsV2Access")))
+                    throw new System.IO.InvalidDataException("Microsoft 登录结果缺少访问令牌。");
                 string AccessToken = Settings.Get<string>("CacheMsV2Access");
                 string Uuid = Settings.Get<string>("CacheMsV2Uuid");
                 string Result = ModNet.NetRequestByClientRetry("https://api.minecraftservices.com/minecraft/profile/skins", HttpMethod.Post, Content: new MultipartFormDataContent() { { new StringContent(SkinInfo.IsSlim ? "slim" : "classic"), "variant" }, { new ByteArrayContent(FileUtils.ReadAsBytes(SkinInfo.LocalFile)), "file", PathUtils.GetLastPart(SkinInfo.LocalFile) } }, Headers: new[,] { { "Authorization", "Bearer " + AccessToken }, { "Accept", "*/*" }, { "User-Agent", "MojangSharp/0.1" } });
                 if (Result.Contains("request requires user authentication"))
                 {
+                    if (AuthenticationRetries++ >= 1)
+                        throw new InvalidOperationException("重新登录后仍无法更改皮肤。");
                     ModMain.Hint("正在重新登录，将在登录后自动更改皮肤……");
                     ModLaunch.McLoginMsLoader.Start(GetLoginData(), IsForceRestart: true);
+                    RetryPending = true;
                     goto Retry;
                 }
                 // 获取新皮肤地址
                 Logger.Info($"皮肤修改返回值：{Constants.vbCrLf}{Result}");
-                JObject ResultJson = (JObject)Result.DeserializeJson();
-                if (ResultJson.ContainsKey("errorMessage"))
-                    throw new Exception(ResultJson["errorMessage"].ToString()); // #5309
-                foreach (JObject Skin in ResultJson["skins"])
+                if (Result.DeserializeJson() is not JObject ResultJson)
+                    throw new System.IO.InvalidDataException("皮肤修改响应不是有效的 JSON 对象。");
+                string ErrorMessage = ResultJson["errorMessage"]?.ToString();
+                if (!string.IsNullOrEmpty(ErrorMessage))
+                    throw new Exception(ErrorMessage); // #5309
+                if (ResultJson["skins"] is not JArray Skins)
+                    throw new System.IO.InvalidDataException("皮肤修改响应缺少 skins 列表。");
+                foreach (var SkinToken in Skins)
                 {
-                    if (Skin["state"].ToString() == "ACTIVE")
+                    if (SkinToken is JObject Skin && Skin["state"]?.ToString() == "ACTIVE")
                     {
-                        MySkin.ReloadCache((string)Skin["url"]);
+                        string SkinUrl = Skin["url"]?.ToString();
+                        if (string.IsNullOrWhiteSpace(SkinUrl))
+                            throw new System.IO.InvalidDataException("当前皮肤资料缺少 url 字段。");
+                        MySkin.ReloadCache(SkinUrl);
                         return;
                     }
                 }
@@ -183,8 +198,14 @@ namespace PCL
                         case HttpStatusCode.Unauthorized:
                             {
                                 Logger.Warn(ex, "更改皮肤时遭遇 401 错误");
+                                if (AuthenticationRetries++ >= 1)
+                                {
+                                    ModMain.Hint("重新登录后仍无法更改皮肤，请稍后重试。", ModMain.HintType.Red);
+                                    return;
+                                }
                                 ModMain.Hint("正在重新登录，将在登录后自动更改皮肤……");
                                 ModLaunch.McLoginMsLoader.Start(GetLoginData(), IsForceRestart: true);
+                                RetryPending = true;
                                 goto Retry;
                                 // 原 VB 为 GoTo Retry，转换后追加的 break 永不执行（CS0162），故删除
                             }
@@ -201,7 +222,8 @@ namespace PCL
             }
             finally
             {
-                IsChanging = false;
+                if (!RetryPending)
+                    IsChanging = false;
             }
         }
 
@@ -226,7 +248,22 @@ namespace PCL
         // 刷新披风
         public void BtnSkinCapeRefresh_Click(object sender, RoutedEventArgs e)
         {
-            ModBase.RunInThread(() => { try { ModMain.Hint("正在刷新披风列表……"); if (ModLaunch.McLaunchLoader.State == ModBase.LoadState.Loading) { ModLaunch.McLoginMsLoader.WaitForExit(); } else { ModLaunch.McLoginMsLoader.WaitForExit(GetLoginData(), IsForceRestart: true); } ModMain.Hint("已刷新披风列表！", ModMain.HintType.Green); } catch (Exception ex) { Logger.Error(ex, "刷新披风列表失败", LogBehavior.Toast); } });
+            ModBase.RunInThread(() =>
+            {
+                try
+                {
+                    ModMain.Hint("正在刷新披风列表……");
+                    if (ModLaunch.McLoginMsLoader.State == ModBase.LoadState.Loading)
+                        ModLaunch.McLoginMsLoader.WaitForExit();
+                    else
+                        ModLaunch.McLoginMsLoader.WaitForExit(GetLoginData(), IsForceRestart: true);
+                    ModMain.Hint("已刷新披风列表！", ModMain.HintType.Green);
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error(ex, "刷新披风列表失败", LogBehavior.Toast);
+                }
+            });
         }
 
         #endregion

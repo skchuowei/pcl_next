@@ -175,7 +175,7 @@ namespace PCL
                     }
                 case FormMain.PageSubType.DownloadMod:
                     {
-                        if (ModMain.FrmDownloadMod is not null)
+                        if (ModMain.FrmDownloadMod?.Content is not null)
                         {
                             ModMain.FrmDownloadMod.Content.Storage = new ResourceSearcher.SearchResult();
                             ModMain.FrmDownloadMod.Content.Page = 0;
@@ -186,7 +186,7 @@ namespace PCL
                     }
                 case FormMain.PageSubType.DownloadPack:
                     {
-                        if (ModMain.FrmDownloadPack is not null)
+                        if (ModMain.FrmDownloadPack?.Content is not null)
                         {
                             ModMain.FrmDownloadPack.Content.Storage = new ResourceSearcher.SearchResult();
                             ModMain.FrmDownloadPack.Content.Page = 0;
@@ -197,7 +197,7 @@ namespace PCL
                     }
                 case FormMain.PageSubType.DownloadResourcePack:
                     {
-                        if (ModMain.FrmDownloadResourcePack is not null)
+                        if (ModMain.FrmDownloadResourcePack?.Content is not null)
                         {
                             ModMain.FrmDownloadResourcePack.Content.Storage = new ResourceSearcher.SearchResult();
                             ModMain.FrmDownloadResourcePack.Content.Page = 0;
@@ -208,7 +208,7 @@ namespace PCL
                     }
                 case FormMain.PageSubType.DownloadShader:
                     {
-                        if (ModMain.FrmDownloadShader is not null)
+                        if (ModMain.FrmDownloadShader?.Content is not null)
                         {
                             ModMain.FrmDownloadShader.Content.Storage = new ResourceSearcher.SearchResult();
                             ModMain.FrmDownloadShader.Content.Page = 0;
@@ -219,7 +219,7 @@ namespace PCL
                     }
                 case FormMain.PageSubType.DownloadDataPack:
                     {
-                        if (ModMain.FrmDownloadDataPack is not null)
+                        if (ModMain.FrmDownloadDataPack?.Content is not null)
                         {
                             ModMain.FrmDownloadDataPack.Content.Storage = new ResourceSearcher.SearchResult();
                             ModMain.FrmDownloadDataPack.Content.Page = 0;
@@ -237,6 +237,11 @@ namespace PCL
         {
             if (!this.ItemInstall.Checked)
                 return;
+            if (ModMain.FrmDownloadInstall is null)
+            {
+                Logger.Warn("安装下载页尚未初始化，无法退出选择模式");
+                return;
+            }
             ModMain.FrmDownloadInstall.ExitSelectPage();
         }
 

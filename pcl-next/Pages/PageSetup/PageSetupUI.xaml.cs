@@ -389,7 +389,7 @@ namespace PCL
         }
         public void MusicRefreshUI()
         {
-            if (this.PanBackgroundOpacity is null)
+            if (this.PanMusicVolume is null || this.PanMusicDetail is null || this.BtnMusicClear is null || this.CardMusic is null)
                 return;
             if (ModMusic.MusicAllList.Any())
             {
@@ -477,6 +477,12 @@ namespace PCL
         }
         private void BtnCustomRefresh_Click()
         {
+            if (ModMain.FrmLaunchRight is null)
+            {
+                Logger.Warn("刷新主页时主页面板尚未就绪");
+                ModMain.Hint("主页尚未就绪，请稍后重试", ModMain.HintType.Red);
+                return;
+            }
             ModMain.FrmLaunchRight.ForceRefresh();
             ModMain.Hint("已刷新主页！", ModMain.HintType.Green);
         }
@@ -641,7 +647,7 @@ namespace PCL
     /// </summary>
         public static void HiddenRefresh()
         {
-            if (ModMain.FrmMain.PanTitleSelect is null || !ModMain.FrmMain.PanTitleSelect.IsLoaded)
+            if (ModMain.FrmMain is null || ModMain.FrmMain.PanTitleSelect is null || !ModMain.FrmMain.PanTitleSelect.IsLoaded)
                 return;
             try
             {
@@ -661,7 +667,7 @@ namespace PCL
                     ModMain.FrmMain.BtnTitleSelect4.Visibility = !HiddenForceShow && Settings.Get<bool>("UiHiddenPageOther") ? Visibility.Collapsed : Visibility.Visible;
                 }
                 // 功能
-                ModMain.FrmLaunchLeft.RefreshButtonsUI();
+                ModMain.FrmLaunchLeft?.RefreshButtonsUI();
                 if (ModMain.FrmSetupUI is not null)
                 {
                     ModMain.FrmSetupUI.CardSwitch.Visibility = !HiddenForceShow && Settings.Get<bool>("UiHiddenFunctionHidden") ? Visibility.Collapsed : Visibility.Visible;
@@ -732,9 +738,9 @@ namespace PCL
                 }
                 // 各个页面的入口
                 if (ModMain.FrmMain.PageCurrent == (FormMain.PageStackData)FormMain.PageType.InstanceSelect)
-                    ModMain.FrmSelectRight.BtnEmptyDownload_Loaded();
+                    ModMain.FrmSelectRight?.BtnEmptyDownload_Loaded();
                 if (ModMain.FrmMain.PageCurrent == (FormMain.PageStackData)FormMain.PageType.Launch)
-                    ModMain.FrmLaunchLeft.RefreshButtonsUI();
+                    ModMain.FrmLaunchLeft?.RefreshButtonsUI();
                 if (ModMain.FrmMain.PageCurrent == (FormMain.PageStackData)FormMain.PageType.InstanceSetup && ModMain.FrmInstanceModDisabled is not null)
                     ModMain.FrmInstanceModDisabled.BtnDownload_Loaded();
                 // 备注

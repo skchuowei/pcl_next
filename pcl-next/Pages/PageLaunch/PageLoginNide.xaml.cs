@@ -14,10 +14,10 @@ namespace PCL
         {
             InitializeComponent();
             this.ComboName.TextChanged += (p1, p2) => ComboName_TextChanged((object)p1, (TextChangedEventArgs)p2);
+            UpdateRegisterButtonText();
             this.TextPass.PasswordChanged += (p1, p2) => TextPass_PasswordChanged((object)p1, (RoutedEventArgs)p2);
             this.ComboName.SelectionChanged += (p1, p2) => ComboName_SelectionChanged((MyComboBox)p1, (SelectionChangedEventArgs)p2);
             this.CheckRemember.Change += (p1, p2) => CheckBoxChange((MyCheckBox)p1, (object)p2);
-            this.ComboName.TextChanged += (p1, p2) => ComboName_TextChanged((object)p1, (TextChangedEventArgs)p2);
             this.BtnLink.Click += (p1, p2) => Btn_Click((object)p1, (EventArgs)p2);
         }
         private bool IsFirstLoad = true;
@@ -83,10 +83,11 @@ namespace PCL
         // 保存输入信息
         private void ComboName_TextChanged(object sender, TextChangedEventArgs e)
         {
-            if (Conversions.ToBoolean(Operators.ConditionalCompareObjectEqual(((dynamic)sender).Text, "", false)))
+            if (sender is MyComboBox comboBox && string.IsNullOrEmpty(comboBox.Text))
                 this.TextPass.Password = "";
             if (ModAnimation.AniControlEnabled == 0)
                 Settings.Set("CacheNideAccess", "");  // 迫使其不进行 Validate
+            UpdateRegisterButtonText();  // 迫使其不进行 Validate
         }
         private void TextPass_PasswordChanged(object sender, RoutedEventArgs e)
         {
@@ -101,7 +102,8 @@ namespace PCL
             }
             else
             {
-                this.TextPass.Password = Settings.Get<string>("LoginNidePass").Split("¨")[sender.SelectedIndex].Trim();
+                string[] Passwords = (Settings.Get<string>("LoginNidePass") ?? "").Split("¨");
+                this.TextPass.Password = sender.SelectedIndex < Passwords.Length ? Passwords[sender.SelectedIndex].Trim() : "";
             }
         }
         private void CheckBoxChange(MyCheckBox sender, object e)
@@ -111,7 +113,7 @@ namespace PCL
         }
 
         // 链接处理
-        private void ComboName_TextChanged()
+        private void UpdateRegisterButtonText()
         {
             this.BtnLink.Content = string.IsNullOrEmpty(this.ComboName.Text) ? "注册账号" : "找回密码";
         }
