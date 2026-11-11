@@ -162,16 +162,31 @@ jobs:
         dotnet test "PCL.Download.Tests\PCL.Download.Tests.csproj" -c ${{ matrix.configuration }} -r win-x64
         if ($LASTEXITCODE -ne 0) { throw "内核单测失败，退出码 $LASTEXITCODE" }
 
-    - name: Publish (self-contained single file)
+    - name: Publish win-x64 (self-contained single file)
       # 同 release.yml：pubxml 内的 RuntimeIdentifier 不能被 PclRidGuard 在求值期读到，
       # 必须显式传 -r win-x64，否则发布流水线在 restore 后直接报 RID 护栏错误。
       run: dotnet publish "pcl-next\pcl-next.csproj" -c ${{ matrix.configuration }} -r win-x64 -p:PclChannel=${{ steps.channel.outputs.channel }} -p:PublishProfile=win-x64-single
+
+    - name: Publish win-arm64 (self-contained single file)
+      # 双 RID 强制（《分支与发布规范》§5.3.1）：普通构建就要覆盖 arm64。
+      # 否则交叉发布链路（arm64 runtime pack 还原、crossgen2 交叉 R2R、单文件打包）
+      # 只在打 tag 那一刻第一次被验证，出错时已经没有回退余地。
+      # 只跑 Release：Debug 不产出发布制品，重复发布纯浪费 runner 时间。
+      if: matrix.configuration == 'Release'
+      run: dotnet publish "pcl-next\pcl-next.csproj" -c ${{ matrix.configuration }} -r win-arm64 -p:PclChannel=${{ steps.channel.outputs.channel }} -p:PublishProfile=win-arm64-single
 
     - name: Upload a Build Artifact
       uses: actions/upload-artifact@v7
       with:
         name: ${{ matrix.configuration }} ${{ steps.channel.outputs.channel }} ${{ env.describe }}
         path: pcl-next\publish\win-x64\${{ steps.channel.outputs.channel }}\pcl-next.exe
+
+    - name: Upload a Build Artifact (win-arm64)
+      if: matrix.configuration == 'Release'
+      uses: actions/upload-artifact@v7
+      with:
+        name: ${{ matrix.configuration }} ${{ steps.channel.outputs.channel }} ${{ env.describe }} (win-arm64)
+        path: pcl-next\publish\win-arm64\${{ steps.channel.outputs.channel }}\pcl-next.exe
 
   # Linux 内核跨平台护栏已拆到独立 workflow（kernel-guard.yml）：
   # Windows 线不再等 Linux 跑完，两条线各自出结论、各自重跑。

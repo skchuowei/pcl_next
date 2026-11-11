@@ -92,19 +92,27 @@ jobs:
             -RepoRoot "${{ GITHUB.WORKSPACE }}" `
             -CacheFile "${{ GITHUB.WORKSPACE }}\pcl-next\obj\pcl-build.small"
 
-    - name: Publish (self-contained single file)
+    - name: Publish win-x64 (self-contained single file)
       # 入口工程必须显式带 -r：pubxml 内的 RuntimeIdentifier 是后期属性，
       # Directory.Build.props 的 PclRidGuard 在求值期读不到，会直接报「未指定真实 RID」。
       # 详见 AGENTS §0.1 /《经验与踩坑》⑦。
       run: dotnet publish "pcl-next\pcl-next.csproj" -c Release -r win-x64 -p:PclChannel=${{ steps.channel.outputs.channel }} -p:PublishProfile=win-x64-single
 
-    - name: Prepare artifacts (exe + ini as separate files, not bundled)
+    - name: Publish win-arm64 (self-contained single file)
+      # 双 RID 强制要求（《分支与发布规范》§5.3.1，2026-11-11 用户裁决）。
+      # 必须用独立的 win-arm64-single profile：它的 PublishDir 是 publish\win-arm64\<渠道>\，
+      # 与 win-x64 分开，否则两个 RID 会互相覆盖，事后无法从路径分辨架构。
+      run: dotnet publish "pcl-next\pcl-next.csproj" -c Release -r win-arm64 -p:PclChannel=${{ steps.channel.outputs.channel }} -p:PublishProfile=win-arm64-single
+
+    - name: Prepare artifacts (x64 + arm64 + ini as separate files, not bundled)
       id: pack
       shell: pwsh
       run: |
-        # 制品命名：PCL-Next-<版本名>-<代号>-<构建号>.exe（《分支与发布规范》§5.2.1 / §5.3）
+        # 制品命名（《分支与发布规范》§5.2.1 / §5.3 / §5.3.1，2026-11-11 起强制双 RID）：
+        #   win-x64   → PCL-Next-<版本名>-<代号>-<构建号>.exe        ← 主附件，命名不可改（升级链依赖）
+        #   win-arm64 → PCL-Next-<版本名>-<代号>-<构建号>-arm64.exe  ← GitHub 附件名唯一，必须带 -arm64 后缀
         #   构建号让拿到 exe 的人直接看出它对应哪一次提交，不必再翻 Release 记录。
-        # 注意：exe 与 DownloadPolicy.ini 作为两个独立文件分别上传到 GitHub Release，不打包成 zip
+        # 注意：两个 exe 与 DownloadPolicy.ini 作为独立文件分别上传到 GitHub Release，不打包成 zip
         $version = (Select-String -Path "pcl-next\Modules\Base\ModBase.cs" -Pattern 'VersionBaseName = "([^"]+)"').Matches[0].Groups[1].Value
         $buildSmall = (& "scripts\Get-BuildSmallVersion.ps1" | Select-Object -First 1).Trim()
         $channel = switch -Regex ('${{ github.ref_name }}') {
@@ -120,25 +128,70 @@ jobs:
           "SP$patch"
         } else { $channel }
         $name = "PCL-Next-$version-$suffix-$buildSmall"
-        $publishDir = "pcl-next\publish\win-x64\${{ steps.channel.outputs.channel }}"
+        $armName = "$name-arm64"
+        $x64Dir = "pcl-next\publish\win-x64\${{ steps.channel.outputs.channel }}"
+        $armDir = "pcl-next\publish\win-arm64\${{ steps.channel.outputs.channel }}"
         New-Item -ItemType Directory -Path "out" -Force | Out-Null
-        # exe：重命名为带版本与代号的主程序（GitHub Release 主附件）
-        Copy-Item "$publishDir\pcl-next.exe" "out\$name.exe" -Force
-        "exe=$name.exe" >> $env:GITHUB_OUTPUT
-        # ini：部署期可选开关，作为独立附件上传（缺失时 exe 走内置默认，仍可运行）
-        Copy-Item "$publishDir\DownloadPolicy.ini" "out\DownloadPolicy.ini" -Force -ErrorAction SilentlyContinue
-        if (Test-Path "out\DownloadPolicy.ini") { "ini=DownloadPolicy.ini" >> $env:GITHUB_OUTPUT }
-        Write-Host "制品：$name.exe$(if (Test-Path 'out\DownloadPolicy.ini') { ' + DownloadPolicy.ini（分别独立上传）' })"
 
-    - name: Create GitHub Release (exe + ini as separate assets)
+        # 两个 RID 的产物缺一个就直接失败：禁止「这次先只发 x64」的降级（§5.3.1 第 5 条）
+        foreach ($pair in @(@{ Dir = $x64Dir; Rid = 'win-x64' }, @{ Dir = $armDir; Rid = 'win-arm64' })) {
+          $src = Join-Path $pair.Dir 'pcl-next.exe'
+          if (-not (Test-Path $src)) {
+            Write-Host "::error::缺少 $($pair.Rid) 的发布产物：$src —— 双 RID 是硬要求（§5.3.1）"
+            exit 1
+          }
+        }
+
+        # exe：重命名为带版本与代号的主程序（GitHub Release 主附件）
+        Copy-Item "$x64Dir\pcl-next.exe" "out\$name.exe" -Force
+        Copy-Item "$armDir\pcl-next.exe" "out\$armName.exe" -Force
+
+        # 架构断言（§5.3.1 机械校验）：只认 PE Machine，不看体积——
+        # x64 与 arm64 单文件大小天然不同（约 83 MB vs 78 MB），体积差异不是失败信号。
+        function Get-PEMachine([string]$Path) {
+          # 必须先转绝对路径：[IO.File] 读的是进程工作目录，不是 PowerShell 的 location，
+          # 直接喂相对路径在 runner 上会解析到别处（2026-11-11 本地实测踩到）。
+          $full = (Resolve-Path -LiteralPath $Path).ProviderPath
+          $fs = [IO.File]::OpenRead($full)
+          try {
+            $br = [IO.BinaryReader]::new($fs)
+            $fs.Position = 0x3C
+            $peOffset = $br.ReadInt32()
+            $fs.Position = $peOffset + 4
+            return $br.ReadUInt16()
+          } finally { $fs.Dispose() }
+        }
+        $x64Machine = Get-PEMachine "out\$name.exe"
+        $armMachine = Get-PEMachine "out\$armName.exe"
+        Write-Host ("x64  PE Machine = 0x{0:X4}（{1:N0} B）" -f $x64Machine, (Get-Item "out\$name.exe").Length)
+        Write-Host ("arm64 PE Machine = 0x{0:X4}（{1:N0} B）" -f $armMachine, (Get-Item "out\$armName.exe").Length)
+        if ($x64Machine -ne 0x8664) {
+          Write-Host "::error::$name.exe 的 PE Machine 为 0x$('{0:X4}' -f $x64Machine)，期望 0x8664（x64）"
+          exit 1
+        }
+        if ($armMachine -ne 0xAA64) {
+          Write-Host "::error::$armName.exe 的 PE Machine 为 0x$('{0:X4}' -f $armMachine)，期望 0xAA64（ARM64）"
+          exit 1
+        }
+        "exe=$name.exe" >> $env:GITHUB_OUTPUT
+        "armexe=$armName.exe" >> $env:GITHUB_OUTPUT
+
+        # ini：部署期可选开关，作为独立附件上传（缺失时 exe 走内置默认，仍可运行）。
+        # 两个 RID 共用同一份，不重复上传。
+        Copy-Item "$x64Dir\DownloadPolicy.ini" "out\DownloadPolicy.ini" -Force -ErrorAction SilentlyContinue
+        if (Test-Path "out\DownloadPolicy.ini") { "ini=DownloadPolicy.ini" >> $env:GITHUB_OUTPUT }
+        Write-Host "制品：$name.exe（win-x64） + $armName.exe（win-arm64）$(if (Test-Path 'out\DownloadPolicy.ini') { ' + DownloadPolicy.ini（分别独立上传）' })"
+
+    - name: Create GitHub Release (x64 + arm64 + ini as separate assets)
       shell: pwsh
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         $notes = "ReleaseNotes\${{ github.ref_name }}.md"
-        # 附件分别上传：主程序 exe + 可选的 DownloadPolicy.ini（不打包在一起）
+        # 附件分别上传：两个 RID 的主程序 exe + 可选的 DownloadPolicy.ini（不打包在一起）
         # 直接用扁平数组拼接，避免嵌套数组导致路径被拼成一个参数
         $args = @('release', 'create', '${{ github.ref_name }}', "out\${{ steps.pack.outputs.exe }}")
+        if ('${{ steps.pack.outputs.armexe }}' -ne '') { $args += "out\${{ steps.pack.outputs.armexe }}" }
         if ('${{ steps.pack.outputs.ini }}' -ne '') { $args += "out\${{ steps.pack.outputs.ini }}" }
         $args += '--verify-tag', '--title', '${{ github.ref_name }}'
         if (Test-Path $notes) { $args += '--notes-file', $notes } else { $args += '--generate-notes' }
