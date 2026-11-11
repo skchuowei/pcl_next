@@ -63,7 +63,7 @@ namespace PCL
         #region 加载器
 
         private ModLoader.LoaderBase PageLoader;
-        private object PageLoaderInputInvoke;
+        private Action<object, bool> PageLoaderRestartAction;
         private MyLoading PageLoaderUi;
         private FrameworkElement PanLoader;
         private FrameworkElement PanContent;
@@ -88,7 +88,11 @@ namespace PCL
             this.PanAlways = PanAlways;
             PageLoader = RealLoader;
             PageLoaderUi = LoaderUi;
-            PageLoaderInputInvoke = InputInvoke;
+            PageLoaderRestartAction = (Input, IsForceRestart) =>
+            {
+                var TypedInput = Conversions.ToGenericParameter<TIn>(Input);
+                RealLoader.Start(RealLoader.StartGetInput(TypedInput, InputInvoke), IsForceRestart);
+            };
             PageLoaderAutoRun = AutoRun;
             // 添加结束 Invoke
             if (FinishedInvoke is not null)
@@ -111,7 +115,7 @@ namespace PCL
             if (PageLoaderAutoRun)
             {
                 // 上下两个重载只有这里不一样
-                PageLoader.Start(RealLoader.StartGetInput(default, (Func<TIn>)PageLoaderInputInvoke));
+                PageLoader.Start(RealLoader.StartGetInput(default, InputInvoke));
             }
             if (PageLoader.State == ModBase.LoadState.Finished && FinishedInvoke is not null)
             {
@@ -138,7 +142,13 @@ namespace PCL
             this.PanAlways = PanAlways;
             PageLoader = RealLoader;
             PageLoaderUi = LoaderUi;
-            PageLoaderInputInvoke = InputInvoke;
+            PageLoaderRestartAction = (Input, IsForceRestart) =>
+            {
+                var TypedInput = Conversions.ToGenericParameter<TIn>(Input);
+                if ((Input is null || EqualityComparer<TIn>.Default.Equals(TypedInput, default)) && InputInvoke is not null)
+                    TypedInput = InputInvoke();
+                RealLoader.Start(TypedInput, IsForceRestart);
+            };
             PageLoaderAutoRun = AutoRun;
             // 添加结束 Invoke
             if (FinishedInvoke is not null)
@@ -162,8 +172,8 @@ namespace PCL
             {
                 // 上下两个重载只有这里不一样
                 object Input = null;
-                if (PageLoaderInputInvoke is not null)
-                    Input = ((dynamic)this.PageLoaderInputInvoke)();
+                if (InputInvoke is not null)
+                    Input = InputInvoke();
                 PageLoader.Start(Input);
             }
             if (PageLoader.State == ModBase.LoadState.Finished && FinishedInvoke is not null)
@@ -179,16 +189,9 @@ namespace PCL
         {
             if (!PageLoaderAutoRun)
                 return;
-            if (GeneralUtils.IsGenericInstanceOf(PageLoader, typeof(ModLoader.LoaderTask<,>)) || PageLoader is ModLoader.LoaderWorker)
-            {
-                PageLoader.Start(((dynamic)((object)PageLoader)).StartGetInput(Input, PageLoaderInputInvoke), IsForceRestart: IsForceRestart);
-            }
-            else
-            {
-                if (Input is null && PageLoaderInputInvoke is not null)
-                    Input = ((dynamic)this.PageLoaderInputInvoke)();
-                PageLoader.Start(Input, IsForceRestart: IsForceRestart);
-            }
+            if (PageLoaderRestartAction is null)
+                throw new InvalidOperationException("页面加载器尚未初始化，无法重启。");
+            PageLoaderRestartAction(Input, IsForceRestart);
         }
 
         #endregion

@@ -439,3 +439,9 @@
 - 实例导出、实例切页、RAM 刷新、设置音乐刷新和帮助页面增加生命周期/目录访问守卫；Auth/Nide、Microsoft 登录及皮肤/披风处理增加索引、响应结构、资源释放与有界重试保护。
 - 五个下载详情空桩未复活；`PageOtherTest` 既有下线提示和 `PageResource` 既有空结果处理均未重复改动。
 - 最终验证：标准 Windows `pcl-next.csproj` Release `win-x64` 构建成功，0 错误 / 30 警告；输出为 `pcl-next\bin-net10\Dev\2.100.0.6-0.87\win-x64\`。最后一处 UI 空值守卫后，运行中的 `pcl-next.exe` 锁定输出文件；不结束用户进程，改以 `dotnet build -t:Compile` 完成最终源码编译（0 错误）。`PCL.Download.Tests` 568/568 通过。
+
+## 十二、Fabric API 加载重试的泛型输入错误
+
+- **现象**：Fabric API 等 `LoaderTask<int, List<...>>` 加载失败后重试，`PageLoaderRestart` 通过 `dynamic` 将 `object` 和装箱的输入委托传给泛型 `StartGetInput`，运行时重载解析失败；截图显示动画回调报错。
+- **修复**：`MyPageRight.PageLoaderInit<TIn,TOut>` 绑定强类型重启委托，输入转换遵循加载器既有 `Conversions.ToGenericParameter<TIn>` 路径；`LoaderCombo<TIn>` 使用对应的泛型输入回调，不再尝试动态调用不存在的 `StartGetInput`。
+- **验证**：Windows Release 项目完整构建通过，0 错误 / 30 警告；本次关闭输出复制以避开仍运行程序锁定的产物文件；不改变 Windows 以外的平台。
