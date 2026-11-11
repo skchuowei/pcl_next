@@ -246,6 +246,15 @@ namespace PCL
                 Logger.Info($"开始可视化{TypeNameSpaced}列表，已储藏 {Storage.Results.Count} 个结果，当前在第 {Page + 1} 页");
                 // 列表项
                 this.PanProjects.Children.Clear();
+                if (Storage.Results.Count == 0)
+                {
+                    this.CardPages.Visibility = Visibility.Collapsed;
+                    this.HintError.Visibility = Storage.ErrorMessage is null ? Visibility.Collapsed : Visibility.Visible;
+                    if (Storage.ErrorMessage is not null)
+                        this.HintError.Text = Storage.ErrorMessage;
+                    this.ScrollToTop();
+                    return;
+                }
                 int Index = Math.Min(Page * PAGE_SIZE, Storage.Results.Count - 1);
                 foreach (var Result in Storage.Results.GetRange(Index, Math.Min(Storage.Results.Count - Index, PAGE_SIZE)))
                     this.PanProjects.Children.Add(Result.ToResourceItem(ShowMcVersionDesc: Loader.Input.GameVersion is null, ShowLoaderDesc: Loader.Input.ModLoaders == ModLoaders.None && (PageType == ResourceTypes.Mod || PageType == ResourceTypes.ModPack)));

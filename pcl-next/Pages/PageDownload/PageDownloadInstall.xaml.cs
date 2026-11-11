@@ -979,10 +979,7 @@ namespace PCL
                     return;
                 // 获取版本列表
                 var Versions = new List<ModDownload.DlLiteLoaderListEntry>();
-                var liteLoaderOutput = ModDownload.DlLiteLoaderListLoader.Output;
-                if (liteLoaderOutput?.Value is null)
-                    return;
-                foreach (ModDownload.DlLiteLoaderListEntry Version in liteLoaderOutput.Value)
+                foreach (ModDownload.DlLiteLoaderListEntry Version in ModDownload.DlLiteLoaderListLoader.Output.Value)
                 {
                     if ((Version.Inherit ?? "") == (VanillaName ?? ""))
                         Versions.Add(Version);
@@ -1199,10 +1196,7 @@ namespace PCL
             if (this.GetLoaderError(this.LoadFabric) is not null)
                 return this.GetLoaderError(this.LoadFabric);
             // 检查版本
-            var fabricOutput = ModDownload.DlFabricListLoader.Output;
-            if (fabricOutput?.Value is null)
-                return "无";
-            var gameNode = fabricOutput.Value["game"];
+            var gameNode = ModDownload.DlFabricListLoader.Output.Value["game"];
             if (gameNode is null)
                 return "无";
             foreach (JObject Version in gameNode)
@@ -1236,10 +1230,7 @@ namespace PCL
                 if (ModDownload.DlFabricListLoader.State != ModBase.LoadState.Finished)
                     return;
                 // 获取版本列表
-                var fabricOutput = ModDownload.DlFabricListLoader.Output;
-                if (fabricOutput?.Value is null)
-                    return;
-                JArray Versions = fabricOutput.Value["loader"] as JArray;
+                JArray Versions = ModDownload.DlFabricListLoader.Output.Value["loader"] as JArray;
                 if (Versions is null || !Versions.Any())
                     return;
                 // 可视化

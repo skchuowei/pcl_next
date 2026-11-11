@@ -157,32 +157,44 @@ namespace PCL
                     case FormMain.PageSubType.DownloadMod:
                         {
                             TargetType = ResourceTypes.Mod;
-                            TargetInstance = ModMain.FrmDownloadMod.Content.Loader.Input.GameVersion;
-                            TargetLoader = ModMain.FrmDownloadMod.Content.Loader.Input.ModLoaders;
+                            var modPage = ModMain.FrmDownloadMod;
+                            if (modPage is not null)
+                            {
+                                TargetInstance = modPage.Content?.Loader?.Input?.GameVersion;
+                                TargetLoader = modPage.Content?.Loader?.Input?.ModLoaders ?? ModLoaders.None;
+                            }
                             break;
                         }
                     case FormMain.PageSubType.DownloadPack:
                         {
                             TargetType = ResourceTypes.ModPack;
-                            TargetInstance = ModMain.FrmDownloadPack.Content.Loader.Input.GameVersion;
+                            var packPage = ModMain.FrmDownloadPack;
+                            if (packPage is not null)
+                                TargetInstance = packPage.Content?.Loader?.Input?.GameVersion;
                             break;
                         }
                     case FormMain.PageSubType.DownloadDataPack:
                         {
                             TargetType = ResourceTypes.DataPack;
-                            TargetInstance = ModMain.FrmDownloadDataPack.Content.Loader.Input.GameVersion;
+                            var dataPackPage = ModMain.FrmDownloadDataPack;
+                            if (dataPackPage is not null)
+                                TargetInstance = dataPackPage.Content?.Loader?.Input?.GameVersion;
                             break;
                         }
                     case FormMain.PageSubType.DownloadResourcePack:
                         {
                             TargetType = ResourceTypes.ResourcePack;
-                            TargetInstance = ModMain.FrmDownloadResourcePack.Content.Loader.Input.GameVersion;
+                            var resourcePackPage = ModMain.FrmDownloadResourcePack;
+                            if (resourcePackPage is not null)
+                                TargetInstance = resourcePackPage.Content?.Loader?.Input?.GameVersion;
                             break;
                         }
                     case FormMain.PageSubType.DownloadShader:
                         {
                             TargetType = ResourceTypes.Shader;
-                            TargetInstance = ModMain.FrmDownloadShader.Content.Loader.Input.GameVersion;
+                            var shaderPage = ModMain.FrmDownloadShader;
+                            if (shaderPage is not null)
+                                TargetInstance = shaderPage.Content?.Loader?.Input?.GameVersion;
                             break;
                         }
                 }

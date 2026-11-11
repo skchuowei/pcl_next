@@ -440,10 +440,7 @@ namespace PCL
                 return;
             Task.Progress = 0.7d;
             // Minecraft
-            var clientOutput = ModDownload.DlClientListLoader.Output;
-            if (clientOutput?.Value is null)
-                return;
-            MinecraftVersions = (JArray)clientOutput.Value["versions"].DeepClone();
+            MinecraftVersions = (JArray)ModDownload.DlClientListLoader.Output.Value["versions"].DeepClone();
             VanillaData = MinecraftVersions.OfType<JObject>().FirstOrDefault(v => (v["id"]?.ToString().Replace("∞", "infinite") ?? "") == (MinecraftVersion.Replace("∞", "infinite") ?? ""));
             if (VanillaData is null)
                 throw new Exception($"Minecraft 列表中没有已安装的 {MinecraftVersion}");
@@ -476,21 +473,15 @@ namespace PCL
             // NeoForge
             if (Components.ModLoaderVersions.ContainsKey(ModLoaders.NeoForge))
             {
-                var neoOutput = ModDownload.DlNeoForgeListLoader.Output;
-                if (neoOutput?.Value is null)
-                    throw new Exception($"NeoForge 列表中没有已安装的 {Components.ModLoaderVersions[ModLoaders.NeoForge]}");
-                SelectedNeoForge = neoOutput.Value.FirstOrDefault(v => (v.Inherit ?? "") == (MinecraftVersion ?? "") && (v.VersionName ?? "") == (Components.ModLoaderVersions[ModLoaders.NeoForge] ?? ""));
+                SelectedNeoForge = ModDownload.DlNeoForgeListLoader.Output.Value.FirstOrDefault(v => (v.Inherit ?? "") == (MinecraftVersion ?? "") && (v.VersionName ?? "") == (Components.ModLoaderVersions[ModLoaders.NeoForge] ?? ""));
                 if (SelectedNeoForge is null)
                     throw new Exception($"NeoForge 列表中没有已安装的 {Components.ModLoaderVersions[ModLoaders.NeoForge]}");
             }
             // Fabric
             if (Components.ModLoaderVersions.ContainsKey(ModLoaders.Fabric))
             {
-                var fabricOutput = ModDownload.DlFabricListLoader.Output;
-                if (fabricOutput?.Value is null)
-                    throw new Exception($"Fabric 列表中没有已安装的 {Components.ModLoaderVersions[ModLoaders.Fabric]}");
-                var fabricLoader = fabricOutput.Value["loader"];
-                var fabricGame = fabricOutput.Value["game"];
+                var fabricLoader = ModDownload.DlFabricListLoader.Output.Value["loader"];
+                var fabricGame = ModDownload.DlFabricListLoader.Output.Value["game"];
                 if (fabricLoader is null || fabricGame is null)
                     throw new Exception($"Fabric 列表中没有已安装的 {Components.ModLoaderVersions[ModLoaders.Fabric]}");
                 var FabricEntry = fabricLoader.OfType<JObject>().FirstOrDefault(v => (v["version"]?.ToString() ?? "") == (Components.ModLoaderVersions[ModLoaders.Fabric] ?? ""), v => (v["version"]?.ToString().Replace("+build", "") ?? "") == (Components.ModLoaderVersions[ModLoaders.Fabric] ?? ""));
@@ -503,10 +494,7 @@ namespace PCL
             // LiteLoader
             if (Components.ModLoaderVersions.ContainsKey(ModLoaders.LiteLoader))
             {
-                var liteOutput = ModDownload.DlLiteLoaderListLoader.Output;
-                if (liteOutput?.Value is null)
-                    throw new Exception($"LiteLoader 列表中没有已安装的 {Components.ModLoaderVersions[ModLoaders.LiteLoader]}");
-                SelectedLiteLoader = liteOutput.Value.FirstOrDefault(v => (v.Inherit ?? "") == (MinecraftVersion ?? "") && (v.JsonToken?["version"]?.ToString() ?? "") == (Components.ModLoaderVersions[ModLoaders.LiteLoader] ?? ""));
+                SelectedLiteLoader = ModDownload.DlLiteLoaderListLoader.Output.Value.FirstOrDefault(v => (v.Inherit ?? "") == (MinecraftVersion ?? "") && (v.JsonToken?["version"]?.ToString() ?? "") == (Components.ModLoaderVersions[ModLoaders.LiteLoader] ?? ""));
                 if (SelectedLiteLoader is null)
                     throw new Exception($"LiteLoader 列表中没有已安装的 {Components.ModLoaderVersions[ModLoaders.LiteLoader]}");
             }
@@ -802,10 +790,7 @@ namespace PCL
                         {
                             if (SelectedFabric is null && LoadFabricGetError() is null)
                             {
-                                var fabricOutput = ModDownload.DlFabricListLoader.Output;
-                                if (fabricOutput?.Value is null)
-                                    return;
-                                var fabricLoader = fabricOutput.Value["loader"];
+                                var fabricLoader = ModDownload.DlFabricListLoader.Output.Value["loader"];
                                 if (fabricLoader is null)
                                     return;
                                 var Versions = fabricLoader.OfType<JObject>();
@@ -834,10 +819,7 @@ namespace PCL
                         {
                             if (SelectedNeoForge is null && LoadNeoForgeGetError() is null)
                             {
-                                var neoOutput = ModDownload.DlNeoForgeListLoader.Output;
-                                if (neoOutput?.Value is null)
-                                    return;
-                                var Versions = neoOutput.Value.Where(v => (v.Inherit ?? "") == (VanillaName ?? ""));
+                                var Versions = ModDownload.DlNeoForgeListLoader.Output.Value.Where(v => (v.Inherit ?? "") == (VanillaName ?? ""));
                                 SelectedNeoForge = Versions.FirstOrDefault(v => (v.VersionName ?? "") == (Version ?? "")) ?? Versions.FirstOrDefault();
                             }
                         }
@@ -845,10 +827,7 @@ namespace PCL
                         {
                             if (SelectedLiteLoader is null && LoadLiteLoaderGetError() is null)
                             {
-                                var liteOutput = ModDownload.DlLiteLoaderListLoader.Output;
-                                if (liteOutput?.Value is null)
-                                    return;
-                                var Versions = liteOutput.Value.Where(v => (v.Inherit ?? "") == (VanillaName ?? ""));
+                                var Versions = ModDownload.DlLiteLoaderListLoader.Output.Value.Where(v => (v.Inherit ?? "") == (VanillaName ?? ""));
                                 SelectedLiteLoader = Versions.FirstOrDefault(v => (v.JsonToken?["version"]?.ToString() ?? "") == (Version ?? "")) ?? Versions.FirstOrDefault();
                             }
                         }
@@ -918,11 +897,8 @@ namespace PCL
                 if (((dynamic)Loader).Kind == ModLoaders.Fabric && OldVersion is not null)
                 {
                     string TargetVersion = VanillaName.Replace("∞", "infinite").Replace("Combat Test 7c", "1.16_combat-3");
-                    var fabricOutput = ModDownload.DlFabricListLoader.Output;
-                    if (fabricOutput?.Value is null)
-                        return;
-                    var fabricLoader = fabricOutput.Value["loader"];
-                    var fabricGame = fabricOutput.Value["game"];
+                    var fabricLoader = ModDownload.DlFabricListLoader.Output.Value["loader"];
+                    var fabricGame = ModDownload.DlFabricListLoader.Output.Value["game"];
                     CanRestore = this.CardFabric.Visibility == Visibility.Visible && this.CardFabric.MainSwap.Visibility == Visibility.Visible && (fabricLoader?.OfType<JObject>().Any(v => (v["version"]?.ToString() ?? "") == (OldVersion ?? "")) ?? false) && (fabricGame?.OfType<JObject>().Any(v => (v["version"]?.ToString() ?? "") == (TargetVersion ?? "")) ?? false);
                 }
                 this.ShowComparison(((dynamic)Loader).ComparePanel, ((dynamic)Loader).CurrentPanel, OldVersion, NewVersion, ((dynamic)Loader).Label.Text, ((dynamic)Loader).RestoreButton, CanRestore, ((dynamic)Loader).ClearButton);
