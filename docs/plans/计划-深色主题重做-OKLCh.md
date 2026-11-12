@@ -188,3 +188,47 @@
   赞助链接；`docs/合规/跨平台授权问询.md` 的暂不发送决定继续有效。
 - 本轮为 Windows 自用改版的本地 UI 计算逻辑，不涉及 MC 本体下载门控、
   遥测、自动更新等合规敏感链路。
+
+## 9. 首轮验收反馈与交互修正（2026-11-12 14:00）
+
+### 现象
+
+用户在设置页点击「新版（OKLCh）/ 旧版（HSL）」后反馈「没反应」。截图显示当时主题为
+「龙猫蓝」（亮色），「深色」未选中。
+
+### 根因（已确证，非绑定 bug）
+
+- `ModSecret.UseLegacyDark` 的判定为 `ThemeNow == ThemeDarkId && ... == 1`。
+  亮色主题下 `ThemeNow != 100`，两套深色配色都不参与计算，切换只改变配置值，
+  `ThemeRefresh()` 重算出的资源与之前完全一致，因此零视觉变化。
+- 现场证据：运行目录 `2.100.0.6-0.92-blur/win-x64/PCL/Setup.ini` 中已写入
+  `UiDarkThemeVariant:0`，而 `UiLauncherTheme` 键不存在（默认 0 亮色）。
+  说明 `MyRadioBox → SettingService.SaveSetting → Settings.Set → OnChanged` 链路正常，
+  配置持久化成功，问题纯粹是「生效条件不可见」造成的体验缺陷。
+- 原先 Tooltip 写「仅当主题选择「深色」时生效」，信息太弱，用户不会先去改主题。
+
+### 修正
+
+- `PageSetupUI.xaml.cs` 订阅两个单选的 `Check` 与 `PreviewCheck`：
+  当前不是深色主题时，自动 `Settings.Set("UiLauncherTheme", ThemeDarkId)`，
+  由 `UiLauncherTheme.OnChanged → ThemeRefresh(100)` 应用刚选中的配色，点一下即见效。
+  `MyRadioBox` 构造函数先订阅了 `SaveSetting`，故回调执行时 `UiDarkThemeVariant`
+  已写入缓存，`ThemeRefresh(100)` 读到的是新值，不会出现「切了主题但配色是旧的」。
+- 重复点击已选中项时 `IsChanged == false`、`Check` 不触发，由 `PreviewCheck` 补一次，
+  保证任何点击都有反馈。
+- 只调用 `SettingService.RefreshSettings(PanLauncherTheme)` 同步主题单选选中态，
+  不用整页 `RefreshSettings`，避免触发其它控件的 `Change` 回写；刷新期间临时抬高
+  `ModAnimation.AniControlEnabled` 以阻止 `RefreshSetting → Check → SaveSetting`。
+- 切换后给一条 `ModMain.Hint` 明确告知当前使用的配色版本。
+- 两处 Tooltip 改为「选择后自动切换到深色主题」，让预期与实际行为一致。
+- 已是深色主题时不额外动作：`Settings` 的 `OnChanged` 已经即时 `ThemeRefresh()`。
+
+### 验证
+
+- `dotnet build pcl-next/pcl-next.csproj -c Release -r win-x64 --self-contained` →
+  0 错误 / 26 个既有警告，无本轮新增警告。
+- 产物 `pcl-next/bin-net10/Dev/2.100.0.6-0.90/win-x64/`：二进制中可检出
+  `DarkVariant_Apply` 与提示字符串；`0.92-blur` / `0.93-blur2` 两份旧件不含本修复，
+  验收必须改用新目录的 exe。
+- 待用户 GUI 验收：亮色下点「旧版」应立刻变为旧版深色并弹提示；再点「新版」
+  应立刻变为新版深色；切回「龙猫蓝」亮色零回归；重启后保持。
