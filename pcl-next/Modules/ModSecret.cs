@@ -100,6 +100,12 @@ namespace PCL
         /// </summary>
         public const int ThemeDarkId = 100;
 
+        /// <summary>
+        /// 深色主题是否使用旧版 HSL 配色（设置项 UiDarkThemeVariant = 1）。
+        /// 默认 0 使用 OKLCh 感知均匀调色板；旧版原样保留重做前的配色，便于对比与回退。
+        /// </summary>
+        public static bool UseLegacyDark => ThemeNow == ThemeDarkId && Settings.Get<int>("UiDarkThemeVariant") == 1;
+
         public static void ThemeRefresh(int NewTheme = -1)
         {
             try
@@ -110,26 +116,51 @@ namespace PCL
                     ThemeNow = NewTheme;
 
                 bool IsDark = ThemeNow == ThemeDarkId;
-                if (IsDark)
+                // 深色有两套配色：旧版 HSL（重做前的原样）与新版 OKLCh（参照 PCL2-CE 的
+                // ToneProfile.DefaultDark）。由设置项 UiDarkThemeVariant 切换，默认新版。
+                // 亮色分支逐行保持原 HSL 计算，确保切回「龙猫蓝」等亮色主题零回归。
+                bool LegacyDark = UseLegacyDark;
+                ModDarkPalette Pal = (IsDark && !LegacyDark) ? ModOklch.CreateDarkPalette() : null;
+                double SurSat = ColorSat * 0.1d;
+                if (LegacyDark)
                 {
-                    // 深色主题：中性面亮度整体反转，强调色略提亮以补偿深底上的对比度
-                    Color1 = new ModBase.MyColor().FromHSL2(ColorHue, ColorSat * 0.15d, 88d);
-                    Color2 = new ModBase.MyColor().FromHSL2(ColorHue, ColorSat, 72d);
-                    Color3 = new ModBase.MyColor().FromHSL2(ColorHue, ColorSat, 62d);
-                    Color4 = new ModBase.MyColor().FromHSL2(ColorHue, ColorSat, 76d);
-                    Color5 = new ModBase.MyColor().FromHSL2(ColorHue, ColorSat * 0.6d, 45d);
-                    Color6 = new ModBase.MyColor().FromHSL2(ColorHue, ColorSat * 0.35d, 21d);
-                    Color7 = new ModBase.MyColor().FromHSL2(ColorHue, ColorSat * 0.3d, 17d);
-                    Color8 = new ModBase.MyColor().FromHSL2(ColorHue, ColorSat * 0.25d, 14d);
-                    ColorBg0 = new ModBase.MyColor().FromHSL2(ColorHue, ColorSat * 0.3d, 30d);
-                    ColorGray1 = new ModBase.MyColor(230d, 230d, 230d);
-                    ColorGray2 = new ModBase.MyColor(184d, 184d, 184d);
-                    ColorGray3 = new ModBase.MyColor(153d, 153d, 153d);
-                    ColorGray4 = new ModBase.MyColor(122d, 122d, 122d);
-                    ColorGray5 = new ModBase.MyColor(77d, 77d, 77d);
-                    ColorGray6 = new ModBase.MyColor(51d, 51d, 51d);
-                    ColorGray7 = new ModBase.MyColor(42d, 42d, 42d);
-                    ColorGray8 = new ModBase.MyColor(36d, 36d, 36d);
+                    Color1 = new ModBase.MyColor().FromHSL2(ColorHue, ColorSat * 0.06d, 90d);   // 主文字
+                    Color2 = new ModBase.MyColor().FromHSL2(ColorHue, ColorSat * 0.9d, 70d);    // 强调文字
+                    Color3 = new ModBase.MyColor().FromHSL2(ColorHue, ColorSat * 0.9d, 58d);    // 主色
+                    Color4 = new ModBase.MyColor().FromHSL2(ColorHue, ColorSat * 0.85d, 70d);   // 主色悬停
+                    Color5 = new ModBase.MyColor().FromHSL2(ColorHue, SurSat * 1.5d, 29d);      // 分隔线 / 弱边框
+                    Color6 = new ModBase.MyColor().FromHSL2(ColorHue, SurSat * 1.2d, 23d);      // 悬停面
+                    Color7 = new ModBase.MyColor().FromHSL2(ColorHue, SurSat, 19d);             // 输入框 / 列表
+                    Color8 = new ModBase.MyColor().FromHSL2(ColorHue, SurSat * 0.8d, 13d);      // 页面底
+                    ColorBg0 = new ModBase.MyColor().FromHSL2(ColorHue, SurSat * 1.2d, 27d);    // 输入框边框
+                    ColorGray1 = new ModBase.MyColor(226d, 226d, 229d);
+                    ColorGray2 = new ModBase.MyColor(176d, 176d, 180d);
+                    ColorGray3 = new ModBase.MyColor(146d, 146d, 150d);
+                    ColorGray4 = new ModBase.MyColor(112d, 112d, 116d);
+                    ColorGray5 = new ModBase.MyColor(74d, 74d, 78d);
+                    ColorGray6 = new ModBase.MyColor(48d, 48d, 52d);
+                    ColorGray7 = new ModBase.MyColor(40d, 40d, 44d);
+                    ColorGray8 = new ModBase.MyColor(34d, 34d, 38d);
+                }
+                else if (IsDark)
+                {
+                    Color1 = Pal.C1;   // 主文字
+                    Color2 = Pal.C2;   // 强调文字
+                    Color3 = Pal.C3;   // 主色
+                    Color4 = Pal.C4;   // 主色悬停
+                    Color5 = Pal.C5;   // 分隔线 / 弱边框
+                    Color6 = Pal.C6;   // 悬停面
+                    Color7 = Pal.C7;   // 输入框 / 列表
+                    Color8 = Pal.C8;   // 页面底
+                    ColorBg0 = Pal.Bg0;   // 输入框边框
+                    ColorGray1 = Pal.Gray1;
+                    ColorGray2 = Pal.Gray2;
+                    ColorGray3 = Pal.Gray3;
+                    ColorGray4 = Pal.Gray4;
+                    ColorGray5 = Pal.Gray5;
+                    ColorGray6 = Pal.Gray6;
+                    ColorGray7 = Pal.Gray7;
+                    ColorGray8 = Pal.Gray8;
                 }
                 else
                 {
@@ -155,14 +186,25 @@ namespace PCL
 
                 ColorSemiTransparent = new ModBase.MyColor(1d, Color8);
                 ModBase.MyColor ColorCard, ColorPopup, ColorTooltip, ColorOverlay, ColorSidebar, ColorWindow;
-                if (IsDark)
+                if (LegacyDark)
                 {
-                    ColorCard = new ModBase.MyColor(242d, new ModBase.MyColor().FromHSL2(ColorHue, ColorSat * 0.3d, 20d));
-                    ColorPopup = new ModBase.MyColor().FromHSL2(ColorHue, ColorSat * 0.3d, 18d);
-                    ColorTooltip = new ModBase.MyColor().FromHSL2(ColorHue, ColorSat * 0.28d, 22d);
-                    ColorOverlay = new ModBase.MyColor(221d, new ModBase.MyColor().FromHSL2(ColorHue, ColorSat * 0.2d, 6d));
-                    ColorSidebar = new ModBase.MyColor(241d, new ModBase.MyColor().FromHSL2(ColorHue, ColorSat * 0.28d, 13d));
-                    ColorWindow = new ModBase.MyColor().FromHSL2(ColorHue, ColorSat * 0.3d, 10d);
+                    // 语义面与 Color6~8 同族，逐层抬升：页面底 < 卡片 < 输入 < 悬停
+                    ColorCard = new ModBase.MyColor(245d, new ModBase.MyColor().FromHSL2(ColorHue, SurSat, 17d));
+                    ColorPopup = new ModBase.MyColor().FromHSL2(ColorHue, SurSat, 18d);
+                    ColorTooltip = new ModBase.MyColor().FromHSL2(ColorHue, SurSat, 22d);
+                    ColorOverlay = new ModBase.MyColor(221d, new ModBase.MyColor().FromHSL2(ColorHue, SurSat * 0.6d, 5d));
+                    ColorSidebar = new ModBase.MyColor(243d, new ModBase.MyColor().FromHSL2(ColorHue, SurSat * 0.7d, 11d));
+                    ColorWindow = new ModBase.MyColor().FromHSL2(ColorHue, SurSat * 0.8d, 10d);
+                }
+                else if (IsDark)
+                {
+                    // 语义面同样由 OKLCh 生成，逐层抬升：页面底 < 侧栏 < 卡片 < 输入 < 悬停
+                    ColorCard = Pal.Card;
+                    ColorPopup = Pal.Popup;
+                    ColorTooltip = Pal.Tooltip;
+                    ColorOverlay = Pal.Overlay;
+                    ColorSidebar = Pal.Sidebar;
+                    ColorWindow = Pal.Window;
                 }
                 else
                 {
@@ -193,8 +235,10 @@ namespace PCL
                 SetBrush("ColorBrushGray6", ColorGray6);
                 SetBrush("ColorBrushGray7", ColorGray7);
                 SetBrush("ColorBrushGray8", ColorGray8);
-                SetBrush("ColorBrushHalfWhite", IsDark ? Color.FromArgb(34, 255, 255, 255) : Color.FromArgb(85, 255, 255, 255));
-                SetBrush("ColorBrushOnAccent", IsDark ? Color.FromArgb(255, 253, 254, 255) : (Color)Color8);
+                SetBrush("ColorBrushHalfWhite", IsDark ? Color.FromArgb(24, 255, 255, 255) : Color.FromArgb(85, 255, 255, 255));
+                SetBrush("ColorBrushScrollBar", LegacyDark ? Color.FromRgb(74, 81, 89) : (IsDark ? (Color)Pal.ScrollBar : (Color)Color4));
+                SetBrush("ColorBrushScrollBarHover", LegacyDark ? Color.FromRgb(108, 116, 124) : (IsDark ? (Color)Pal.ScrollBarHover : (Color)Color3));
+                SetBrush("ColorBrushOnAccent", LegacyDark ? Color.FromArgb(255, 253, 254, 255) : (IsDark ? (Color)Pal.OnAccent : (Color)Color8));
                 SetBrush("ColorBrushCard", ColorCard);
                 SetBrush("ColorBrushPopup", ColorPopup);
                 SetBrush("ColorBrushTooltip", ColorTooltip);
@@ -226,7 +270,7 @@ namespace PCL
                 Res["ColorObjectGray6"] = (Color)ColorGray6;
                 Res["ColorObjectGray7"] = (Color)ColorGray7;
                 Res["ColorObjectGray8"] = (Color)ColorGray8;
-                Res["ColorObjectShadow"] = IsDark ? Color.FromArgb(255, 0, 0, 0) : (Color)Color1;
+                Res["ColorObjectShadow"] = LegacyDark ? Color.FromArgb(255, 0, 0, 0) : (IsDark ? (Color)Pal.ObjectShadow : (Color)Color1);
                 ThemeRefreshMain();
 
                 void SetBrush(string Key, Color Value) => Res[Key] = new SolidColorBrush(Value);
@@ -243,31 +287,56 @@ namespace PCL
             if (!ModMain.FrmMain.IsLoaded)
                 return;
             bool IsDark = ThemeNow == ThemeDarkId;
+            bool LegacyDark = UseLegacyDark;
             // 顶部条背景
             var Brush = new LinearGradientBrush() { EndPoint = new Point(1d, 0d), StartPoint = new Point(0d, 0d) };
             int[] Deltas = ColorHueTopbarDelta.Switch(d => new int[] { -d, 0, d }, d => d);
-            int TopLight = IsDark ? 22 : 48;
-            int TopLightMid = IsDark ? 26 : 54;
-            Brush.GradientStops.Add(new GradientStop() { Offset = 0d, Color = new ModBase.MyColor().FromHSL2(ColorHue + Deltas[0], IsDark ? ColorSat * 0.8d : ColorSat, TopLight + ColorLightAdjust) });
-            Brush.GradientStops.Add(new GradientStop() { Offset = 0.5d, Color = new ModBase.MyColor().FromHSL2(ColorHue + Deltas[1], IsDark ? ColorSat * 0.8d : ColorSat, TopLightMid + ColorLightAdjust) });
-            Brush.GradientStops.Add(new GradientStop() { Offset = 1d, Color = new ModBase.MyColor().FromHSL2(ColorHue + Deltas[2], IsDark ? ColorSat * 0.8d : ColorSat, TopLight + ColorLightAdjust) });
+            int TopLight = IsDark ? 19 : 48;
+            int TopLightMid = IsDark ? 23 : 54;
+            double TopSat = IsDark ? ColorSat * 0.14d : ColorSat;
+            if (IsDark && !LegacyDark)
+            {
+                // 深色标题栏：OKLCh 低色度深蓝，三段只变感知亮度与色相。
+                Brush.GradientStops.Add(new GradientStop() { Offset = 0d, Color = ModOklch.FromLch(0.28d, 0.045d, ModOklch.DarkHue + Deltas[0]) });
+                Brush.GradientStops.Add(new GradientStop() { Offset = 0.5d, Color = ModOklch.FromLch(0.32d, 0.045d, ModOklch.DarkHue + Deltas[1]) });
+                Brush.GradientStops.Add(new GradientStop() { Offset = 1d, Color = ModOklch.FromLch(0.28d, 0.045d, ModOklch.DarkHue + Deltas[2]) });
+            }
+            else
+            {
+                Brush.GradientStops.Add(new GradientStop() { Offset = 0d, Color = new ModBase.MyColor().FromHSL2(ColorHue + Deltas[0], TopSat, TopLight + ColorLightAdjust) });
+                Brush.GradientStops.Add(new GradientStop() { Offset = 0.5d, Color = new ModBase.MyColor().FromHSL2(ColorHue + Deltas[1], TopSat, TopLightMid + ColorLightAdjust) });
+                Brush.GradientStops.Add(new GradientStop() { Offset = 1d, Color = new ModBase.MyColor().FromHSL2(ColorHue + Deltas[2], TopSat, TopLight + ColorLightAdjust) });
+            }
             ModMain.FrmMain.PanTitle.Background = Brush;
             ModMain.FrmMain.PanTitle.Background.Freeze();
             // 主页面背景
             if (Settings.Get<bool>("UiBackgroundColorful"))
             {
                 Brush = new LinearGradientBrush() { EndPoint = new Point(0.1d, 1d), StartPoint = new Point(0.9d, 0d) };
-                double FormLight = IsDark ? 15d : 91d;
-                Brush.GradientStops.Add(new GradientStop() { Offset = -0.1d, Color = new ModBase.MyColor().FromHSL2(ColorHue - 15, ColorSat * 0.8d, FormLight) });
-                Brush.GradientStops.Add(new GradientStop() { Offset = 0.4d, Color = new ModBase.MyColor().FromHSL2(ColorHue, ColorSat * 0.8d, FormLight) });
-                Brush.GradientStops.Add(new GradientStop() { Offset = 1.1d, Color = new ModBase.MyColor().FromHSL2(ColorHue + 15, ColorSat * 0.8d, FormLight) });
+                if (IsDark && !LegacyDark)
+                {
+                    // 彩色底：CE 的 darkLight=0.2 口径，L=0.168 / 0.192，色相 ±15°。
+                    Brush.GradientStops.Add(new GradientStop() { Offset = -0.1d, Color = ModOklch.FromLch(0.168d, 0.093d, ModOklch.DarkHue - 15d) });
+                    Brush.GradientStops.Add(new GradientStop() { Offset = 0.4d, Color = ModOklch.FromLch(0.192d, 0.028d, ModOklch.DarkHue) });
+                    Brush.GradientStops.Add(new GradientStop() { Offset = 1.1d, Color = ModOklch.FromLch(0.168d, 0.093d, ModOklch.DarkHue + 15d) });
+                }
+                else
+                {
+                    double FormLight = IsDark ? 13d : 91d;
+                    double FormSat = IsDark ? ColorSat * 0.12d : ColorSat * 0.8d;
+                    Brush.GradientStops.Add(new GradientStop() { Offset = -0.1d, Color = new ModBase.MyColor().FromHSL2(ColorHue - 15, FormSat, FormLight) });
+                    Brush.GradientStops.Add(new GradientStop() { Offset = 0.4d, Color = new ModBase.MyColor().FromHSL2(ColorHue, FormSat, FormLight) });
+                    Brush.GradientStops.Add(new GradientStop() { Offset = 1.1d, Color = new ModBase.MyColor().FromHSL2(ColorHue + 15, FormSat, FormLight) });
+                }
                 ModMain.FrmMain.PanForm.Background = Brush;
             }
             else
             {
-                ModMain.FrmMain.PanForm.Background = IsDark
-                    ? (ModBase.MyColor)new ModBase.MyColor().FromHSL2(ColorHue, ColorSat * 0.3d, 10d)
-                    : new ModBase.MyColor(245d, 245d, 245d);
+                ModMain.FrmMain.PanForm.Background = LegacyDark
+                    ? (ModBase.MyColor)new ModBase.MyColor().FromHSL2(ColorHue, ColorSat * 0.08d, 13d)
+                    : (IsDark
+                        ? (ModBase.MyColor)ModOklch.FromLch(0.20d, 0.008d, ModOklch.DarkHue)
+                        : new ModBase.MyColor(245d, 245d, 245d));
             }
             ModMain.FrmMain.PanForm.Background.Freeze();
         });

@@ -35,24 +35,24 @@ namespace PCL
                 {
                     NewOpacity = 0d;
                     Time = 20; // 防止错误的尺寸判断导致闪烁
-                    NewColor = "ColorBrush4";
+                    NewColor = "ColorBrushScrollBar";
                 }
                 else if (IsMouseCaptureWithin)
                 {
                     NewOpacity = 1d;
-                    NewColor = "ColorBrush4";
+                    NewColor = "ColorBrushScrollBarHover";
                     Time = 50;
                 }
                 else if (IsMouseOver)
                 {
                     NewOpacity = 0.9d;
-                    NewColor = "ColorBrush3";
+                    NewColor = "ColorBrushScrollBarHover";
                     Time = 130;
                 }
                 else
                 {
                     NewOpacity = 0.5d;
-                    NewColor = "ColorBrush4";
+                    NewColor = "ColorBrushScrollBar";
                     Time = 180;
                 }
                 // 触发颜色动画

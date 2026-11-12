@@ -76,6 +76,9 @@
             <SolidColorBrush x:Key="ColorBrushInk" Color="#A0000000" />
             <SolidColorBrush x:Key="ColorBrushInkHover" Color="#E6000000" />
             <Color x:Key="ColorObjectShadow">#343d4a</Color>
+            <!-- 滚动条滑块：亮色沿用主色，深色改中性灰，避免深底上出现亮蓝条 -->
+            <SolidColorBrush x:Key="ColorBrushScrollBar" Color="#4890f5" />
+            <SolidColorBrush x:Key="ColorBrushScrollBarHover" Color="#1370f3" />
 
             <!-- Window -->
             <Style TargetType="{x:Type Window}" x:Key="MyWindow">
