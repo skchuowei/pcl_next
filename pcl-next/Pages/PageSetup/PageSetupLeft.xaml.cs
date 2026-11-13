@@ -73,6 +73,7 @@ namespace PCL
             this.ItemSystem.Check += (p1, p2) => PageCheck((MyListItem)p1, (EventArgs)p2);
             this.ItemUI.Check += (p1, p2) => PageCheck((MyListItem)p1, (EventArgs)p2);
             this.ItemLink.Check += (p1, p2) => PageCheck((MyListItem)p1, (EventArgs)p2);
+            this.ItemUIAdv.Check += (p1, p2) => PageCheck((MyListItem)p1, (EventArgs)p2);
             // 选择第一个未被禁用的子页面
             if (!Settings.Get<bool>("UiHiddenSetupLaunch"))
             {
@@ -143,6 +144,12 @@ namespace PCL
                             ModMain.FrmSetupSystem = new PageSetupSystem();
                         return ModMain.FrmSetupSystem;
                     }
+                case FormMain.PageSubType.SetupUIAdv:
+                    {
+                        if (ModMain.FrmSetupUIAdv is null)
+                            ModMain.FrmSetupUIAdv = new PageSetupUIAdv();
+                        return ModMain.FrmSetupUIAdv;
+                    }
 
                 default:
                     {
@@ -191,6 +198,13 @@ namespace PCL
                             if (ModMain.FrmSetupSystem == null)
                                 ModMain.FrmSetupSystem = new PageSetupSystem();
                             PageSetupLeft.PageChangeRun(ModMain.FrmSetupSystem);
+                            break;
+                        }
+                    case FormMain.PageSubType.SetupUIAdv:
+                        {
+                            if (ModMain.FrmSetupUIAdv == null)
+                                ModMain.FrmSetupUIAdv = new PageSetupUIAdv();
+                            PageSetupLeft.PageChangeRun(ModMain.FrmSetupUIAdv);
                             break;
                         }
 
@@ -286,6 +300,14 @@ namespace PCL
                             this.ItemLink.Checked = true;
                         }
 
+                        break;
+                    }
+                case (double)FormMain.PageSubType.SetupUIAdv:
+                    {
+                        if (ModMain.FrmSetupUIAdv == null)
+                            ModMain.FrmSetupUIAdv = new PageSetupUIAdv();
+                        ModMain.FrmSetupUIAdv.Reset();
+                        this.ItemUIAdv.Checked = true;
                         break;
                     }
             }

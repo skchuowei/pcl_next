@@ -32,6 +32,7 @@ namespace PCL
             this.BtnLaunch.Loaded += (p1, p2) => RefreshButtonsUI();
             this.BtnCancel.Click += (p1, p2) => BtnCancel_Click();
             this.BtnMore.Click += (p1, p2) => BtnMore_Click();
+            this.ItemAccountQuick.Click += (p1, p2) => { IsAccountQuickOpen = !IsAccountQuickOpen; RefreshAccountQuick(); };
             this.PanLaunchingInfo.SizeChanged += (p1, p2) => PanLaunchingInfo_SizeChangedW((object)p1, (SizeChangedEventArgs)p2);
             this.PanLaunchingInfo.SizeChanged += (p1, p2) => PanLaunchingInfo_SizeChangedH((object)p1, (SizeChangedEventArgs)p2);
             this.Loaded += (_, __) => PageLaunchLeft_Loaded();
@@ -383,6 +384,8 @@ namespace PCL
     /// </summary>
         public void RefreshPage(bool KeepInput, bool Anim)
         {
+            // 刷新账号快捷切换条（独立于登录分页，需在下方提前返回之前更新）
+            RefreshAccountQuick();
             // 获取页面的可用种类并回写缓存
             PageType Type = PageType.None; // VB 的 Dim Type As PageType 默认值为 PageType.None，按原文补默认值
             int LoginPageType;
@@ -503,6 +506,56 @@ namespace PCL
             MyRadioButton Control = (MyRadioButton)this.FindName("RadioLoginType" + ((int)Settings.Get<ModLaunch.McLoginType>("LoginType")).ToString());
             if (Control is not null)
                 Control.Checked = true;
+        }
+
+        /// <summary>
+        /// 启动页账号快捷切换：常驻显示当前账号一行，点开后列出全部账号供一键切换。
+        /// 复制 / 删除等更完整的管理放在设置页「我的账号」，此处不重复提供。
+        /// </summary>
+        private bool IsAccountQuickOpen = false;
+        public void RefreshAccountQuick()
+        {
+            try
+            {
+                var Accounts = ModAccountList.GetAll();
+                var Current = ModAccountList.GetCurrent();
+                // 没有任何账号时不占用启动页空间
+                if (Accounts.Count == 0)
+                {
+                    this.PanAccountQuick.Visibility = Visibility.Collapsed;
+                    return;
+                }
+                this.PanAccountQuick.Visibility = Visibility.Visible;
+                this.ItemAccountQuick.Title = string.IsNullOrEmpty(Current?.Name) ? "选择账号" : Current.Name;
+                this.ItemAccountQuick.Info = IsAccountQuickOpen ? "收起" : (Current is null ? "" : Current.TypeText);
+                // 重建可展开的账号列表
+                this.PanAccountQuickList.Children.Clear();
+                foreach (var Entry in Accounts)
+                {
+                    var Item = new MyListItem()
+                    {
+                        Height = 32,
+                        Title = Entry.Name,
+                        Info = Entry.TypeText,
+                        Type = MyListItem.CheckType.Clickable,
+                        IsScaleAnimationEnabled = false
+                    };
+                    if (Current != null && Current.Type == Entry.Type && (Current.Name ?? "") == Entry.Name)
+                        Item.Checked = true;
+                    Item.Click += (s, e) =>
+                    {
+                        ModAccountList.SwitchTo(Entry);
+                        IsAccountQuickOpen = false;
+                        RefreshAccountQuick();
+                    };
+                    this.PanAccountQuickList.Children.Add(Item);
+                }
+                this.PanAccountQuickList.Visibility = IsAccountQuickOpen ? Visibility.Visible : Visibility.Collapsed;
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn(ex, "刷新启动页账号快捷切换失败");
+            }
         }
         private void RadioLoginType_Change(object sender, bool raiseByMouse)
         {

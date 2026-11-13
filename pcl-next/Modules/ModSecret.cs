@@ -289,21 +289,28 @@ namespace PCL
             try
             {
                 var Res = Application.Current.Resources;
-                ApplyDevBrush(Res, "UiDevColorAccent", "ColorBrush3", "ColorBrush4", "ColorBrushScrollBar", "ColorBrushOnAccent");
+                // ColorBrushScrollBar 不随 ThemeRefresh 重算，不纳入覆盖，否则清空后无法回落。
+                ApplyDevBrush(Res, "UiDevColorAccent", "ColorBrush3", "ColorBrush4", "ColorBrushOnAccent");
                 ApplyDevBrush(Res, "UiDevColorText", "ColorBrush1");
                 ApplyDevBrush(Res, "UiDevColorBtnDefault", "ColorBrushButton");
                 ApplyDevBrush(Res, "UiDevColorBtnHover", "ColorBrushButtonHover");
                 ApplyDevBrush(Res, "UiDevColorBtnPressed", "ColorBrushButtonPressed");
                 ApplyDevBrush(Res, "UiDevColorBtnDisabled", "ColorBrushButtonDisabled");
                 ApplyDevBrush(Res, "UiDevColorPopup", "ColorBrushPopup");
-                // 主窗体背景
+                // 主窗体背景与标题栏：与 ThemeRefreshMain 一致在 UI 队列中执行，保证排在主题基线之后。
+                // 清空覆盖时 ThemeRefreshMain 会自行恢复基线，故此处无需额外回滚。
                 string Bg = Settings.Get<string>("UiDevColorBg");
-                if (!string.IsNullOrEmpty(Bg) && ModMain.FrmMain is not null && ModMain.FrmMain.IsLoaded)
-                    ModMain.FrmMain.PanForm.Background = new SolidColorBrush((Color)new ModBase.MyColor(Bg));
-                // 主题色（含标题栏）：额外重刷标题栏渐变
                 string Ac = Settings.Get<string>("UiDevColorAccent");
-                if (!string.IsNullOrEmpty(Ac))
-                    DevApplyTitleBar(new ModBase.MyColor(Ac));
+                if (!string.IsNullOrEmpty(Bg) || !string.IsNullOrEmpty(Ac))
+                    ModBase.RunInUi(() =>
+                    {
+                        if (ModMain.FrmMain is null || !ModMain.FrmMain.IsLoaded)
+                            return;
+                        if (!string.IsNullOrEmpty(Bg))
+                            ModMain.FrmMain.PanForm.Background = new SolidColorBrush((Color)new ModBase.MyColor(Bg));
+                        if (!string.IsNullOrEmpty(Ac))
+                            DevApplyTitleBar(new ModBase.MyColor(Ac));
+                    });
             }
             catch (Exception ex)
             {

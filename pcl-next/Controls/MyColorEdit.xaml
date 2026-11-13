@@ -1,0 +1,51 @@
+<Grid x:Class="PCL.MyColorEdit"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:local="clr-namespace:PCL"
+      Margin="0,7">
+    <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="108" />
+        <ColumnDefinition Width="*" />
+        <ColumnDefinition Width="Auto" />
+    </Grid.ColumnDefinitions>
+    <TextBlock x:Name="LabTitle" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,12,0" TextWrapping="Wrap" FontSize="13" />
+    <StackPanel Grid.Column="1" x:Name="PanSliders" VerticalAlignment="Center">
+        <Grid Height="22" Margin="0,1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="14" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <TextBlock Text="A" VerticalAlignment="Center" Foreground="{DynamicResource ColorBrushGray3}" />
+            <local:MySlider x:Name="SliderA" Grid.Column="1" HorizontalAlignment="Stretch" MaxValue="255" Height="22" />
+        </Grid>
+        <Grid Height="22" Margin="0,1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="14" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <TextBlock Text="R" VerticalAlignment="Center" Foreground="{DynamicResource ColorBrushGray3}" />
+            <local:MySlider x:Name="SliderR" Grid.Column="1" HorizontalAlignment="Stretch" MaxValue="255" Height="22" />
+        </Grid>
+        <Grid Height="22" Margin="0,1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="14" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <TextBlock Text="G" VerticalAlignment="Center" Foreground="{DynamicResource ColorBrushGray3}" />
+            <local:MySlider x:Name="SliderG" Grid.Column="1" HorizontalAlignment="Stretch" MaxValue="255" Height="22" />
+        </Grid>
+        <Grid Height="22" Margin="0,1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="14" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <TextBlock Text="B" VerticalAlignment="Center" Foreground="{DynamicResource ColorBrushGray3}" />
+            <local:MySlider x:Name="SliderB" Grid.Column="1" HorizontalAlignment="Stretch" MaxValue="255" Height="22" />
+        </Grid>
+    </StackPanel>
+    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="14,0,0,0">
+        <Border x:Name="Preview" Width="36" Height="36" CornerRadius="3" BorderThickness="1" BorderBrush="{DynamicResource ColorBrushGray4}" />
+        <local:MyTextBox x:Name="HexBox" Width="98" Height="28" Margin="10,0,0,0" HintText="#AARRGGBB" MaxLength="9" VerticalAlignment="Center" />
+        <local:MyButton x:Name="BtnReset" Width="64" Height="28" Margin="10,0,0,0" Text="重置" Padding="0" VerticalAlignment="Center" />
+    </StackPanel>
+</Grid>

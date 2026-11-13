@@ -7,9 +7,13 @@
              mc:Ignorable="d" x:Name="PanBack"
              d:DesignHeight="417.2" Width="300">
     <Grid Name="PanInput" RenderTransformOrigin="0.5,0.5">
+        <Grid.RenderTransform>
+            <ScaleTransform />
+        </Grid.RenderTransform>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="20" />
@@ -21,9 +25,12 @@
             <ColumnDefinition Width="Auto" />
             <ColumnDefinition Width="10" />
         </Grid.ColumnDefinitions>
-        <Grid.RenderTransform>
-            <ScaleTransform />
-        </Grid.RenderTransform>
+        <Grid Grid.ColumnSpan="5" Grid.Row="4" x:Name="PanAccountQuick" Margin="20,4,20,0" Visibility="Collapsed">
+            <StackPanel>
+                <local:MyListItem x:Name="ItemAccountQuick" Height="30" IsScaleAnimationEnabled="False" Type="Clickable" Title="我的账号" Info="" />
+                <StackPanel x:Name="PanAccountQuickList" Visibility="Collapsed" Margin="0,2,0,0" />
+            </StackPanel>
+        </Grid>
         <local:MyButton Grid.Row="3" Grid.Column="2" x:Name="BtnVersion" Height="35" Margin="0,10,10,0" Text="版本选择" IsEnabled="False" />
         <local:MyButton Grid.Row="3" Grid.Column="3" x:Name="BtnMore" Visibility="Collapsed" Height="35" Margin="0,10,10,0" TextPadding="36" Text="版本设置" />
         <Grid Grid.ColumnSpan="5" Grid.Row="1" Margin="20,0" VerticalAlignment="Center" x:Name="PanLogin" />

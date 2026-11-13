@@ -1,0 +1,24 @@
+<local:MyPageRight
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="clr-namespace:PCL" xmlns:d="http://schemas.microsoft.com/expression/blend/2008" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d" x:Class="PCL.PageSetupAccount"
+    PanScroll="PanBack">
+    <local:MyScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" x:Name="PanBack">
+        <StackPanel x:Name="PanMain" Margin="25,10">
+            <local:MyCard Margin="0,15" Title="我的账号">
+                <StackPanel Margin="25,37,25,15">
+                    <TextBlock x:Name="LabEmpty" Text="尚未添加任何账号。请前往启动页左侧的登录入口添加账号。" Opacity="0.5" Visibility="Collapsed" TextWrapping="Wrap" />
+                    <StackPanel x:Name="PanAccounts" />
+                </StackPanel>
+            </local:MyCard>
+            <local:MyCard Margin="0,0,0,15" Title="说明">
+                <StackPanel Margin="25,37,25,15">
+                    <TextBlock Text="· 启动页左侧提供账号快捷切换；这里可进行更完整的账号管理（切换 / 复制 / 删除）。" TextWrapping="Wrap" Opacity="0.7" Margin="0,0,0,6" />
+                    <TextBlock Text="· 删除账号不可撤销，且只会移除本地的登录记录，不会注销该账号本身。" TextWrapping="Wrap" Opacity="0.7" Margin="0,0,0,6" />
+                    <TextBlock Text="· 当前选中的账号会以高亮标识；点击账号即可切换为当前账号。" TextWrapping="Wrap" Opacity="0.7" />
+                </StackPanel>
+            </local:MyCard>
+        </StackPanel>
+    </local:MyScrollViewer>
+</local:MyPageRight>
