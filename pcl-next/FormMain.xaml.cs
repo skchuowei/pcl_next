@@ -1163,6 +1163,9 @@ namespace PCL
             }
             // 标题栏文本是否居左
             this.PanTitleMain.ColumnDefinitions[0].Width = new GridLength(Settings.Get<bool>("UiLogoLeft") && Settings.Get<int>("UiLogoType") == 0 ? 0 : 1, GridUnitType.Star);
+            // 卡片毛玻璃：本方法在窗口加载、背景图刷新、背景模糊设置变化时都会调用；
+            // VisualBrush 实时指向 ImgBack，无需重拍快照，这里只负责半径与显隐。
+            ModBlur.Apply();
         }
 
         #endregion

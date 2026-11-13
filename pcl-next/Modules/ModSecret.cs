@@ -239,6 +239,10 @@ namespace PCL
                 SetBrush("ColorBrushScrollBar", LegacyDark ? Color.FromRgb(74, 81, 89) : (IsDark ? (Color)Pal.ScrollBar : (Color)Color4));
                 SetBrush("ColorBrushScrollBarHover", LegacyDark ? Color.FromRgb(108, 116, 124) : (IsDark ? (Color)Pal.ScrollBarHover : (Color)Color3));
                 SetBrush("ColorBrushOnAccent", LegacyDark ? Color.FromArgb(255, 253, 254, 255) : (IsDark ? (Color)Pal.OnAccent : (Color)Color8));
+                // 卡片毛玻璃开启时下调卡片底色 alpha，让下方模糊背景层透出来；
+                // 只影响 ColorBrushCard，Popup / Tooltip / Sidebar / Window 保持原不透明度。
+                if (Settings.Get<int>("UiCardBlur") > 0)
+                    ColorCard.A = IsDark ? 165d : 180d;
                 SetBrush("ColorBrushCard", ColorCard);
                 SetBrush("ColorBrushPopup", ColorPopup);
                 SetBrush("ColorBrushTooltip", ColorTooltip);
