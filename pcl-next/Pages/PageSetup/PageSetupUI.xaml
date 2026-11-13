@@ -163,15 +163,6 @@
                                         ToolTip="高度的模糊会严重掉帧，请谨慎。&#13;不建议在制作整合包时开启模糊，以确保 PCL 在低性能电脑上可以流畅运行。" />
                     </Grid>
                     <local:MyCheckBox local:SettingService.Key="UiBackgroundColorful" Text="叠加彩色背景" Margin="-1,0,0,8" Height="22" />
-                    <Grid x:Name="PanCardBlur" Height="22" Margin="0,0,0,8">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" SharedSizeGroup="Name" />
-                            <ColumnDefinition />
-                        </Grid.ColumnDefinitions>
-                        <TextBlock VerticalAlignment="Center" HorizontalAlignment="Left" Text="卡片毛玻璃" Margin="0,0,25,0" />
-                        <local:MySlider local:SettingService.Key="UiCardBlur" x:Name="SliderCardBlur" MaxValue="40" Grid.Column="1"
-                                        ToolTip="0 为关闭。需先在上方设置一张自定义背景图，卡片才会半透明并透出下方模糊的背景；没有背景图时不会产生磨砂效果。&#13;数值越大越模糊，过高的数值会掉帧，低性能电脑建议调小或关闭。" />
-                    </Grid>
                     <Grid Height="35" Margin="0,2,0,0">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto" SharedSizeGroup="Button" />
