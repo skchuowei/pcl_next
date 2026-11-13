@@ -59,6 +59,19 @@ namespace PCL
             }
         }
         /// <summary>
+        /// 开发者 UI 细调：动画渲染帧率（FPS，15–240，默认 60）。
+        /// </summary>
+        public static int AniFrameRate => Math.Max(15, Math.Min(240, Settings.Get<int>("UiDevAnimFps")));
+        /// <summary>
+        /// 开发者 UI 细调：动画帧间隔（毫秒）。帧率越高，间隔越短。
+        /// </summary>
+        public static long AniFrameIntervalMs => (long)Math.Round(1000d / AniFrameRate);
+        /// <summary>
+        /// 开发者 UI 细调：弹窗消失动画保持帧数折算出的时长（毫秒）。
+        /// 12 帧 @60FPS = 200ms，与原 Hint 消失动画时长一致。
+        /// </summary>
+        public static double AniPopupHideTime => Math.Max(0, Math.Min(120, Settings.Get<int>("UiDevAnimPopupHideFrames"))) * 1000d / AniFrameRate;
+        /// <summary>
     /// 动画组列表。
     /// </summary>
         public static Dictionary<string, AniGroupEntry> AniGroups = new Dictionary<string, AniGroupEntry>();
@@ -1055,6 +1068,15 @@ namespace PCL
                 {
                     // 两帧之间的间隔时间
                     long DeltaTime = (ModBase.GetTimeMs() - AniLastTick).Clamp(0L, 100000L);
+                    // 【帧间隔阈值必须远小于 Thread.Sleep(1) 的实际粒度】
+                    // 本循环末尾是 Thread.Sleep(1)，而 Windows 默认定时器精度是 15.6ms（本项目未调用
+                    // timeBeginPeriod），即 Sleep(1) 实际睡 15.6ms。若阈值取 AniFrameIntervalMs（60FPS ≈ 17ms），
+                    // 每圈醒来 DeltaTime=15.6 仍不足阈值 → 被跳过；再睡一圈凑到 31.2ms 才渲染一帧，
+                    // 实际帧率由约 64FPS 腰斩到约 32FPS。滚动惯性动画总时长只有 300ms，
+                    // 于是从约 19 帧掉到约 10 帧，视觉上就是「一格一格跳」，即「滚动惯性动画没了」。
+                    // 因此这里固定用 3ms（等价于跟随系统唤醒节奏、不限帧）；
+                    // AniFrameRate 只用于按帧数折算时长的场景（见 AniPopupHideTime），若要让帧率设置真正生效，
+                    // 需要配合 timeBeginPeriod(1) 提升系统定时器精度，不能只靠加大这里的阈值。
                     if (DeltaTime < 3L)
                         goto Sleeper;
                     AniLastTick = ModBase.GetTimeMs();
