@@ -38,7 +38,10 @@ namespace PCL
                                              // 号段按代号阶梯严格递增，且每个代号都占独立区间——
                                              // dev 与 slush 若共用同一号段，切换时代会被判成版本倒退而误弹降级提示。
                                              // 本值由 scripts\Set-VersionInfo.ps1 依据标签写入，不可手工填写。
-        public const int VersionCode = 5010;
+        // 2026-11-13 渠道拆分：本目录（PCL_NEXT_Windows）= dev 渠道，版本名保持 2.100.0.7 不动，
+        // 仅把号段从 slush 的 5010 移回 dev 区间（5000–5009），取 5007（2.100.0.7 周期的 dev 序号 7）。
+        // slush 渠道（5010）已独立到目录 PCL_NEXT_Windows_slush，两条渠道不再共用号段。
+        public const int VersionCode = 5007;
 
         // 版本信息
         /// <summary>
