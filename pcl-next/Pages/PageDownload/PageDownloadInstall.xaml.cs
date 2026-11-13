@@ -3,8 +3,13 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
+using System.Windows.Media.Effects;
+using System.Windows.Media.Imaging;
+using System.Windows.Shapes;
 using System.Xml.Linq;
 using MeloongCore;
 using MeloongCore.Extensions;
@@ -626,17 +631,33 @@ namespace PCL
             ExitSelectPage(); // 返回
             try
             {
-                var Dict = new Dictionary<string, List<JObject>>() { { "正式版", new List<JObject>() }, { "预览版", new List<JObject>() }, { "远古版", new List<JObject>() }, { "愚人节版", new List<JObject>() } };
+                var Dict = new Dictionary<string, List<JObject>>() { { "正式版（1.21.11-）", new List<JObject>() }, { "正式版（26.1+）", new List<JObject>() }, { "预览版", new List<JObject>() }, { "远古版", new List<JObject>() }, { "愚人节版", new List<JObject>() } };
+                            // 新体系（2026 起：年份.版本 命名）主题版本下的开发版（pre / rc / 快照），按主题版本聚合，key 形如 "26.1"
+                            var DevByTheme = new Dictionary<string, List<JObject>>();
                 foreach (JObject Version in MinecraftVersions)
                 {
                     // 确定分类
                     string Type = (string)Version["type"];
                     string versionId = Version["id"]?.ToString() ?? "";
+                    // 新体系命名（2026 起）：两位年份 + 点 开头，如 26.1 / 26.1.2 / 26.1-pre1
+                    if (IsNewNaming(versionId))
+                    {
+                        string theme = GetThemeVersion(versionId);
+                        if (Type == "release")
+                            Dict["正式版（26.1+）"].Add(Version);
+                        else
+                        {
+                            if (!DevByTheme.ContainsKey(theme))
+                                DevByTheme[theme] = new List<JObject>();
+                            DevByTheme[theme].Add(Version);
+                        }
+                        continue;
+                    }
                     switch (Type ?? "")
                     {
                         case "release":
                             {
-                                Type = "正式版";
+                                Type = "正式版（1.21.11-）";
                                 break;
                             }
                         case "snapshot":
@@ -645,7 +666,7 @@ namespace PCL
                                 // Mojang 误分类
                                 if (versionId.StartsWithF("1.") && !versionId.Lower().Contains("combat") && !versionId.Lower().Contains("rc") && !versionId.Lower().Contains("experimental") && !versionId.Lower().Contains("pre"))
                                 {
-                                    Type = "正式版";
+                                    Type = "正式版（1.21.11-）";
                                     Version["type"] = "release";
                                 }
                                 // 愚人节版本
@@ -728,9 +749,10 @@ namespace PCL
                 // 添加最新版本
                 var CardInfo = new MyCard() { Title = "最新版本", Margin = new Thickness(0d, 15d, 0d, 15d) };
                 var PinnedVersions = new List<JObject>();
-                if (Dict["正式版"].Count > 0)
+                var allOfficial = Dict["正式版（1.21.11-）"].Concat(Dict["正式版（26.1+）"]).OrderByDescending(j => GetReleaseTime(j)).ToList();
+                if (allOfficial.Count > 0)
                 {
-                    JObject Release = (JObject)Dict["正式版"][0].DeepClone();
+                    JObject Release = (JObject)allOfficial[0].DeepClone();
                     DateTime releaseDate = default;
                     var releaseRt = Release["releaseTime"];
                     if (releaseRt is not null && releaseRt.Type != JTokenType.Null)
@@ -761,12 +783,46 @@ namespace PCL
                 CardInfo.SetContentBuilder(PinnedVersions, Version => ModDownloadLib.McDownloadListItem(Version, (sender, e) => MinecraftSelected((MyListItem)sender, e), false)); // 使用 Lambda 转发点击事件，避免 #535
                 CardInfo.BuildContent();
                 this.PanMinecraft.Children.Insert(0, CardInfo);
-                // 添加其他版本
+                // 新体系 26.1+：按主题版本聚合，点击主题版本弹出独立对话框
+                if (Dict["正式版（26.1+）"].Count > 0 || DevByTheme.Count > 0)
+                {
+                    var NewCard = new MyCard() { Title = "正式版（26.1+）", Margin = new Thickness(0d, 0d, 0d, 15d) };
+                    var NewStack = new StackPanel() { Margin = new Thickness(20d, MyCard.SwapedHeight, 18d, 0d), VerticalAlignment = VerticalAlignment.Top, RenderTransform = new TranslateTransform(0d, 0d) };
+                    NewCard.Children.Add(NewStack);
+                    NewCard.SwapControl = NewStack;
+                    // 合并：既有正式发布版的主题，也保留仅含快照/开发版的主题（如 26.4 仅有快照，无正式发布版）
+                    var themeSet = new HashSet<string>();
+                    foreach (var v in Dict["正式版（26.1+）"])
+                        themeSet.Add(GetThemeVersion(v["id"]?.ToString() ?? ""));
+                    foreach (var k in DevByTheme.Keys)
+                        themeSet.Add(k);
+                    var ThemeGroups = themeSet
+                        .OrderByDescending(t => t, new McVersionTextComparer())
+                        .Select(t => new { Theme = t, Items = Dict["正式版（26.1+）"].Where(v => GetThemeVersion(v["id"]?.ToString() ?? "") == t).ToList() })
+                        .ToList();
+                    NewCard.SetContentBuilder(ThemeGroups, g => BuildNewSystemThemeItem(g.Theme, g.Items, DevByTheme));
+                    NewCard.IsSwapped = false;
+                    NewCard.BuildContent();
+                    this.PanMinecraft.Children.Add(NewCard);
+                }
+                // 旧体系正式版：普通卡片
+                if (Dict["正式版（1.21.11-）"].Count > 0)
+                {
+                    var OldCard = new MyCard() { Title = "正式版（1.21.11-）", Margin = new Thickness(0d, 0d, 0d, 15d) };
+                    var OldStack = new StackPanel() { Margin = new Thickness(20d, MyCard.SwapedHeight, 18d, 0d), VerticalAlignment = VerticalAlignment.Top, RenderTransform = new TranslateTransform(0d, 0d) };
+                    OldCard.Children.Add(OldStack);
+                    OldCard.SwapControl = OldStack;
+                    OldCard.SetContentBuilder(Dict["正式版（1.21.11-）"], Version => ModDownloadLib.McDownloadListItem(Version, (sender, e) => MinecraftSelected((MyListItem)sender, e), false));
+                    OldCard.IsSwapped = true;
+                    this.PanMinecraft.Children.Add(OldCard);
+                }
+                // 其余分类（预览版 / 远古版 / 愚人节版）：普通渲染
                 foreach (KeyValuePair<string, List<JObject>> Pair in Dict)
                 {
+                    if (Pair.Key == "正式版（1.21.11-）" || Pair.Key == "正式版（26.1+）")
+                        continue;
                     if (!Pair.Value.Any())
                         continue;
-                    // 增加卡片
                     var NewCard = new MyCard() { Title = Pair.Key, Margin = new Thickness(0d, 0d, 0d, 15d) };
                     var NewStack = new StackPanel() { Margin = new Thickness(20d, MyCard.SwapedHeight, 18d, 0d), VerticalAlignment = VerticalAlignment.Top, RenderTransform = new TranslateTransform(0d, 0d) };
                     NewCard.Children.Add(NewStack);
@@ -775,12 +831,487 @@ namespace PCL
                     NewCard.IsSwapped = true;
                     this.PanMinecraft.Children.Add(NewCard);
                 }
+
             }
             catch (Exception ex)
             {
                 Logger.Error(ex, "可视化安装版本列表出错");
             }
         }
+        #region 新体系（年份.版本）正式版聚合与内联菜单
+
+        private static readonly System.Text.RegularExpressions.Regex NewNamingRegex = new System.Text.RegularExpressions.Regex(@"^\d{2}\.", System.Text.RegularExpressions.RegexOptions.Compiled);
+        private static bool IsNewNaming(string id) => !string.IsNullOrEmpty(id) && NewNamingRegex.IsMatch(id);
+        private static string GetThemeVersion(string id)
+        {
+            if (string.IsNullOrEmpty(id)) return id ?? "";
+            var parts = id.Split('.');
+            if (parts.Length < 2) return parts[0];
+            var second = parts[1].Split(new[] { '-', ' ' })[0];
+            return parts[0] + "." + second;
+        }
+        private static DateTime GetReleaseTime(JObject v)
+        {
+            var rt = v?["releaseTime"];
+            if (rt is not null && rt.Type != JTokenType.Null)
+            {
+                try { return rt.Value<DateTime>(); } catch { }
+            }
+            return default;
+        }
+        private class McVersionTextComparer : IComparer<string>
+        {
+            public int Compare(string x, string y)
+            {
+                var xs = (x ?? "").Split('.');
+                var ys = (y ?? "").Split('.');
+                int n = Math.Max(xs.Length, ys.Length);
+                for (int i = 0; i < n; i++)
+                {
+                    int a = i < xs.Length ? ParseLeadingInt(xs[i]) : 0;
+                    int b = i < ys.Length ? ParseLeadingInt(ys[i]) : 0;
+                    if (a != b) return a.CompareTo(b);
+                }
+                return 0;
+            }
+            private static int ParseLeadingInt(string s)
+            {
+                var m = System.Text.RegularExpressions.Regex.Match(s ?? "", @"\d+");
+                return m.Success ? int.Parse(m.Value) : 0;
+            }
+        }
+
+        // 构建单个主题版本（如 26.1）的可点击入口：点击后在原位置浮出右键菜单式面板
+        private UIElement BuildNewSystemThemeItem(string theme, List<JObject> items, Dictionary<string, List<JObject>> devByTheme)
+        {
+            var item = new MyListItem()
+            {
+                Logo = ModBase.PathImage + "Blocks/Grass.png",
+                Title = theme,
+                Height = 42d,
+                Type = MyListItem.CheckType.Clickable,
+                Info = "点击查看版本、搜索与开发版",
+                Tag = null
+            };
+            item.ContentHandler = null;
+            item.Click += (s, e) => OpenNewSystemThemeFlyout(item, theme, items, devByTheme.TryGetValue(theme, out var d) ? d : null);
+            return item;
+        }
+
+        // 当前展开的主题版本浮层（透明遮罩层 + 面板）；打开新的之前先收起旧的
+        private Grid _ThemeFlyoutLayer;
+
+        /// <summary>
+        /// 以被点击的那一行为垂直中心，上下同时展开一个与本卡片等宽的浮层：
+        /// 底层卡片完全不动、无遮罩变暗；浮层始终被限制在主窗口内，点击空白处收起（右键菜单式行为）。
+        /// </summary>
+        private void OpenNewSystemThemeFlyout(MyListItem anchor, string theme, List<JObject> items, List<JObject> devItems)
+        {
+            CloseThemeFlyout();
+            var panMsg = ModMain.FrmMain.PanMsg;
+            double overlayW = panMsg.ActualWidth > 0d ? panMsg.ActualWidth : ModMain.FrmMain.ActualWidth;
+            double overlayH = panMsg.ActualHeight > 0d ? panMsg.ActualHeight : ModMain.FrmMain.ActualHeight;
+            const double margin = 12d;
+            // 标题栏（PanTitle）高度：PanMsg 跨两行、从窗口顶部开始，所以浮层必须把顶部压在标题栏以下，绝不能盖住标题栏
+            double titleBarH = ModMain.FrmMain.PanTitle is FrameworkElement tb && tb.ActualHeight > 0d ? tb.ActualHeight : 48d;
+            // 对齐到「正式版（26.1+）」这张卡片：宽度与其严格一致，但绝不超出主窗口
+            var cardEl = FindCardAncestor(anchor) as FrameworkElement;
+            double panelW = cardEl is not null && cardEl.ActualWidth > 0d
+                ? cardEl.ActualWidth
+                : (anchor.ActualWidth > 0d ? anchor.ActualWidth : 560d);
+            panelW = Math.Max(320d, Math.Min(panelW, overlayW - margin * 2d));
+            var panel = new Border()
+            {
+                Width = panelW,
+                // 与页面卡片（MyCard）同款半透明白底，避免纯白带来的“偏黄/硬边”观感
+                Background = (Brush)Application.Current.TryFindResource("ColorBrushCard") ?? Brushes.White,
+                CornerRadius = new CornerRadius(6d),
+                Padding = new Thickness(10d, 8d, 10d, 8d),
+                SnapsToDevicePixels = true,
+                UseLayoutRounding = true
+            };
+            var body = new StackPanel();
+            body.Children.Add(new TextBlock()
+            {
+                Text = "Minecraft " + theme,
+                FontSize = 13d,
+                Foreground = ModSecret.ColorGray1,
+                Margin = new Thickness(4d, 0d, 0d, 2d)
+            });
+            // 框 1：版本（补丁版本从新到旧，主题版本排最后；仅有快照时填「未发布」占位）
+            var themeVersion = items.FirstOrDefault(v => (v["id"]?.ToString() ?? "") == theme);
+            var patches = items
+                .Where(v => (v["id"]?.ToString() ?? "").StartsWith(theme + "."))
+                .OrderByDescending(v => GetReleaseTime(v))
+                .ToList();
+            var versionRows = new List<UIElement>();
+            foreach (var p in patches)
+                versionRows.Add(MakeVersionRow(p, "补丁版本"));
+            versionRows.Add(themeVersion is not null ? MakeVersionRow(themeVersion, "主题版本") : MakeUnreleasedRow(theme, "主题版本"));
+            body.Children.Add(MakeSection("版本", versionRows));
+            // 框 2：搜索
+            string major = theme.Split('.')[0];
+            body.Children.Add(MakeSection("搜索", new List<UIElement>()
+            {
+                MakeSearchRow($"搜索基于 {major}.x 的整合包", ResourceTypes.ModPack, major + ".x"),
+                MakeSearchRow($"搜索基于 {theme} 的模组", ResourceTypes.Mod, theme)
+            }));
+            // 框 3：开发版（该主题版本的快照 / pre / rc 等非正式版）
+            if (devItems is not null && devItems.Count > 0)
+            {
+                body.Children.Add(MakeSection("开发版", devItems
+                    .OrderByDescending(v => GetReleaseTime(v))
+                    .Select(v => MakeVersionRow(v, "开发版"))
+                    .Cast<UIElement>()
+                    .ToList()));
+            }
+            // 内容超高时在浮层内部滚动，且整体被限制在标题栏以下、窗口以内
+            double maxBody = Math.Max(160d, overlayH - titleBarH - margin * 2d - 46d);
+            panel.Child = new ScrollViewer()
+            {
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+                MaxHeight = maxBody,
+                Content = body,
+                Style = (Style)Application.Current.TryFindResource("ScrollViewerFullMargin")
+            };
+            // 用与 MyCard 相同的 MyDropShadow 软阴影包裹：去掉硬边框、只留悬浮投影，底色与卡片一致
+            var shadow = new MyDropShadow()
+            {
+                ShadowRadius = 5d,
+                CornerRadius = new CornerRadius(6d),
+                Child = panel
+            };
+            shadow.Color = Color.FromArgb(0x22, 0x34, 0x3d, 0x4a);
+            // 先量出真实高度，再按「以被点击那行为垂直中心」定位
+            panel.Measure(new Size(panelW, double.PositiveInfinity));
+            double panelH = panel.DesiredSize.Height;
+            Point anchorPos;
+            try
+            {
+                anchorPos = anchor.TransformToVisual(panMsg).Transform(new Point(0d, 0d));
+            }
+            catch
+            {
+                anchorPos = new Point(margin, margin);
+            }
+            // 垂直：以被点击的那一行为中心，上下同时展开；但顶部绝不低于标题栏、底部绝不超出窗口
+            double top = anchorPos.Y + anchor.ActualHeight / 2d - panelH / 2d;
+            top = Math.Max(titleBarH + margin, Math.Min(top, Math.Max(titleBarH + margin, overlayH - panelH - margin)));
+            // 水平：与卡片左边对齐，左右都不出窗口
+            double leftTarget = anchorPos.X;
+            if (cardEl is not null)
+            {
+                try { leftTarget = cardEl.TransformToVisual(panMsg).Transform(new Point(0d, 0d)).X; } catch { }
+            }
+            double left = Math.Max(margin, Math.Min(leftTarget, Math.Max(margin, overlayW - panelW - margin)));
+            // 透明遮罩层：吃掉「点浮层本体以外」的点击以收起
+            // （模糊底板盖在透明层之上，点空白时 OriginalSource 是模糊层而非 layer，故不能只判 layer）
+            var layer = new Grid() { Background = Brushes.Transparent };
+            layer.MouseLeftButtonDown += (s, e) =>
+            {
+                if (shadow is null || !IsSelfOrDescendant(e.OriginalSource as DependencyObject, shadow))
+                    CloseThemeFlyout();
+            };
+            // 背景模糊特效：对当前窗口内容拍快照并做高斯模糊，作为浮层背后的毛玻璃底板
+            var blur = MakeBackdropBlur() as FrameworkElement;
+            if (blur is not null)
+            {
+                blur.HorizontalAlignment = HorizontalAlignment.Stretch;
+                blur.VerticalAlignment = VerticalAlignment.Stretch;
+                blur.SnapsToDevicePixels = true;
+                blur.Opacity = 0d; // 随开合动画淡入
+                layer.Children.Add(blur);
+            }
+            shadow.HorizontalAlignment = HorizontalAlignment.Left;
+            shadow.VerticalAlignment = VerticalAlignment.Top;
+            shadow.Margin = new Thickness(left, top, 0d, 0d);
+            layer.Children.Add(shadow);
+            _ThemeFlyoutLayer = layer;
+            panMsg.Children.Add(layer);
+            panMsg.Visibility = Visibility.Visible;
+            // 让浮层成为模态焦点：吞掉键盘事件，避免冒泡到主窗口 FormMain.KeyDown
+            // （其旧代码引用了不存在的 Btn3，会抛“无法关闭”的报错）；并支持 Esc 关闭
+            layer.Focusable = true;
+            layer.FocusVisualStyle = null;
+            layer.KeyDown += (s, e) =>
+            {
+                if (e.Key == Key.Escape)
+                    CloseThemeFlyout();
+                e.Handled = true; // 阻止继续冒泡到主窗口，避免触发 Btn3 缺失报错
+            };
+            try { Keyboard.Focus(layer); } catch { }
+            // 开合动画：淡入 + 轻微弹出，呼应全站 MyCard 的展开手感（放慢以便看清）
+            const int openMs = 420;
+            panel.Opacity = 0d;
+            panel.RenderTransform = new ScaleTransform(0.96d, 0.96d);
+            panel.RenderTransformOrigin = new Point(0.5d, 0.5d);
+            shadow.Opacity = 0d;
+            var openAni = new List<ModAnimation.AniData>()
+            {
+                ModAnimation.AaOpacity(panel, 1d, openMs, Ease: new ModAnimation.AniEaseOutFluent()),
+                ModAnimation.AaOpacity(shadow, 1d, openMs, Ease: new ModAnimation.AniEaseOutFluent()),
+                ModAnimation.AaScaleTransform(panel, 0.04d, openMs, Ease: new ModAnimation.AniEaseOutFluent())
+            };
+            if (blur is not null)
+                openAni.Add(ModAnimation.AaOpacity(blur, 1d, openMs, Ease: new ModAnimation.AniEaseOutFluent()));
+            ModAnimation.AniStart(openAni, "ThemeFlyout Open");
+        }
+
+        // 背景模糊底板：对当前窗口内容拍一次快照，做高斯模糊后作为毛玻璃底板铺在浮层背后。
+        // 用快照而非实时 VisualBrush，既避免与浮层自身的视觉树形成循环引用，又足够用于这种瞬时浮层。
+        private UIElement MakeBackdropBlur()
+        {
+            try
+            {
+                var w = ModMain.FrmMain;
+                if (w is null || w.ActualWidth < 1d || w.ActualHeight < 1d)
+                    return null;
+                double scaleX = 1d, scaleY = 1d;
+                var ps = PresentationSource.FromVisual(w);
+                if (ps?.CompositionTarget is System.Windows.Media.CompositionTarget ct)
+                {
+                    scaleX = ct.TransformToDevice.M11;
+                    scaleY = ct.TransformToDevice.M22;
+                }
+                int pxW = (int)Math.Max(1, Math.Round(w.ActualWidth * scaleX));
+                int pxH = (int)Math.Max(1, Math.Round(w.ActualHeight * scaleY));
+                // 渲染窗口客户端根（BorderForm）而不是 Window 本身：坐标系与 PanMsg 一致，
+                // 不会被窗口非客户区边框偏移（之前全窗口模糊错位即源于此）
+                var root = w.Content as Visual ?? w;
+                var bmp = new RenderTargetBitmap(pxW, pxH, 96d * scaleX, 96d * scaleY, PixelFormats.Pbgra32);
+                bmp.Render(root);
+                bmp.Freeze();
+                var img = new Image()
+                {
+                    Source = bmp,
+                    Stretch = Stretch.Fill,
+                    Effect = new BlurEffect() { Radius = 30d, KernelType = KernelType.Gaussian, RenderingBias = RenderingBias.Quality }
+                };
+                var grid = new Grid();
+                grid.Children.Add(img);
+                // 毛玻璃双层罩：一层浅色提亮增加「磨砂」质感，一层极低 alpha 深色压低背景对比，
+                // 让后面内容更不可辨认、浮层更突出（整体极淡，不会变成「压暗遮罩」）
+                grid.Children.Add(new Rectangle()
+                {
+                    Fill = new SolidColorBrush(Color.FromArgb(40, 255, 255, 255)),
+                    SnapsToDevicePixels = true
+                });
+                grid.Children.Add(new Rectangle()
+                {
+                    Fill = new SolidColorBrush(Color.FromArgb(22, 40, 50, 64)),
+                    SnapsToDevicePixels = true
+                });
+                // 只模糊主内容区：排除左侧边栏（PanLeft）与顶部标题栏（PanTitle）。
+                // grid 被铺满 PanMsg（= 窗口客户端全幅），其坐标系与快照一致，故 Clip 矩形直接取这两块的补集。
+                double sidebarW = (ModMain.FrmMain.PanLeft is FrameworkElement lb && lb.ActualWidth > 0d) ? lb.ActualWidth : 0d;
+                double titleH = (ModMain.FrmMain.PanTitle is FrameworkElement tb && tb.ActualHeight > 0d) ? tb.ActualHeight : 48d;
+                double clipW = Math.Max(1d, w.ActualWidth - sidebarW);
+                double clipH = Math.Max(1d, w.ActualHeight - titleH);
+                grid.Clip = new RectangleGeometry(new Rect(sidebarW, titleH, clipW, clipH), 0d, 0d);
+                return grid;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        // 收起当前浮层（选择版本、跳转搜索、切换到其它主题版本时调用）
+        private void CloseThemeFlyout()
+        {
+            var layer = _ThemeFlyoutLayer;
+            _ThemeFlyoutLayer = null;
+            if (layer is null)
+                return;
+            // layer.Children[0] 可能是背景模糊底板（Grid），[1] 是浮层本体（MyDropShadow）
+            UIElement blur = null;
+            MyDropShadow shadow = null;
+            foreach (var c in layer.Children)
+            {
+                if (c is MyDropShadow sd)
+                    shadow = sd;
+                else if (blur is null)
+                    blur = c as UIElement;
+            }
+            var panel = shadow?.Child as Border;
+            if (panel is not null && shadow is not null)
+            {
+                // 淡出 + 轻微缩回，与展开动画呼应；结束后才从视觉树移除（放慢以便看清）
+                const int closeMs = 320;
+                var closeAni = new List<ModAnimation.AniData>()
+                {
+                    ModAnimation.AaOpacity(panel, -1d, closeMs, Ease: new ModAnimation.AniEaseOutFluent()),
+                    ModAnimation.AaOpacity(shadow, -1d, closeMs, Ease: new ModAnimation.AniEaseOutFluent()),
+                    ModAnimation.AaScaleTransform(panel, -0.04d, closeMs, Ease: new ModAnimation.AniEaseOutFluent())
+                };
+                if (blur is not null)
+                    closeAni.Add(ModAnimation.AaOpacity(blur, -1d, closeMs, Ease: new ModAnimation.AniEaseOutFluent()));
+                closeAni.Add(ModAnimation.AaCode(() =>
+                {
+                    if (layer.Parent is Panel p)
+                        p.Children.Remove(layer);
+                    var panMsg = ModMain.FrmMain.PanMsg;
+                    if (panMsg.Children.Count == 0)
+                        panMsg.Visibility = Visibility.Collapsed;
+                }, After: true));
+                ModAnimation.AniStart(closeAni, "ThemeFlyout Close");
+            }
+            else
+            {
+                try
+                {
+                    if (layer.Parent is Panel p)
+                        p.Children.Remove(layer);
+                    var panMsg = ModMain.FrmMain.PanMsg;
+                    if (panMsg.Children.Count == 0)
+                        panMsg.Visibility = Visibility.Collapsed;
+                }
+                catch { }
+            }
+        }
+
+        // 向上找到承载该行的 MyCard 卡片，用来把浮层宽度/左边与卡片对齐
+        private static DependencyObject FindCardAncestor(DependencyObject node)
+        {
+            while (node is not null)
+            {
+                if (node is MyCard)
+                    return node;
+                node = VisualTreeHelper.GetParent(node);
+            }
+            return null;
+        }
+
+        // 判断 node 是否为 root 自身或其后裔（用于区分「点到浮层本体」与「点到背景空白」）
+        private static bool IsSelfOrDescendant(DependencyObject node, DependencyObject root)
+        {
+            while (node is not null)
+            {
+                if (ReferenceEquals(node, root))
+                    return true;
+                node = (node is Visual v) ? VisualTreeHelper.GetParent(v) : null;
+            }
+            return false;
+        }
+
+        // 灰色胶囊徽章（替代原先的 [主题版本]/[补丁版本] 方括号文字）
+        private Border MakeBadge(string text)
+        {
+            var badge = new Border()
+            {
+                CornerRadius = new CornerRadius(3d),
+                Padding = new Thickness(6d, 1d, 6d, 1d),
+                VerticalAlignment = VerticalAlignment.Center,
+                SnapsToDevicePixels = true,
+                Margin = new Thickness(8d, 0d, 0d, 0d),
+                Child = new TextBlock()
+                {
+                    Text = text,
+                    FontSize = 11d,
+                    Foreground = ModSecret.ColorGray2
+                }
+            };
+            // 底色改用主题感知的「轻微浮起表面」画刷（ColorBrushHalfWhite）：浅色模式为淡白、
+            // 深色模式为淡白半透明，均由 ModSecret.ThemeRefresh 运行时切换。
+            // 原写死的浅灰 (235,237,240) 在深色下会变成扎眼的浅色胶囊，与深色浮层冲突。
+            badge.SetResourceReference(Border.BackgroundProperty, "ColorBrushHalfWhite");
+            return badge;
+        }
+
+        private UIElement MakeSection(string title, List<UIElement> rows)
+        {
+            var box = new StackPanel() { Margin = new Thickness(0d, 4d, 0d, 10d) };
+            box.Children.Add(new TextBlock()
+            {
+                Text = title,
+                FontSize = 12d,
+                Foreground = ModSecret.ColorGray1,
+                Margin = new Thickness(0d, 0d, 0d, 4d)
+            });
+            foreach (var it in rows)
+                box.Children.Add(it);
+            return box;
+        }
+
+        // 版本行：复用 McDownloadListItem 的图标/标题/副标题与右键菜单，右侧挂徽章，左键点击选择并收起浮层
+        private UIElement MakeVersionRow(JObject version, string tag)
+        {
+            var item = ModDownloadLib.McDownloadListItem(version, null, false).Init() as MyListItem;
+            if (item is not null)
+            {
+                item.Click += (s, e) =>
+                {
+                    CloseThemeFlyout();
+                    MinecraftSelected(item, null);
+                };
+            }
+            var grid = new Grid() { Margin = new Thickness(0d, 0d, 0d, 2d) };
+            grid.ColumnDefinitions.Add(new ColumnDefinition() { Width = new GridLength(1d, GridUnitType.Star) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition() { Width = GridLength.Auto });
+            if (item is not null) grid.Children.Add(item);
+            Grid.SetColumn(item, 0);
+            var badge = MakeBadge(tag);
+            grid.Children.Add(badge);
+            Grid.SetColumn(badge, 1);
+            return grid;
+        }
+
+        // 未发布占位行：该主题版本仅有快照/开发版，尚无正式发布版
+        private UIElement MakeUnreleasedRow(string theme, string tag)
+        {
+            var item = new MyListItem()
+            {
+                Logo = ModBase.PathImage + "Blocks/Grass.png",
+                Title = "未发布",
+                Height = 42d,
+                Type = MyListItem.CheckType.None,
+                Info = "该主题版本（" + theme + "）尚未发布正式版",
+                Tag = null
+            };
+            item.ContentHandler = null;
+            var grid = new Grid() { Margin = new Thickness(0d, 0d, 0d, 2d) };
+            grid.ColumnDefinitions.Add(new ColumnDefinition() { Width = new GridLength(1d, GridUnitType.Star) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition() { Width = GridLength.Auto });
+            grid.Children.Add(item);
+            Grid.SetColumn(item, 0);
+            grid.Children.Add(MakeBadge(tag));
+            Grid.SetColumn(grid.Children[grid.Children.Count - 1], 1);
+            return grid;
+        }
+
+        private UIElement MakeSearchRow(string text, ResourceTypes type, string version)
+        {
+            var item = new MyListItem()
+            {
+                Logo = ModBase.PathImage + "Blocks/CommandBlock.png",
+                Title = text,
+                Height = 42d,
+                Type = MyListItem.CheckType.Clickable,
+                Info = "跳转至" + (type == ResourceTypes.ModPack ? "整合包" : "模组") + "搜索并预设版本 " + version,
+                Tag = null
+            };
+            item.ContentHandler = null;
+            item.Click += (s, e) => { CloseThemeFlyout(); SearchWithVersion(type, version); };
+            return item;
+        }
+
+        private void SearchWithVersion(ResourceTypes type, string version)
+        {
+            try
+            {
+                PageResource.TargetVersion = version;
+                var sub = type == ResourceTypes.ModPack ? FormMain.PageSubType.DownloadPack : FormMain.PageSubType.DownloadMod;
+                ModMain.FrmDownloadLeft.PageChange(sub);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "从下载页跳转资源搜索失败");
+            }
+        }
+
+        #endregion
+
         private void TrySelectWaitingVersion()
         {
             if (VersionWaitingSelect is null)

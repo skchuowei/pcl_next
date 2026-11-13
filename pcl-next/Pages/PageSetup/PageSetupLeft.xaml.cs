@@ -73,6 +73,7 @@ namespace PCL
             this.ItemSystem.Check += (p1, p2) => PageCheck((MyListItem)p1, (EventArgs)p2);
             this.ItemUI.Check += (p1, p2) => PageCheck((MyListItem)p1, (EventArgs)p2);
             this.ItemLink.Check += (p1, p2) => PageCheck((MyListItem)p1, (EventArgs)p2);
+            this.ItemAccount.Check += (p1, p2) => PageCheck((MyListItem)p1, (EventArgs)p2);
             // 选择第一个未被禁用的子页面
             if (!Settings.Get<bool>("UiHiddenSetupLaunch"))
             {
@@ -143,6 +144,12 @@ namespace PCL
                             ModMain.FrmSetupSystem = new PageSetupSystem();
                         return ModMain.FrmSetupSystem;
                     }
+                case FormMain.PageSubType.SetupAccount:
+                    {
+                        if (ModMain.FrmSetupAccount is null)
+                            ModMain.FrmSetupAccount = new PageSetupAccount();
+                        return ModMain.FrmSetupAccount;
+                    }
 
                 default:
                     {
@@ -191,6 +198,13 @@ namespace PCL
                             if (ModMain.FrmSetupSystem == null)
                                 ModMain.FrmSetupSystem = new PageSetupSystem();
                             PageSetupLeft.PageChangeRun(ModMain.FrmSetupSystem);
+                            break;
+                        }
+                    case FormMain.PageSubType.SetupAccount:
+                        {
+                            if (ModMain.FrmSetupAccount == null)
+                                ModMain.FrmSetupAccount = new PageSetupAccount();
+                            PageSetupLeft.PageChangeRun(ModMain.FrmSetupAccount);
                             break;
                         }
 
@@ -286,6 +300,14 @@ namespace PCL
                             this.ItemLink.Checked = true;
                         }
 
+                        break;
+                    }
+                case (double)FormMain.PageSubType.SetupAccount:
+                    {
+                        if (ModMain.FrmSetupAccount == null)
+                            ModMain.FrmSetupAccount = new PageSetupAccount();
+                        ModMain.FrmSetupAccount.Reset();
+                        this.ItemAccount.Checked = true;
                         break;
                     }
             }

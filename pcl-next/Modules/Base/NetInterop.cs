@@ -39,6 +39,9 @@ namespace PCL
     /// </summary>
         public static void RunCSharpDownload(ModNet.NetFile File)
         {
+            // C# 下载引擎的取消源：由 NetFile.CancelInternal 触发取消，
+            // 引擎任务结束后在 finally 中释放，避免每个文件泄漏一个 CTS。
+            CancellationTokenSource Cts = null;
             try
             {
                 // ---------- 构造请求 ----------
@@ -87,8 +90,15 @@ namespace PCL
                 };
 
                 // ---------- 状态镜像 ----------
-                var Cts = new CancellationTokenSource();
+                Cts = new CancellationTokenSource();
                 File.CSharpCts = Cts;
+                // 进度回调可能在引擎收尾释放 CTS 之后才到达，此时 Cancel 会抛 ObjectDisposedException，
+                // 统一走安全取消，避免取消路径反过来刷日志。
+                void SafeCancelCts()
+                {
+                    try { Cts?.Cancel(); }
+                    catch (ObjectDisposedException) { }
+                }
                 lock (File.LockState)
                 {
                     if (File.State < ModNet.NetState.Connecting)
@@ -107,19 +117,22 @@ namespace PCL
                 // 注意：C# 引擎接管时状态只会被设到 Connecting(1)，而原来的门槛要求 State >= Reading(2)，
                 // 条件恒不成立 → 进度长期钉在 Connecting 的 2%，直到 Finish() 直接跳到 100%。
                 // 这就是真机上「一直卡 2%，过一会突然下载完成」的根因。
-                var ProgressCallback = new Progress<DownloadProgress>(p => { try { if (File.State >= ModNet.NetState.Finished) { Cts.Cancel(); return; } if (!SizeMirrored && p.TotalBytesExpected >= 0L) { Interlocked.Exchange(ref File.FileSize, p.TotalBytesExpected); SizeMirrored = true; } long Previous = Interlocked.Exchange(ref LastDone, p.TotalBytesDone); long Delta = p.TotalBytesDone - Previous; if (Delta != 0L) { Interlocked.Add(ref File.DownloadDone, Delta); Interlocked.Add(ref ModNet.NetManager.DownloadDone, Delta); if (File.DownloadDone < 0L) Interlocked.Exchange(ref File.DownloadDone, 0L); if (ModNet.NetManager.DownloadDone < 0L) Interlocked.Exchange(ref ModNet.NetManager.DownloadDone, 0L); } if (p.ActiveChunks > 0 || p.TotalBytesDone > 0L) { lock (File.LockState) { if (File.State < ModNet.NetState.Merging) { File.State = ModNet.NetState.Downloading; } } } } catch (Exception ex) { Logger.Warn(ex, "C# 下载引擎进度镜像出错"); } });
+                var ProgressCallback = new Progress<DownloadProgress>(p => { try { if (File.State >= ModNet.NetState.Finished) { SafeCancelCts(); return; } if (!SizeMirrored && p.TotalBytesExpected >= 0L) { Interlocked.Exchange(ref File.FileSize, p.TotalBytesExpected); SizeMirrored = true; } long Previous = Interlocked.Exchange(ref LastDone, p.TotalBytesDone); long Delta = p.TotalBytesDone - Previous; if (Delta != 0L) { Interlocked.Add(ref File.DownloadDone, Delta); Interlocked.Add(ref ModNet.NetManager.DownloadDone, Delta); if (File.DownloadDone < 0L) Interlocked.Exchange(ref File.DownloadDone, 0L); if (ModNet.NetManager.DownloadDone < 0L) Interlocked.Exchange(ref ModNet.NetManager.DownloadDone, 0L); } if (p.ActiveChunks > 0 || p.TotalBytesDone > 0L) { lock (File.LockState) { if (File.State < ModNet.NetState.Merging) { File.State = ModNet.NetState.Downloading; } } } } catch (Exception ex) { Logger.Warn(ex, "C# 下载引擎进度镜像出错"); } });
 
                 // ---------- 执行 ----------
                 var Engine = new DownloadEngine();
                 // 引擎的本地复用结果也计入完成
                 // VB 侧主动取消/失败导致的中断，状态已由 VB 管理
                 // 把错误分发到各下载源，供 LoaderDownload.OnFileFail 汇总展示
-                Task.Run(async () => { try { var Report = await Engine.DownloadAsync(new[] { Request }, Options, ProgressCallback, Cts.Token); var Reused = Report.Files.FirstOrDefault(); if (Reused is not null && Reused.IsLocalReuse && File.FileSize < 0L) { Interlocked.Exchange(ref File.FileSize, -1); } long BytesLog = Reused is not null ? Reused.BytesDownloaded : 0L; File.Finish(); Logger.Info($"{File.LocalName}：C# 引擎下载完成（{StringUtils.FormatByteSize(BytesLog)}）"); } catch (OperationCanceledException) when (File.State >= ModNet.NetState.Finished) { } catch (Exception ex) { IReadOnlyList<Exception> SourceErrors = new[] { ex }; DownloadFailedException Failed = ex as DownloadFailedException; if (Failed is not null) { foreach (var kvp in Failed.ErrorsByFile) { SourceErrors = kvp.Value; break; } } for (int i = 0, loopTo = File.Sources.Count - 1; i <= loopTo; i++) { if (i < SourceErrors.Count) { File.Sources[i].Ex = SourceErrors[i]; File.Sources[i].IsFailed = true; } } File.Fail(ex); } }); // 复用场景引擎未下载，大小留给 VB 校验逻辑
+                Task.Run(async () => { try { var Report = await Engine.DownloadAsync(new[] { Request }, Options, ProgressCallback, Cts.Token); var Reused = Report.Files.FirstOrDefault(); if (Reused is not null && Reused.IsLocalReuse && File.FileSize < 0L) { Interlocked.Exchange(ref File.FileSize, -1); } long BytesLog = Reused is not null ? Reused.BytesDownloaded : 0L; File.Finish(); Logger.Info($"{File.LocalName}：C# 引擎下载完成（{StringUtils.FormatByteSize(BytesLog)}）"); } catch (OperationCanceledException) when (File.State >= ModNet.NetState.Finished) { } catch (Exception ex) { IReadOnlyList<Exception> SourceErrors = new[] { ex }; DownloadFailedException Failed = ex as DownloadFailedException; if (Failed is not null) { foreach (var kvp in Failed.ErrorsByFile) { SourceErrors = kvp.Value; break; } } for (int i = 0, loopTo = File.Sources.Count - 1; i <= loopTo; i++) { if (i < SourceErrors.Count) { File.Sources[i].Ex = SourceErrors[i]; File.Sources[i].IsFailed = true; } } File.Fail(ex); } finally { Interlocked.CompareExchange(ref File.CSharpCts, null, Cts)?.Dispose(); } }); // 复用场景引擎未下载，大小留给 VB 校验逻辑
                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 // 单文件任务
             }
             catch (Exception ex)
             {
                 // 接管失败：撤销抢占标记并回退 VB 实现
+                // 引擎任务未启动，不会有 finally 兜底，这里必须自行释放已创建的 CTS。
+                if (Cts is not null)
+                    Interlocked.CompareExchange(ref File.CSharpCts, null, Cts)?.Dispose();
                 Interlocked.Exchange(ref File.CSharpDownloadStarted, 0);
                 Logger.Warn(ex, $"C# 下载引擎启动失败，回退 VB 实现（{File.LocalName}）");
             }

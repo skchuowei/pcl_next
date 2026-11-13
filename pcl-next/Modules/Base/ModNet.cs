@@ -1421,11 +1421,7 @@ namespace PCL
                 // 状态变更
                 Interlocked.Increment(ref Th.Source.FailCount);
                 foreach (var Task in Tasks)
-                {
-                    int arglocation = Task.FailCount;
-                    Interlocked.Increment(ref arglocation);
-                    Task.FailCount = arglocation;
-                }
+                    Task.IncrementFailCount();
                 Th.State = NetState.Canceled;
                 Th.Source.Ex = ex;
                 // 根据情况判断，是否在多线程下禁用下载源（连续错误过多，或不支持断点续传）
@@ -1688,6 +1684,16 @@ namespace PCL
             }
             private void CancelInternal()
             {
+                // 通知 C# 下载引擎立即停止。此前取消链路只置 VB 侧状态，引擎令牌从不 Cancel，
+                // 只能等下一次进度回调发现 State >= Finished；引擎停滞时后台传输不会退出，
+                // 且每个文件泄漏一个 CTS。这里只 Cancel、不 Dispose，
+                // 释放由 NetInterop 的引擎任务 finally 统一负责。
+                var Cts = Volatile.Read(ref CSharpCts);
+                if (Cts is not null)
+                {
+                    try { Cts.Cancel(); }
+                    catch (ObjectDisposedException) { } // 引擎已收尾并释放，取消已无意义
+                }
                 // VB 原文：On Error Resume Next / Reset() / Interlocked.Decrement(NetManager.FileRemain)
                 // 逐语句「出错即继续」，故把 Reset 单独包住，异常时仍执行后面的计数递减。
                 try
@@ -1793,42 +1799,55 @@ namespace PCL
                 set
                 {
                     _FailCount = value;
-                    if (State == ModBase.LoadState.Loading && value >= Math.Min(10000, Math.Max(FileRemain * 8, NetTaskThreadLimit * 8 + 3)))
+                    CheckFailCount(value);
+                }
+            }
+            /// <summary>
+            /// 线程安全地递增失败计数。SourceFail 可由多个下载线程并发进入，
+            /// 原「读入局部变量 → Interlocked.Increment(局部变量) → 写回属性」并非原子读-改-写，
+            /// 并发下会丢失递增；本方法既保证不丢计数，也保留 setter 的强制失败判定。
+            /// </summary>
+            public void IncrementFailCount()
+            {
+                CheckFailCount(Interlocked.Increment(ref _FailCount));
+            }
+            private void CheckFailCount(int value)
+            {
+                if (State == ModBase.LoadState.Loading && value >= Math.Min(10000, Math.Max(FileRemain * 8, NetTaskThreadLimit * 8 + 3)))
+                {
+                    Logger.Error($"由于同加载器中失败次数过多引发强制失败：连续失败了 {value} 次", LogBehavior.ToastIfDebug);
+                    // VB 原文此处为 On Error Resume Next：收集各下载源错误并调用 OnFail 的过程中出错一律忽略，
+                    // 因为该路径本身就是在处理「加载器已失败」，收尾逻辑不能反过来把状态机打断。
+                    var ExList = new List<Exception>();
+                    try
                     {
-                        Logger.Error($"由于同加载器中失败次数过多引发强制失败：连续失败了 {value} 次", LogBehavior.ToastIfDebug);
-                        // VB 原文此处为 On Error Resume Next：收集各下载源错误并调用 OnFail 的过程中出错一律忽略，
-                        // 因为该路径本身就是在处理「加载器已失败」，收尾逻辑不能反过来把状态机打断。
-                        var ExList = new List<Exception>();
-                        try
+                        foreach (var File in Files)
                         {
-                            foreach (var File in Files)
+                            foreach (var Source in File.Sources)
                             {
-                                foreach (var Source in File.Sources)
+                                if (Source.Ex is not null)
                                 {
-                                    if (Source.Ex is not null)
-                                    {
-                                        ExList.Add(Source.Ex);
-                                        if (ExList.Count > 10)
-                                            goto FinishExCatch;
-                                    }
+                                    ExList.Add(Source.Ex);
+                                    if (ExList.Count > 10)
+                                        goto FinishExCatch;
                                 }
                             }
+                        }
 
-                        FinishExCatch:
-                            OnFail(ExList);
-                        }
-                        catch (InvalidOperationException ex)
-                        {
-                            // 吞掉 InvalidOperationException：OnFail 内部会枚举/修改 Files 并逐项 Cancel，
-                            // 多线程竞争下集合状态变化可能抛出，按 VB 语义忽略，避免失败路径二次抛出。
-                            Logger.Trace(ex, "下载加载器失败收尾出错（已忽略）");
-                        }
-                        catch (NullReferenceException ex)
-                        {
-                            // 吞掉 NullReferenceException：VB 原文 `s.Ex.IsCanceled()` 未判空，某些下载源无错误信息时可能抛出，
-                            // 与 VB 一样按「错误信息缺失」继续，不让它破坏强制失败流程。
-                            Logger.Trace(ex, "下载加载器失败详情获取失败（已忽略）");
-                        }
+                    FinishExCatch:
+                        OnFail(ExList);
+                    }
+                    catch (InvalidOperationException ex)
+                    {
+                        // 吞掉 InvalidOperationException：OnFail 内部会枚举/修改 Files 并逐项 Cancel，
+                        // 多线程竞争下集合状态变化可能抛出，按 VB 语义忽略，避免失败路径二次抛出。
+                        Logger.Trace(ex, "下载加载器失败收尾出错（已忽略）");
+                    }
+                    catch (NullReferenceException ex)
+                    {
+                        // 吞掉 NullReferenceException：VB 原文 `s.Ex.IsCanceled()` 未判空，某些下载源无错误信息时可能抛出，
+                        // 与 VB 一样按「错误信息缺失」继续，不让它破坏强制失败流程。
+                        Logger.Trace(ex, "下载加载器失败详情获取失败（已忽略）");
                     }
                 }
             }
@@ -2067,7 +2086,7 @@ namespace PCL
                     {
                         if (File.State != NetState.Canceled)
                             continue;
-                        if (File.Sources.All(s => s.Ex.IsCanceled() || s.Ex is TimeoutException))
+                        if (File.Sources.All(s => s.Ex is not null && (s.Ex.IsCanceled() || s.Ex is TimeoutException)))
                             continue;
                         string Detail = Enumerable.Select((IEnumerable<NetSource>)File.Sources, s => $"{(s.Ex is null ? "无错误信息。" : ExceptionExtensions.GetDisplay(s.Ex, false))}（{s.Url}）").Join(Constants.vbCrLf);
                         Error = new Exception("文件下载失败：" + File.LocalPath + Constants.vbCrLf + "各下载源的错误如下：" + Constants.vbCrLf + Detail, Error);

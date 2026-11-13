@@ -240,7 +240,8 @@ namespace PCL
                 SetBrush("ColorBrushScrollBarHover", LegacyDark ? Color.FromRgb(108, 116, 124) : (IsDark ? (Color)Pal.ScrollBarHover : (Color)Color3));
                 SetBrush("ColorBrushOnAccent", LegacyDark ? Color.FromArgb(255, 253, 254, 255) : (IsDark ? (Color)Pal.OnAccent : (Color)Color8));
                 // 卡片毛玻璃开启时下调卡片底色 alpha，让下方模糊背景层透出来；
-                // 只影响 ColorBrushCard，Popup / Tooltip / Sidebar / Window 保持原不透明度。
+                // 影响 ColorBrushCard 及其下游（含左侧导航栏 ColorBrushBackgroundTransparentSidebar，
+                // 已统一为卡片底色），Popup / Tooltip / Window 保持原不透明度。
                 if (Settings.Get<int>("UiCardBlur") > 0)
                     ColorCard.A = IsDark ? 165d : 180d;
                 SetBrush("ColorBrushCard", ColorCard);
@@ -255,7 +256,14 @@ namespace PCL
                 SetBrush("ColorBrushRedDark", IsDark ? Color.FromArgb(255, 255, 138, 122) : Color.FromArgb(255, 206, 33, 17));
                 SetBrush("ColorBrushRedLight", IsDark ? Color.FromArgb(255, 255, 107, 107) : Color.FromArgb(255, 255, 76, 76));
                 SetBrush("ColorBrushSemiTransparent", ColorSemiTransparent);
-                SetBrush("ColorBrushBackgroundTransparentSidebar", ColorSidebar);
+                // 左侧导航栏背景与右侧 MyCard 卡片统一为同一底色（ColorBrushCard），
+                // 避免侧栏比卡片偏黄/偏主题色、两侧配色不一致。沿用 PageDownloadInstall 的既有约定。
+                SetBrush("ColorBrushBackgroundTransparentSidebar", ColorCard);
+                // 按钮边框专用画刷：默认与主题保持一致（Color1 / Color3 / Gray4），供开发者 UI 细调独立覆盖
+                SetBrush("ColorBrushButton", Color1);
+                SetBrush("ColorBrushButtonHover", Color3);
+                SetBrush("ColorBrushButtonPressed", Color3);
+                SetBrush("ColorBrushButtonDisabled", ColorGray4);
                 Res["ColorObject1"] = (Color)Color1;
                 Res["ColorObject2"] = (Color)Color2;
                 Res["ColorObject3"] = (Color)Color3;
@@ -276,6 +284,7 @@ namespace PCL
                 Res["ColorObjectGray8"] = (Color)ColorGray8;
                 Res["ColorObjectShadow"] = LegacyDark ? Color.FromArgb(255, 0, 0, 0) : (IsDark ? (Color)Pal.ObjectShadow : (Color)Color1);
                 ThemeRefreshMain();
+                DevColorApplyOverrides();
 
                 void SetBrush(string Key, Color Value) => Res[Key] = new SolidColorBrush(Value);
             }
@@ -344,6 +353,62 @@ namespace PCL
             }
             ModMain.FrmMain.PanForm.Background.Freeze();
         });
+        }
+
+        // —— 开发者测试：UI 细调覆盖层 ——
+        // 在 ThemeRefresh 算出的主题基线之上，叠加开发者在「UI 设置（测试）」中写入的覆盖色。
+        // 仅当对应设置非空时才覆盖；清空（恢复默认）时自动回落到主题基线，不污染正式配色。
+        public static void DevColorApplyOverrides()
+        {
+            try
+            {
+                var Res = Application.Current.Resources;
+                ApplyDevBrush(Res, "UiDevColorAccent", "ColorBrush3", "ColorBrush4", "ColorBrushScrollBar", "ColorBrushOnAccent");
+                ApplyDevBrush(Res, "UiDevColorText", "ColorBrush1");
+                ApplyDevBrush(Res, "UiDevColorBtnDefault", "ColorBrushButton");
+                ApplyDevBrush(Res, "UiDevColorBtnHover", "ColorBrushButtonHover");
+                ApplyDevBrush(Res, "UiDevColorBtnPressed", "ColorBrushButtonPressed");
+                ApplyDevBrush(Res, "UiDevColorBtnDisabled", "ColorBrushButtonDisabled");
+                ApplyDevBrush(Res, "UiDevColorPopup", "ColorBrushPopup");
+                // 主窗体背景
+                string Bg = Settings.Get<string>("UiDevColorBg");
+                if (!string.IsNullOrEmpty(Bg) && ModMain.FrmMain is not null && ModMain.FrmMain.IsLoaded)
+                    ModMain.FrmMain.PanForm.Background = new SolidColorBrush((Color)new ModBase.MyColor(Bg));
+                // 主题色（含标题栏）：额外重刷标题栏渐变
+                string Ac = Settings.Get<string>("UiDevColorAccent");
+                if (!string.IsNullOrEmpty(Ac))
+                    DevApplyTitleBar(new ModBase.MyColor(Ac));
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn(ex, "应用开发者配色覆盖失败");
+            }
+        }
+
+        private static void ApplyDevBrush(System.Windows.ResourceDictionary Res, string SettingKey, params string[] BrushKeys)
+        {
+            string Hex = Settings.Get<string>(SettingKey);
+            if (string.IsNullOrEmpty(Hex))
+                return;
+            var Brush = new SolidColorBrush((Color)new ModBase.MyColor(Hex));
+            foreach (var Key in BrushKeys)
+                Res[Key] = Brush;
+        }
+
+        // 用开发者指定的主题色重算标题栏三段渐变（沿用 ThemeRefreshMain 的三段结构，明暗随主题色轻微浮动）
+        private static void DevApplyTitleBar(ModBase.MyColor Accent)
+        {
+            ModBase.RunInUi(() =>
+            {
+                if (ModMain.FrmMain is null || !ModMain.FrmMain.IsLoaded)
+                    return;
+                var Brush = new LinearGradientBrush() { EndPoint = new Point(1d, 0d), StartPoint = new Point(0d, 0d) };
+                Brush.GradientStops.Add(new GradientStop() { Offset = 0d, Color = (Color)(Accent * 0.9d) });
+                Brush.GradientStops.Add(new GradientStop() { Offset = 0.5d, Color = (Color)Accent });
+                Brush.GradientStops.Add(new GradientStop() { Offset = 1d, Color = (Color)(Accent * 1.1d) });
+                ModMain.FrmMain.PanTitle.Background = Brush;
+                ModMain.FrmMain.PanTitle.Background.Freeze();
+            });
         }
         internal static void ThemeCheckAll(bool EffectSetup)
         {

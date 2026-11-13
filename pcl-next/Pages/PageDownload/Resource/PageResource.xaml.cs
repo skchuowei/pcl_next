@@ -101,6 +101,10 @@ namespace PCL
     /// 在切换到该页面时自动设置的搜索框内的内容。
     /// </summary>
         public static string TargetName = null;
+        /// <summary>
+        /// 切换到本页时自动预设的游戏版本筛选（由下载页「基于某版本搜索」入口写入）。
+        /// </summary>
+        public static string TargetVersion = null;
 
         // 在点击 MyResourceItem 时会获取 Loader 的输入，以使资源详情页面可以应用相同的筛选项
         // 数据源已改由 C# 侧 Provider 提供（Phase 4 首步）；接口与原先的 ResourceSearcher.GetLoader 一致
@@ -165,9 +169,18 @@ namespace PCL
                     StartNewSearch();
                 this.ScrollToHome();
             }
+            if (TargetVersion is not null)
+            {
+                ResetFilter();
+                this.TextSearchVersion.Text = TargetVersion;
+                TargetVersion = null;
+                if (_PageResource_Loaded_IsFirstLoaded)
+                    StartNewSearch();
+                this.ScrollToHome();
+            }
             // 加载器初始化
             if (_PageResource_Loaded_IsFirstLoaded)
-                return;
+                    return;
             _PageResource_Loaded_IsFirstLoaded = true;
             ApplySourceAvailability();
             ((MyPageRight)this.Parent).PageLoaderInit(this.Load, this.PanLoad, this.PanContent, this.PanAlways, Loader, (_) => Load_OnFinish(), this.LoaderInput);

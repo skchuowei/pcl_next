@@ -23,6 +23,11 @@
             <SolidColorBrush x:Key="ColorBrush2">#0b5bcb</SolidColorBrush>
             <SolidColorBrush x:Key="ColorBrush3">#1370f3</SolidColorBrush>
             <SolidColorBrush x:Key="ColorBrush4">#4890f5</SolidColorBrush>
+            <!-- 按钮边框专用画刷：默认与主题主色/文字/灰阶一致，可被开发者 UI 细调独立覆盖 -->
+            <SolidColorBrush x:Key="ColorBrushButton">#343d4a</SolidColorBrush>
+            <SolidColorBrush x:Key="ColorBrushButtonHover">#1370f3</SolidColorBrush>
+            <SolidColorBrush x:Key="ColorBrushButtonPressed">#1370f3</SolidColorBrush>
+            <SolidColorBrush x:Key="ColorBrushButtonDisabled">#a6a6a6</SolidColorBrush>
             <SolidColorBrush x:Key="ColorBrush5">#96c0f9</SolidColorBrush>
             <SolidColorBrush x:Key="ColorBrush6">#d5e6fd</SolidColorBrush>
             <SolidColorBrush x:Key="ColorBrush7">#e0eafd</SolidColorBrush>

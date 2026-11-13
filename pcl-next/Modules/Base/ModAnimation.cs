@@ -32,7 +32,30 @@ namespace PCL
             get
             {
                 int Setting = Settings.Get<int>("SystemDebugAnim");
-                return Setting >= 30 ? 200d : (Setting * 0.1d + 0.1d).Clamp(0.1d, 3d);
+                double Base = Setting >= 30 ? 200d : (Setting * 0.1d + 0.1d).Clamp(0.1d, 3d);
+                // 开发者 UI 细调：动画速度倍率（×0.1 步进，10 = 1.0×）
+                double Dev = Settings.Get<int>("UiDevAnimSpeed") / 10d;
+                return Base * Dev;
+            }
+        }
+        /// <summary>
+        /// 开发者 UI 细调：动画默认缓动曲线。当具体动画未显式指定 Ease 时采用。
+        /// </summary>
+        public static AniEase AniEaseDefault
+        {
+            get
+            {
+                switch (Settings.Get<int>("UiDevAnimEase"))
+                {
+                    case 1:
+                        return new AniEaseOutFluent();   // 标准（流畅）
+                    case 2:
+                        return new AniEaseInFluent();    // 缓入
+                    case 3:
+                        return new AniEaseOutBack();     // 缓出（回弹）
+                    default:
+                        return new AniEaseLinear();      // 线性
+                }
             }
         }
         /// <summary>
@@ -227,7 +250,7 @@ namespace PCL
                 TypeMain = AniType.Number,
                 TypeSub = AniTypeSub.X,
                 TimeTotal = Time,
-                Ease = Ease ?? new AniEaseLinear(),
+                Ease = Ease ?? AniEaseDefault,
                 Obj = Obj,
                 Value = Value,
                 IsAfter = After,
@@ -252,7 +275,7 @@ namespace PCL
                 TypeMain = AniType.Number,
                 TypeSub = AniTypeSub.Y,
                 TimeTotal = Time,
-                Ease = Ease ?? new AniEaseLinear(),
+                Ease = Ease ?? AniEaseDefault,
                 Obj = Obj,
                 Value = Value,
                 IsAfter = After,
@@ -277,7 +300,7 @@ namespace PCL
                 TypeMain = AniType.Number,
                 TypeSub = AniTypeSub.Width,
                 TimeTotal = Time,
-                Ease = Ease ?? new AniEaseLinear(),
+                Ease = Ease ?? AniEaseDefault,
                 Obj = Obj,
                 Value = Value,
                 IsAfter = After,
@@ -302,7 +325,7 @@ namespace PCL
                 TypeMain = AniType.Number,
                 TypeSub = AniTypeSub.Height,
                 TimeTotal = Time,
-                Ease = Ease ?? new AniEaseLinear(),
+                Ease = Ease ?? AniEaseDefault,
                 Obj = Obj,
                 Value = Value,
                 IsAfter = After,
@@ -327,7 +350,7 @@ namespace PCL
                 TypeMain = AniType.Number,
                 TypeSub = AniTypeSub.Opacity,
                 TimeTotal = Time,
-                Ease = Ease ?? new AniEaseLinear(),
+                Ease = Ease ?? AniEaseDefault,
                 Obj = Obj,
                 Value = Value,
                 IsAfter = After,
@@ -352,7 +375,7 @@ namespace PCL
                 TypeMain = AniType.Number,
                 TypeSub = AniTypeSub.Value,
                 TimeTotal = Time,
-                Ease = Ease ?? new AniEaseLinear(),
+                Ease = Ease ?? AniEaseDefault,
                 Obj = Obj,
                 Value = Value,
                 IsAfter = After,
@@ -377,7 +400,7 @@ namespace PCL
                 TypeMain = AniType.Number,
                 TypeSub = AniTypeSub.Radius,
                 TimeTotal = Time,
-                Ease = Ease ?? new AniEaseLinear(),
+                Ease = Ease ?? AniEaseDefault,
                 Obj = Obj,
                 Value = Value,
                 IsAfter = After,
@@ -402,7 +425,7 @@ namespace PCL
                 TypeMain = AniType.Number,
                 TypeSub = AniTypeSub.BorderThickness,
                 TimeTotal = Time,
-                Ease = Ease ?? new AniEaseLinear(),
+                Ease = Ease ?? AniEaseDefault,
                 Obj = Obj,
                 Value = Value,
                 IsAfter = After,
@@ -425,7 +448,7 @@ namespace PCL
                 TypeMain = AniType.Number,
                 TypeSub = AniTypeSub.StrokeThickness,
                 TimeTotal = Time,
-                Ease = Ease ?? new AniEaseLinear(),
+                Ease = Ease ?? AniEaseDefault,
                 Obj = Obj,
                 Value = Value,
                 IsAfter = After,
@@ -448,7 +471,7 @@ namespace PCL
                 TypeMain = AniType.Number,
                 TypeSub = AniTypeSub.GridLengthWidth,
                 TimeTotal = Time,
-                Ease = Ease ?? new AniEaseLinear(),
+                Ease = Ease ?? AniEaseDefault,
                 Obj = Obj,
                 Value = Value,
                 IsAfter = After,
@@ -472,7 +495,7 @@ namespace PCL
     /// <remarks></remarks>
         public static AniData AaDouble(object Obj, DependencyProperty Prop, double Value, int Time = 400, int Delay = 0, AniEase Ease = null, bool After = false)
         {
-            return new AniData() { TypeMain = AniType.Number, TypeSub = AniTypeSub.Double, TimeTotal = Time, Ease = Ease ?? new AniEaseLinear(), Obj = new[] { Obj, Prop, "" }, Value = Value, IsAfter = After, TimeFinished = -Delay };
+            return new AniData() { TypeMain = AniType.Number, TypeSub = AniTypeSub.Double, TimeTotal = Time, Ease = Ease ?? AniEaseDefault, Obj = new[] { Obj, Prop, "" }, Value = Value, IsAfter = After, TimeFinished = -Delay };
         }
         /// <summary>
     /// 获取数字动画值。
@@ -486,7 +509,7 @@ namespace PCL
     /// <remarks></remarks>
         public static AniData AaDouble(ParameterizedThreadStart Lambda, double Value, int Time = 400, int Delay = 0, AniEase Ease = null, bool After = false)
         {
-            return new AniData() { TypeMain = AniType.Number, TypeSub = AniTypeSub.DoubleParam, TimeTotal = Time, Ease = Ease ?? new AniEaseLinear(), Obj = Lambda, Value = Value, IsAfter = After, TimeFinished = -Delay };
+            return new AniData() { TypeMain = AniType.Number, TypeSub = AniTypeSub.DoubleParam, TimeTotal = Time, Ease = Ease ?? AniEaseDefault, Obj = Lambda, Value = Value, IsAfter = After, TimeFinished = -Delay };
         }
 
         // ColorAnimation（Obj, Prop, [Res]）
@@ -505,7 +528,7 @@ namespace PCL
     /// <remarks></remarks>
         public static AniData AaColor(FrameworkElement Obj, DependencyProperty Prop, ModBase.MyColor Value, int Time = 400, int Delay = 0, AniEase Ease = null, bool After = false)
         {
-            return new AniData() { TypeMain = AniType.Color, TimeTotal = Time, Ease = Ease ?? new AniEaseLinear(), Obj = new object[]{ Obj, Prop, "" }, Value = Value, IsAfter = After, TimeFinished = -Delay, ValueLast = new ModBase.MyColor(0d, 0d, 0d, 0d) };
+            return new AniData() { TypeMain = AniType.Color, TimeTotal = Time, Ease = Ease ?? AniEaseDefault, Obj = new object[]{ Obj, Prop, "" }, Value = Value, IsAfter = After, TimeFinished = -Delay, ValueLast = new ModBase.MyColor(0d, 0d, 0d, 0d) };
         }
         /// <summary>
     /// 改变颜色属性为一个资源的动画。
@@ -521,7 +544,7 @@ namespace PCL
     /// <remarks></remarks>
         public static AniData AaColor(FrameworkElement Obj, DependencyProperty Prop, string Res, int Time = 400, int Delay = 0, AniEase Ease = null, bool After = false)
         {
-            return new AniData() { TypeMain = AniType.Color, TimeTotal = Time, Ease = Ease ?? new AniEaseLinear(), Obj = new object[]{ Obj, Prop, Res }, Value = new ModBase.MyColor(Application.Current.FindResource(Res)) - new ModBase.MyColor(Obj.GetValue(Prop)), IsAfter = After, TimeFinished = -Delay, ValueLast = new ModBase.MyColor(0d, 0d, 0d, 0d) };
+            return new AniData() { TypeMain = AniType.Color, TimeTotal = Time, Ease = Ease ?? AniEaseDefault, Obj = new object[]{ Obj, Prop, Res }, Value = new ModBase.MyColor(Application.Current.FindResource(Res)) - new ModBase.MyColor(Obj.GetValue(Prop)), IsAfter = After, TimeFinished = -Delay, ValueLast = new ModBase.MyColor(0d, 0d, 0d, 0d) };
         }
 
         // Scale
@@ -549,7 +572,7 @@ namespace PCL
             {
                 ChangeRect = new ModBase.MyRect(Conversions.ToDouble(Operators.MultiplyObject(Operators.MultiplyObject(-0.5d, ((dynamic)Obj).ActualWidth), Value)), Conversions.ToDouble(Operators.MultiplyObject(Operators.MultiplyObject(-0.5d, ((dynamic)Obj).ActualHeight), Value)), Conversions.ToDouble(Operators.MultiplyObject(((dynamic)Obj).ActualWidth, Value)), Conversions.ToDouble(Operators.MultiplyObject(((dynamic)Obj).ActualHeight, Value)));
             }
-            return new AniData() { TypeMain = AniType.Scale, TimeTotal = Time, Ease = Ease ?? new AniEaseLinear(), Obj = Obj, Value = ChangeRect, IsAfter = After, TimeFinished = -Delay };
+            return new AniData() { TypeMain = AniType.Scale, TimeTotal = Time, Ease = Ease ?? AniEaseDefault, Obj = Obj, Value = ChangeRect, IsAfter = After, TimeFinished = -Delay };
         }
 
         // TextAppear
@@ -568,7 +591,7 @@ namespace PCL
         public static AniData AaTextAppear(object Obj, bool Hide = false, bool TimePerText = true, int Time = 70, int Delay = 0, AniEase Ease = null, bool After = false)
         {
             // Are we cool yet？
-            return new AniData() { TypeMain = AniType.TextAppear, Ease = Ease ?? new AniEaseLinear(), TimeTotal = TimePerText ? Time * (Obj is TextBlock ? ((dynamic)Obj).Text : ((dynamic)Obj).Context.ToString()).ToString().Length : Time, Obj = Obj, Value = new[] { Obj is TextBlock ? ((dynamic)Obj).Text : ((dynamic)Obj).Context.ToString(), Hide }, IsAfter = After, TimeFinished = -Delay };
+            return new AniData() { TypeMain = AniType.TextAppear, Ease = Ease ?? AniEaseDefault, TimeTotal = TimePerText ? Time * (Obj is TextBlock ? ((dynamic)Obj).Text : ((dynamic)Obj).Context.ToString()).ToString().Length : Time, Obj = Obj, Value = new[] { Obj is TextBlock ? ((dynamic)Obj).Text : ((dynamic)Obj).Context.ToString(), Hide }, IsAfter = After, TimeFinished = -Delay };
         }
 
         // Code
@@ -608,7 +631,7 @@ namespace PCL
     /// <remarks></remarks>
         public static AniData AaScaleTransform(object Obj, double Value, int Time = 400, int Delay = 0, AniEase Ease = null, bool After = false)
         {
-            return new AniData() { TypeMain = AniType.ScaleTransform, TimeTotal = Time, Ease = Ease ?? new AniEaseLinear(), Obj = Obj, Value = Value, IsAfter = After, TimeFinished = -Delay };
+            return new AniData() { TypeMain = AniType.ScaleTransform, TimeTotal = Time, Ease = Ease ?? AniEaseDefault, Obj = Obj, Value = Value, IsAfter = After, TimeFinished = -Delay };
         }
 
         // RotateTransform
@@ -626,7 +649,7 @@ namespace PCL
     /// <remarks></remarks>
         public static AniData AaRotateTransform(object Obj, double Value, int Time = 400, int Delay = 0, AniEase Ease = null, bool After = false)
         {
-            return new AniData() { TypeMain = AniType.RotateTransform, TimeTotal = Time, Ease = Ease ?? new AniEaseLinear(), Obj = Obj, Value = Value, IsAfter = After, TimeFinished = -Delay };
+            return new AniData() { TypeMain = AniType.RotateTransform, TimeTotal = Time, Ease = Ease ?? AniEaseDefault, Obj = Obj, Value = Value, IsAfter = After, TimeFinished = -Delay };
         }
 
         // TranslateTransform
@@ -647,7 +670,7 @@ namespace PCL
                 TypeMain = AniType.Number,
                 TypeSub = AniTypeSub.TranslateX,
                 TimeTotal = Time,
-                Ease = Ease ?? new AniEaseLinear(),
+                Ease = Ease ?? AniEaseDefault,
                 Obj = Obj,
                 Value = Value,
                 IsAfter = After,
@@ -670,7 +693,7 @@ namespace PCL
                 TypeMain = AniType.Number,
                 TypeSub = AniTypeSub.TranslateY,
                 TimeTotal = Time,
-                Ease = Ease ?? new AniEaseLinear(),
+                Ease = Ease ?? AniEaseDefault,
                 Obj = Obj,
                 Value = Value,
                 IsAfter = After,

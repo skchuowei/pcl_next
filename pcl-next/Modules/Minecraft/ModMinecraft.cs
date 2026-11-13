@@ -2563,7 +2563,9 @@ namespace PCL
                         return Index;
                     if (Instance.JsonObject["assets"] is not null)
                         AssetsName = Instance.JsonObject["assets"].ToString();
-                    if (CheckURLEmpty && Index["url"] is not null)
+                    // 该层版本 json 可能没有 assetIndex（Index 为 null），直接取 Index["url"]
+                    // 会抛 NRE 并被下面的空 catch 吞掉，从而错误回退到 legacy 内置索引。
+                    if (CheckURLEmpty && Index is not null && Index["url"] is not null)
                         return Index;
                     // 下一个版本
                     if (string.IsNullOrEmpty(Instance.InheritName))
@@ -2571,8 +2573,11 @@ namespace PCL
                     Instance = new McInstance(McFolderSelected + @"versions\" + Instance.InheritName);
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                // 原实现是空 catch：任何异常（含上面的 NRE）都被静默吞掉，
+                // 直接落到 legacy 回退，日志里看不出为什么资源索引换了内容。
+                Logger.Warn(ex, "获取资源文件索引信息失败");
             }
             // 无法获取到下载地址
             if (ReturnLegacyOnError)
@@ -2738,7 +2743,11 @@ namespace PCL
             }
             catch (Exception ex)
             {
+                // 索引缺失/损坏时原实现吞掉异常并返回空列表，加载器会把「一个文件都没下」
+                // 当成成功完成（表现为资源、语言包下载不完整，补全却提示成功）。
+                // 与 CheckHash=true 分支的语义保持一致：让加载器明确失败，暴露真实原因。
                 Logger.Warn(ex, "获取版本缺失的资源文件下载列表失败");
+                throw new Exception("获取版本缺失的资源文件下载列表失败，资源文件可能不完整", ex);
             }
             if (ProgressFeed is not null)
                 ProgressFeed.Progress = 0.99d;

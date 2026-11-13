@@ -445,3 +445,81 @@
 - **现象**：Fabric API 等 `LoaderTask<int, List<...>>` 加载失败后重试，`PageLoaderRestart` 通过 `dynamic` 将 `object` 和装箱的输入委托传给泛型 `StartGetInput`，运行时重载解析失败；截图显示动画回调报错。
 - **修复**：`MyPageRight.PageLoaderInit<TIn,TOut>` 绑定强类型重启委托，输入转换遵循加载器既有 `Conversions.ToGenericParameter<TIn>` 路径；`LoaderCombo<TIn>` 使用对应的泛型输入回调，不再尝试动态调用不存在的 `StartGetInput`。
 - **验证**：Windows Release 项目完整构建通过，0 错误 / 30 警告；本次关闭输出复制以避开仍运行程序锁定的产物文件；不改变 Windows 以外的平台。
+
+---
+
+## 十三、M1–M8 确认缺陷修复记录（2026-11-12）
+
+> 范围：`PCL_NEXT_Windows` / `dev.6-Windows`，仅改 `pcl-next/Modules/` 下 5 个文件；
+> 不涉及并行会话正在修改的 UI 文件，不改版本常量、构建配置与发布配置；未提交、未推送。
+
+| 编号 | 文件 | 修复 |
+|---|---|---|
+| M1 | `Modules/Base/ModNet.cs`、`Modules/Base/NetInterop.cs` | `NetFile.CancelInternal` 读 `CSharpCts` 并 `Cancel()`（带 `ObjectDisposedException` 兜底）；`NetInterop` 的引擎任务加 `finally`，用 `Interlocked.CompareExchange` 原子摘除并 `Dispose()` CTS，启动失败的外层 catch 同样释放；进度回调改走 `SafeCancelCts()`，避免释放后 Cancel 刷日志 |
+| M2 | `Modules/Base/ModNet.cs` | `OnFail` 的 `File.Sources.All(...)` 谓词补 `s.Ex is not null`，与 `OnFileFail` 判空口径一致 |
+| M3 | `Modules/Base/ModNet.cs` | `LoaderDownload` 新增 `IncrementFailCount()`（对私有字段 `Interlocked.Increment`）与 `CheckFailCount(int)`，`SourceFail` 改调它；原「读局部 → 自增局部 → 写回属性」的非原子读-改-写已删除，强制失败判定（原 setter 副作用）完整保留。`FailCount` 是带副作用的属性，不能直接 `ref` 传给 `Interlocked` |
+| M4 | `Modules/Base/ModBase.cs` | `ExtractResources` 在类型分支前判 `Resource is null`，抛「资源不存在」而非在 else 里对 null 调 `GetType()` |
+| M5 | `Modules/Minecraft/ModJava.cs` | `WaitIfRunning` 后判 `HasSucceeded`，失败时用空 `List<JavaDownloadInfo>` 复用既有「手动安装 Java」提示，不再读 `LastResult` 抛「从未成功完成过」掩盖真实原因 |
+| M6 | `Modules/Base/MyBitmap.cs` | 2 字节头循环读满（短流按原语义走非 WebP 分支），WebP 全文改 `Stream.ReadExactly`；消除 2 条 CA2022 |
+| M7 | `Modules/Minecraft/ModJava.cs` | `AddConstraint` 先接住 `Intersect` 结果，`null` 或 `IsEmpty()` 一并视为约束冲突走提示 + 回退，交集正常时才赋值 |
+| M8 | `Modules/Base/MyBitmap.cs` | 缓存字典恢复 `static readonly`（对齐 VB 过程级 `Static`），并把 `ContainsKey` + 索引器改为 `TryGetValue`，消除共享后的读-写竞态 |
+
+**验证**：`dotnet build pcl-next/pcl-next.csproj -c Release -r win-x64 --self-contained -p:PclChannel=Dev`
+→ 0 错误 / 26 警告（基线 30，M6 的 2 条 CA2022 已消失），产物落在
+`pcl-next/bin-net10/Dev/2.100.0.6-0.89/win-x64/`；`PCL.Download.Tests` 568/568 通过；
+`git diff --check` 通过。
+
+**未纳入本轮**：S1–S14（可疑项，需运行/边界确认或产品裁决）、第五节低危、第六节上游留痕，
+以及 11-11 交接的其余 P1 项（`Lower()` 对 null 抛 NRE、`Nothing == ""` 语义丢失、
+`RefreshColor` 订阅丢参数、331 处 dynamic 晚绑定等；
+其中 `McAssetsGetIndex` 空 catch 已在第十四节修复）。
+
+---
+
+## 十四、资源/语言包「下载不完整」（2026-11-12 实机，已修）
+
+### 取证（只读扫描用户游戏目录，未改动任何个人文件）
+
+| 目录 | `assets/indexes/34.json` | objects | 结论 |
+|---|---|---|---|
+| `C:\Users\chuowei\AppData\Roaming\.minecraft` | sha1 `e99f9973…`，597235 B，5149 条（SUC 整合包版） | 5149/5149 SHA1 与大小全对 | 10:40:19–47 的补全正是把 145 个 `minecraft/lang/*.json` 全部补齐，当前完整 |
+| `D:\bing\MC\pcl_x\PCL_next游戏测试目录` | sha1 `331e5c80…`，597035 B，5147 条（26.3-Fabric 版） | 5134/5147，**缺 13 个** | 含 `minecraft/lang/bs_ba.json`，另有 11 个音乐/唱片 ogg 与 2 个 realms 贴图 |
+
+26.3 系列四个版本 json 的 `assetIndex.id` 全是 `34`，但 `sha1` 各不相同
+（`917ff6d7` / `331e5c80` / `e9d91243` / `e99f9973`）、`objects` 集合也不同；
+PCL 把它们全部写到同一个 `assets/indexes/34.json`。
+
+### 根因（三处，均为 VB 原文既有语义被 26.x 版本体系放大）
+
+1. `ModDownload.DlClientAssetIndexGet` 给索引文件的 `FileChecker` 只有 `IsJson = true`，
+   **不使用 version json 里自带的 `assetIndex.sha1`**。于是「本地已有一份合法 JSON」就跳过刷新，
+   上一版本留下的 `34.json` 被当前版本继续用，objects 列表与磁盘实际内容错配。
+2. `ModMinecraft.McAssetsFixList` 的非 Hash 分支 catch 吞掉 `McAssetsListGet` 异常并**返回空列表**，
+   加载器把「一个文件都没下」当成成功完成（日志里即「文件补全成功！」），失败完全不可见。
+3. `ModMinecraft.McAssetsGetIndex` 的 `Index["url"]` 在 `Index` 为 null 时抛 NRE，
+   被空 catch 静默吞掉后错误回退内置 legacy 索引，日志无痕迹。
+
+### 修复
+
+- `ModDownload.cs`：索引 `NetFile` 增加 `Checker.Hash = assetIndex.sha1`（不设 `ActualSize`，
+  避免索引下载「文件大小未知」时触发 `DownloadFileTask.cs:656` 的大小比对误判）；
+  下载完成后 `FileCheckRule.Validate` 对落盘文件算 SHA1，同 id 不同内容必定触发重新下载。
+  安装流程（`ModDownloadLib.cs:82`）与补全流程（`DlClientFix`）共用此函数，一处修复覆盖两条链路。
+- `ModMinecraft.cs`：`Index["url"]` 补 `Index is not null`；空 catch 改记 `Logger.Warn`；
+  `McAssetsFixList` 的 catch 改为包装后重抛，与 `CheckHash=true` 分支语义一致。
+
+### 验证
+
+Release / win-x64 / self-contained 构建 0 错误 / 26 警告；`PCL.Download.Tests` 568/568。
+未改 `CheckAssetsHash` 策略（补全是否按 hash 全量校验仍由用户设置决定），
+未改版本常量、构建配置与发布配置；未提交、未推送。
+
+**排除项**：`DownloadEngine.DownloadAsync` 失败会抛 `DownloadFailedException`，
+`NetInterop` 会 `File.Fail(ex)`，即下载引擎不会静默跳过；游戏 `logs/latest.log` 里
+各 mod 语言包均加载成功，两份 crash report 分别是 Iris/Voxy 渲染 NPE 与 watchdog，与语言包无关。
+
+### 用户侧恢复动作
+
+`PCL_next游戏测试目录` 的 13 个缺失对象仍需在该实例上再跑一次「补全文件」：
+修复后索引会按 sha1 刷新到当前版本，缺失的 13 个会进入下载列表。
+`.minecraft` 目录当前已完整，无需处理。

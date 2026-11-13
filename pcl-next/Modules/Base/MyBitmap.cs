@@ -88,7 +88,10 @@ namespace PCL
         {
         }
         // 使用缓存
-        private ConcurrentDictionary<string, MyBitmap> _Cache = new ConcurrentDictionary<string, MyBitmap>();
+        // VB 原文是过程级 Static（全实例共享一份缓存）；转换器把它抬成了实例字段，
+        // 于是每次 new MyBitmap 都拿到空字典、缓存永不命中。恢复静态共享，
+        // 并改用 TryGetValue 消除共享之后的「先查再取」竞态。
+        private static readonly ConcurrentDictionary<string, MyBitmap> _Cache = new ConcurrentDictionary<string, MyBitmap>();
         public MyBitmap(string FilePathOrResourceName)
         {
             do
@@ -110,9 +113,9 @@ namespace PCL
                     }
                     if (FilePathOrResourceName.StartsWithF(ModBase.PathImage))
                     {
-                        if (_Cache.ContainsKey(FilePathOrResourceName))
+                        if (_Cache.TryGetValue(FilePathOrResourceName, out var Cached))
                         {
-                            Pic = _Cache[FilePathOrResourceName].Pic;
+                            Pic = Cached.Pic;
                         }
                         else
                         {
@@ -127,13 +130,21 @@ namespace PCL
                         {
                             // 判断是否为 WebP 文件头
                             var Header = new byte[2];
-                            InputStream.Read(Header, 0, 2);
-                            InputStream.Seek(0L, SeekOrigin.Begin);
-                            if (Header[0] == 82 && Header[1] == 73)
+                            // Stream.Read 不保证一次读满；短于 2 字节的文件按原语义当作非 WebP，
+                            // 交给下面的 Bitmap 构造去报「图片格式不支持」。
+                            int HeaderRead = 0;
+                            while (HeaderRead < Header.Length)
                             {
-                                // 读取 WebP
-                                var FileBytes = new byte[(int)(InputStream.Length - 1L + 1)];
-                                InputStream.Read(FileBytes, 0, FileBytes.Length);
+                                int Read = InputStream.Read(Header, HeaderRead, Header.Length - HeaderRead);
+                                if (Read == 0) break;
+                                HeaderRead += Read;
+                            }
+                            InputStream.Seek(0L, SeekOrigin.Begin);
+                            if (HeaderRead == Header.Length && Header[0] == 82 && Header[1] == 73)
+                            {
+                                // WebP 必须读满整个文件：单次 Read 未读满时尾部补 0，解码会损坏或失败。
+                                var FileBytes = new byte[(int)InputStream.Length];
+                                InputStream.ReadExactly(FileBytes, 0, FileBytes.Length);
                                 Pic = WebPDecoder.DecodeFromBytes(FileBytes); // 将代码隔离在另外一个类中，这样只要不走进这个分支就不会加载 Imazen.WebP.dll
                             }
                             else

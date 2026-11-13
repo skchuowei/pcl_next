@@ -68,7 +68,15 @@ namespace PCL
             }
             else
             {
-                return new ModNet.NetFile(DlSourceLauncherOrMetaGet(IndexUrl), IndexAddress, new FileChecker() { IsJson = true });
+                // version json 的 assetIndex 自带 sha1。26.x 系列多个版本共用同一个 id（如 "34"），
+                // 但每份索引的内容与 objects 集合都不同；只校验 IsJson 会把上一个版本留下的
+                // 34.json 当成有效而跳过刷新，导致 objects 与索引错配
+                // （表现为资源、语言包下载不完整，补全却提示成功）。
+                var Checker = new FileChecker() { IsJson = true };
+                string IndexHash = (string)(IndexInfo["sha1"] ?? "");
+                if (!string.IsNullOrEmpty(IndexHash))
+                    Checker.Hash = IndexHash;
+                return new ModNet.NetFile(DlSourceLauncherOrMetaGet(IndexUrl), IndexAddress, Checker);
             }
         }
 

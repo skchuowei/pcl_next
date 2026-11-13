@@ -1288,6 +1288,8 @@ namespace PCL
         public static void ExtractResources(string FilePath, string ResourceName)
         {
             var Resource = My.Resources.Resources.ResourceManager.GetObject(ResourceName);
+            if (Resource is null)
+                throw new Exception($"资源 {ResourceName} 不存在");
             if (Resource is byte[])
             {
                 byte[] Bytes = (byte[])Resource;

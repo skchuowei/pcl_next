@@ -214,11 +214,17 @@ namespace PCL
             var JavaRange = ValueRange<Version>.All();
             void AddConstraint(ValueRange<Version> Constraint)
             {
-                JavaRange = JavaRange?.Intersect(Constraint);
-                if (JavaRange.IsEmpty())
+                // ValueRange.Intersect 在无交集时返回 null（其契约如此），与 IsEmpty() 同属约束冲突；
+                // 原写法直接对 null 调 IsEmpty() 会抛 NRE，走不到下面的提示 + 回退分支。
+                var Intersected = JavaRange?.Intersect(Constraint);
+                if (Intersected is null || Intersected.IsEmpty())
                 {
                     Logger.Warn($"Java 版本要求冲突，若启动失败请在版本设置手动指定 Java：当前追加的要求为 {Constraint}，游戏版本为 {Instance.VersionDisplayName()}", LogBehavior.Toast);
                     JavaRange = Constraint;
+                }
+                else
+                {
+                    JavaRange = Intersected;
                 }
             };
 
@@ -561,7 +567,15 @@ return Results;
                                     _SelectOrDownloadJava_DownloadListWorker.Start(c, p?.SplitTo(0.4d));
                                 _SelectOrDownloadJava_DownloadListWorker.WaitIfRunning(cancellationToken: c);
                                 p?.Set(0.4d, skiped: true);
-                                var Components = _SelectOrDownloadJava_DownloadListWorker.LastResult;
+                                // RedoableWorker.LastResult 在本次负载未成功完成时抛「从未成功完成过」，
+                                // 会掩盖网络/JSON 失败的真实原因，且走不到手动安装提示。
+                                // 改为空列表，复用下方「Mojang 列表中没有合适的 Java」的提示路径。
+                                bool ListReady = _SelectOrDownloadJava_DownloadListWorker.HasSucceeded;
+                                if (!ListReady)
+                                    Logger.Warn("获取 Mojang Java 下载列表失败，无法自动下载 Java");
+                                var Components = ListReady
+                                    ? _SelectOrDownloadJava_DownloadListWorker.LastResult ?? new List<JavaDownloadInfo>()
+                                    : new List<JavaDownloadInfo>();
 
                                 // 确定要下载的目标 Java
                                 var JavaToDownload = Components.FirstOrDefault(Comp => (Comp.Java["version"]["name"].ToString() ?? "") == (RecommendedComponent ?? ""), Comp => Range.Contains(Comp.JavaVersion)); // 优先选择指定的 Component

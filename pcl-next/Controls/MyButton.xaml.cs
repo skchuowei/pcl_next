@@ -128,13 +128,13 @@ namespace PCL
                                 {
                                     if (this.IsMouseOver)
                                     {
-                                        // 指向（Main 3）
-                                        ModAnimation.AniStart(new[] { ModAnimation.AaColor(this.PanFore, Border.BorderBrushProperty, "ColorBrush3", AnimationColorIn) }, "MyButton Color " + Uuid);
+                                        // 指向（按钮悬停色）
+                                        ModAnimation.AniStart(new[] { ModAnimation.AaColor(this.PanFore, Border.BorderBrushProperty, "ColorBrushButtonHover", AnimationColorIn) }, "MyButton Color " + Uuid);
                                     }
                                     else
                                     {
-                                        // 普通（Main 1）
-                                        ModAnimation.AniStart(new[] { ModAnimation.AaColor(this.PanFore, Border.BorderBrushProperty, "ColorBrush1", AnimationColorOut) }, "MyButton Color " + Uuid);
+                                        // 普通（按钮默认色）
+                                        ModAnimation.AniStart(new[] { ModAnimation.AaColor(this.PanFore, Border.BorderBrushProperty, "ColorBrushButton", AnimationColorOut) }, "MyButton Color " + Uuid);
                                     }
 
                                     break;
@@ -143,8 +143,8 @@ namespace PCL
                                 {
                                     if (this.IsMouseOver)
                                     {
-                                        // 指向（Main 3）
-                                        ModAnimation.AniStart(new[] { ModAnimation.AaColor(this.PanFore, Border.BorderBrushProperty, "ColorBrush3", AnimationColorIn) }, "MyButton Color " + Uuid);
+                                        // 指向（按钮悬停色）
+                                        ModAnimation.AniStart(new[] { ModAnimation.AaColor(this.PanFore, Border.BorderBrushProperty, "ColorBrushButtonHover", AnimationColorIn) }, "MyButton Color " + Uuid);
                                     }
                                     else
                                     {
@@ -173,8 +173,8 @@ namespace PCL
                     }
                     else
                     {
-                        // 不可用（Gray 4）
-                        ModAnimation.AniStart(new[] { ModAnimation.AaColor(this.PanFore, Border.BorderBrushProperty, ModSecret.ColorGray4 - this.PanFore.BorderBrush, AnimationColorOut) }, "MyButton Color " + Uuid);
+                        // 不可用（按钮禁用色）
+                        ModAnimation.AniStart(new[] { ModAnimation.AaColor(this.PanFore, Border.BorderBrushProperty, "ColorBrushButtonDisabled", AnimationColorOut) }, "MyButton Color " + Uuid);
                     }
                 }
                 else
@@ -189,11 +189,11 @@ namespace PCL
                                 {
                                     if (this.IsMouseOver)
                                     {
-                                        this.PanFore.SetResourceReference(Border.BorderBrushProperty, "ColorBrush3");
+                                        this.PanFore.SetResourceReference(Border.BorderBrushProperty, "ColorBrushButtonHover");
                                     }
                                     else
                                     {
-                                        this.PanFore.SetResourceReference(Border.BorderBrushProperty, "ColorBrush1");
+                                        this.PanFore.SetResourceReference(Border.BorderBrushProperty, "ColorBrushButton");
                                     }
 
                                     break;
@@ -202,7 +202,7 @@ namespace PCL
                                 {
                                     if (this.IsMouseOver)
                                     {
-                                        this.PanFore.SetResourceReference(Border.BorderBrushProperty, "ColorBrush3");
+                                        this.PanFore.SetResourceReference(Border.BorderBrushProperty, "ColorBrushButtonHover");
                                     }
                                     else
                                     {
@@ -228,7 +228,7 @@ namespace PCL
                     }
                     else
                     {
-                        this.PanFore.BorderBrush = ModSecret.ColorGray4;
+                        this.PanFore.SetResourceReference(Border.BorderBrushProperty, "ColorBrushButtonDisabled");
                     }
 
                 }
@@ -248,11 +248,14 @@ namespace PCL
             Logger.Info($"按下按钮：{Text}");
             Click?.Invoke(sender, e);
             this.RaiseCustomEvent(); // 自定义事件
+            RefreshColor(); // 松手后复位边框色（悬停/普通）
         }
         private void Button_MouseDown(object sender, MouseButtonEventArgs e)
         {
             IsMouseDown = true;
             this.Focus();
+            // 按下（按钮按下色）
+            ModAnimation.AniStart(new[] { ModAnimation.AaColor(this.PanFore, Border.BorderBrushProperty, "ColorBrushButtonPressed", 60) }, "MyButton Color " + Uuid);
             ModAnimation.AniStart(new[] { ModAnimation.AaScaleTransform(this.PanFore, 0.955d - ((ScaleTransform)this.PanFore.RenderTransform).ScaleX, 80, Ease: new ModAnimation.AniEaseOutFluent(ModAnimation.AniEasePower.ExtraStrong)), ModAnimation.AaScaleTransform(this.PanFore, -0.01d, 700, Ease: new ModAnimation.AniEaseOutFluent(ModAnimation.AniEasePower.Middle)) }, "MyButton Scale " + Uuid);
         }
         private void Button_MouseEnter()
@@ -269,6 +272,7 @@ namespace PCL
         private void Button_MouseLeave()
         {
             ModAnimation.AniStart(ModAnimation.AaColor(this.PanFore, Border.BackgroundProperty, "ColorBrushHalfWhite", AnimationColorOut), "MyButton Background " + Uuid);
+            RefreshColor(); // 离开后复位边框色（普通）
             if (!IsMouseDown)
                 return;
             IsMouseDown = false;
