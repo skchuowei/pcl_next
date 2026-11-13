@@ -1,3 +1,4 @@
+using System;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -35,28 +36,76 @@ namespace PCL
             e.Handled = true;
             PerformVerticalOffsetDelta(-e.Delta);
         }
+        // 滚动动画改由渲染帧驱动，不再挂在 ModAnimation 的后台定时器上。
+        // 原因（2026-11-13 实测日志）：ModAnimation 的动画线程每帧都要 RunInUiWait → Dispatcher.Invoke 排队，
+        // 实测帧间隔 124~398 ms（3~8 FPS）。原实现把一个 300 ms 的 AaDouble 动画交给这条时钟，
+        // 等于整个滚动只有 1~2 帧被执行，画面「一步跳到位」，用户感知就是「滚动惯性没了」。
+        // 这里保留原版完全相同的语义（时长 300 ms、AniEaseOutFluent(6) 的同一条曲线、像素增量累加），
+        // 只把驱动时钟换成 CompositionTarget.Rendering —— 它在每次 WPF 渲染帧回调（约 60 Hz，UI 线程内），
+        // 不受后台动画线程排队延迟影响，因此低帧率时也不会被压成「瞬移」。
+        private const int ScrollAnimTime = 300;
+        private bool isScrollAnimating;
+        private double scrollAnimFrom;
+        private double scrollAnimTo;
+        private long scrollAnimStart;
+
         public void PerformVerticalOffsetDelta(double Delta)
         {
-            // VB 原文：AaDouble(Sub(AnimDelta As Double) ... End Sub, Delta * DeltaMult, 300, , New AniEaseOutFluent(6))
-            // 转换产物有两处与 VB 对不上，下面逐条按原义修正：
-            // 1) 该重载的形参是 ParameterizedThreadStart（Object 入参），VB 的 Sub(AnimDelta As Double) 靠
-            //    Option Strict Off 的宽松委托转换才成立；C# 必须把形参写成 object，再按 VB 隐式转换的语义转回 double。
-            //    （转换产物写成 (double AnimDelta) 使 lambda 无法匹配该重载，重载决议掉到 AaDouble(Object, DependencyProperty, ...) 上，
-            //      于是报「参数 2 无法从 double 转为 DependencyProperty」。）
-            // 2) VB 调用跳过了第 4 个可选参数 Delay（取默认 0），Ease 是第 5 个实参；转换器漏了 Delay，把 Ease 顶到了 Delay 位置上
-            //    （报「参数 5 无法从 AniEaseOutFluent 转为 int」）。此处显式补 0。
-            // 另：VB 的 New AniEaseOutFluent(6) 传入整数 6（Option Strict Off 下转成枚举，底层值即 6），
-            //    故保留 (AniEasePower)6，与原值一致。
-            ModAnimation.AniStart(ModAnimation.AaDouble((object AnimDelta) =>
+            if (ActualHeight == 0d || ExtentHeight - ActualHeight <= 0d)
+                return;
+            long Now = Environment.TickCount64;
+            // 上一段动画已接近尾声（剩不到 100 ms）时不再续接，直接以当前位置为新起点重开，
+            // 免得剩余时间不够、最后一帧一次性跳完剩余距离。
+            if (isScrollAnimating && Now - scrollAnimStart >= ScrollAnimTime - 100)
+                isScrollAnimating = false;
+            if (!isScrollAnimating)
             {
-                double animDelta = Conversions.ToDouble(AnimDelta);
-                RealOffset = (RealOffset + animDelta).Clamp(0d, ExtentHeight - ActualHeight);
-                ScrollToVerticalOffset(RealOffset);
-            }, Delta * DeltaMult, 300, 0, new ModAnimation.AniEaseOutFluent((ModAnimation.AniEasePower)6)));
+                // 必须以「当前实际位置」为基准：用户中途拖过滚动条时，旧目标值不能再用
+                scrollAnimFrom = VerticalOffset;
+                scrollAnimTo = VerticalOffset;
+                scrollAnimStart = Now;
+            }
+            // 连续滚轮时在既有目标上继续叠加，保持原版的「惯性累积」手感
+            scrollAnimTo = (scrollAnimTo + Delta * DeltaMult).Clamp(0d, ExtentHeight - ActualHeight);
+            if (isScrollAnimating)
+                return; // 已有动画在跑，只更新目标，交给同一个渲染帧回调继续推进
+            double Target = scrollAnimTo;
+            if (Target - scrollAnimFrom is > -0.5d and < 0.5d)
+            {
+                // 位移可忽略：直接落位，并确保渲染帧回调不残留订阅（否则会每帧空转并重复订阅）
+                CompositionTarget.Rendering -= ScrollAnimOnRendering;
+                isScrollAnimating = false;
+                return;
+            }
+            isScrollAnimating = true;
+            CompositionTarget.Rendering += ScrollAnimOnRendering;
         }
+
+        private void ScrollAnimOnRendering(object sender, EventArgs e)
+        {
+            if (!isScrollAnimating)
+                return;
+            double Progress = (Environment.TickCount64 - scrollAnimStart) / (double)ScrollAnimTime;
+            if (Progress > 1d || !IsVisible)
+                Progress = 1d; // 被切走/最小化时直接落位，避免动画卡在中间
+            if (Progress < 0d)
+                Progress = 0d;
+            // 与原版 AniEaseOutFluent(6) 一致：AniEase.GetDelta 的累积值即 1 - (1-t)^6
+            double Eased = 1d - Math.Pow(1d - Progress, 6d);
+            RealOffset = (scrollAnimFrom + (scrollAnimTo - scrollAnimFrom) * Eased).Clamp(0d, ExtentHeight - ActualHeight);
+            ScrollToVerticalOffset(RealOffset);
+            if (Progress >= 1d)
+            {
+                CompositionTarget.Rendering -= ScrollAnimOnRendering;
+                isScrollAnimating = false;
+                RealOffset = VerticalOffset;
+            }
+        }
+
         private void MyScrollViewer_ScrollChanged(object sender, ScrollChangedEventArgs e)
         {
-            RealOffset = VerticalOffset;
+            if (!isScrollAnimating)
+                RealOffset = VerticalOffset;
             if (ModMain.FrmMain is not null && (Conversions.ToBoolean(e.VerticalChange) || Conversions.ToBoolean(e.ViewportHeightChange)))
                 ModMain.FrmMain.BtnExtraBack.ShowRefresh();
         }
