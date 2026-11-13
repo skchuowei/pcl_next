@@ -81,19 +81,51 @@ namespace PCL
             }
             // 统一通行证：LoginNideEmail 为 ¨ 分隔邮箱
             var Nide = Settings.Get<string>("LoginNideEmail") ?? "";
+            var NideServer = GetServerDisplay("VersionServerNide", "CacheNideServer");
             foreach (var Name in Nide.Split("¨"))
             {
                 if (!string.IsNullOrEmpty(Name.Trim()))
-                    List.Add(new AccountEntry() { Type = ModLaunch.McLoginType.Nide, Name = Name.Trim(), Server = Settings.Get<string>("VersionServerNide") ?? "" });
+                    List.Add(new AccountEntry() { Type = ModLaunch.McLoginType.Nide, Name = Name.Trim(), Server = NideServer });
             }
             // Authlib：LoginAuthEmail 为 ¨ 分隔邮箱
             var Auth = Settings.Get<string>("LoginAuthEmail") ?? "";
+            var AuthServer = GetServerDisplay("VersionServerAuthServer", "CacheAuthServerName");
             foreach (var Name in Auth.Split("¨"))
             {
                 if (!string.IsNullOrEmpty(Name.Trim()))
-                    List.Add(new AccountEntry() { Type = ModLaunch.McLoginType.Auth, Name = Name.Trim(), Server = Settings.Get<string>("VersionServerAuthServer") ?? "" });
+                    List.Add(new AccountEntry() { Type = ModLaunch.McLoginType.Auth, Name = Name.Trim(), Server = AuthServer });
             }
             return List;
+        }
+
+        /// <summary>
+        /// 读取展示用的服务器名：选中版本时优先取该版本的独立设置，
+        /// 否则回退到全局缓存（CacheNideServer / CacheAuthServerName）。
+        /// VersionServerNide / VersionServerAuthServer 是版本独立设置（Source = Instance），
+        /// 必须先有目标版本才能读；启动页在任何时候都会刷新账号列表，
+        /// 直接无参读取会抛 NullReferenceException 并中断整个列表。
+        /// </summary>
+        private static string GetServerDisplay(string InstanceKey, string CacheKey)
+        {
+            try
+            {
+                var Instance = ModMinecraft.McInstanceSelected;
+                if (Instance is not null)
+                    return Settings.Get<string>(InstanceKey, Instance) ?? "";
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn(ex, "读取版本服务器设置失败：" + InstanceKey);
+            }
+            try
+            {
+                return Settings.Get<string>(CacheKey) ?? "";
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn(ex, "读取服务器缓存失败：" + CacheKey);
+                return "";
+            }
         }
 
         /// <summary>获取当前选中的账号（与启动页左侧一致）。</summary>

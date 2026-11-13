@@ -90,6 +90,11 @@ namespace PCL
             public ConcurrentDictionary<string, object> ValueCache = new ConcurrentDictionary<string, object>();
             public object GetCache(ModMinecraft.McInstance Instance)
             {
+                // 版本独立设置（Source = Instance）必须依附某个版本，没有目标版本时
+                // 无从取值：直接返回「未缓存」，避免解引用 Nothing 抛 NullReferenceException。
+                // 缺少目标版本时由 Get 走默认值分支（见 Settings.Get 同名判断）。
+                if (Source == Sources.Instance && Instance is null)
+                    return null;
                 string Key = Source == Sources.Instance ? Instance.PathVersion : "";
                 object Result = null;
                 return ValueCache.TryGetValue(Key, out Result) ? Result : null;
@@ -204,6 +209,10 @@ namespace PCL
             Setting Entry = null;
             if (!Entries.TryGetValue(Key, out Entry))
                 throw new KeyNotFoundException("未找到设置项：" + Key);
+            // 版本独立设置没有目标版本时无法读取真实值，返回默认值而不是抛异常 / 弹 Toast：
+            // 调用方（如启动页账号列表）本来就允许在没有选中版本时展示。
+            if (Entry.Source == Sources.Instance && Instance is null)
+                return Conversion.CTypeDynamic(Entry.DefaultValue, Entry.Type);
             var Value = Entry.GetCache(Instance);
             if (Value is not null)
                 return Value;

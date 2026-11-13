@@ -492,6 +492,7 @@ namespace PCL
         public static PageSetupUI FrmSetupUI;
         public static PageSetupSystem FrmSetupSystem;
         public static PageSetupLink FrmSetupLink;
+        public static PageSetupAccount FrmSetupAccount;
         public static PageSetupUIAdv FrmSetupUIAdv;
 
         // 其他页面声明

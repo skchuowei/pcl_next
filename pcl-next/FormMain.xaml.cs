@@ -1721,6 +1721,7 @@ namespace PCL
             SetupUI = 2,
             SetupSystem = 3,
             SetupUIAdv = 4,
+            SetupAccount = 5,
             LinkMain = 0,
             OtherHelp = 0,
             OtherAbout = 1,
