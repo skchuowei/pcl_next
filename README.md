@@ -1,17 +1,28 @@
-# Plain Craft Launcher
+# pcl-next（NeoPCL）
 
-[![Stars](https://img.shields.io/github/stars/Meloong-Git/PCL?style=flat&logo=data:image/svg%2bxml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZlcnNpb249IjEiIHdpZHRoPSIxNiIgaGVpZ2h0PSIxNiI+PHBhdGggZD0iTTggLjI1YS43NS43NSAwIDAgMSAuNjczLjQxOGwxLjg4MiAzLjgxNSA0LjIxLjYxMmEuNzUuNzUgMCAwIDEgLjQxNiAxLjI3OWwtMy4wNDYgMi45Ny43MTkgNC4xOTJhLjc1MS43NTEgMCAwIDEtMS4wODguNzkxTDggMTIuMzQ3bC0zLjc2NiAxLjk4YS43NS43NSAwIDAgMS0xLjA4OC0uNzlsLjcyLTQuMTk0TC44MTggNi4zNzRhLjc1Ljc1IDAgMCAxIC40MTYtMS4yOGw0LjIxLS42MTFMNy4zMjcuNjY4QS43NS43NSAwIDAgMSA4IC4yNVoiIGZpbGw9IiNlYWM1NGYiLz48L3N2Zz4=&logoSize=auto&label=Stars&labelColor=444444&color=eac54f)](https://github.com/Meloong-Git/PCL/)
-[![Issues](https://img.shields.io/github/issues/Meloong-Git/PCL?style=flat&label=Issues&labelColor=444444&color=1F883D)](https://github.com/Meloong-Git/PCL/issues)
-[![哔哩哔哩](https://img.shields.io/badge/动态-BiliBili-00A4DB?style=flat&labelColor=444444&logoSize=auto)](https://space.bilibili.com/11343203/dynamic)
-[![爱发电](https://img.shields.io/badge/赞助-爱发电-946ce6?style=flat&labelColor=444444&logoSize=auto)](https://meloong.com/afd/a/LTCat)
+> PCL2 的第三方修改版（fork）。在 [Meloong 的 PCL2](https://github.com/Meloong-Git/PCL) 源码基础上进行持续性改写与跨平台化。
 
-包含 PCL 的大部分源代码，包括 UI 库、动画模块、下载模块、Minecraft 启动模块等！<br/>
-代码并不是实时更新的，它会在每次 PCL 发布更新时同步一次。<br/>
-非常感谢社区的大力支持！
+[![Stars](https://img.shields.io/github/stars/skchuowei/pcl_next?style=flat&label=Stars&labelColor=444444&color=eac54f)](https://github.com/skchuowei/pcl_next)
+[![Issues](https://img.shields.io/github/issues/skchuowei/pcl_next?style=flat&label=Issues&labelColor=444444&color=1F883D)](https://github.com/skchuowei/pcl_next/issues)
 
-<br/>
+pcl-next 在 PCL2 的基础上，将内核（下载 / 版本解析 / 启动）逐步 C# 化，并扩展到 **Windows / Linux / Android** 三条平台线，目标运行时为 **.NET 10**（`net10.0-windows` / `net10.0-linux` / `net10.0-android`）。
 
-### 相关资源
-- [PCL 下载](https://meloong.com/pcl)：下载可免费使用的正式版 PCL！
-- [PCL 功能投票](https://github.com/Meloong-Git/PCL/discussions/2)：来参加投票吧，开发者会优先处理票数较高的项目！
-- [帮助文档库](https://github.com/LTCatt/PCL2Help)：PCL 内置帮助文档的存储库
+当前处于 `dev` 代号阶段，三条平台线各自独立推进、互不合并，分支命名形如 `dev.<序号>-<平台>`（例：`dev.6-Windows`）。
+
+## 平台线
+
+| 平台 | 分支命名 | 说明 |
+|---|---|---|
+| Windows | `dev.<n>-Windows` | 主线，.NET 10 + WPF |
+| Linux   | `dev.<n>-Linux`   | 独立仓库与分支，推送须过 `kernel-guard.yml` 跨平台门禁 |
+| Android | `dev.<n>-Android` | 独立仓库与分支，`net10.0-android` |
+
+## 许可证
+
+本仓库派生自 PCL2，遵循上游《PCL 分发有限许可》（详见根目录 [`LICENCE`](./LICENCE)）。请在遵守该许可的前提下合理使用；如有疑问请先查阅许可文本。
+
+## 相关
+
+- 上游 PCL2：<https://github.com/Meloong-Git/PCL>
+- 发布说明与更新日志：[`ReleaseNotes/`](./ReleaseNotes)
+- 开发规则与分支 / 发布规范：[`AGENTS.md`](./AGENTS.md)、[`分支与发布规范.md`](./分支与发布规范.md)
