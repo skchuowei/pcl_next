@@ -29,7 +29,7 @@ namespace PCL
         #region 声明
 
         // 下列版本信息由更新器自动修改
-        public const string VersionBaseName = "2.100.0.6"; // 显示用版本名
+        public const string VersionBaseName = "2.100.0.7"; // 显示用版本名
         public const string CommitHash = ""; // Commit Hash，由 GitHub Workflow 自动替换
                                              // 版本号按《分支与发布规范》§5.2 的号段表分配，必须全局单调递增，否则会误触发降级：
                                              // 周期基址 base = 5000 + 100 × 周期序号（周期 1 = 2.100 → 5000）
@@ -38,7 +38,7 @@ namespace PCL
                                              // 号段按代号阶梯严格递增，且每个代号都占独立区间——
                                              // dev 与 slush 若共用同一号段，切换时代会被判成版本倒退而误弹降级提示。
                                              // 本值由 scripts\Set-VersionInfo.ps1 依据标签写入，不可手工填写。
-        public const int VersionCode = 5006;
+        public const int VersionCode = 5010;
 
         // 版本信息
         /// <summary>
