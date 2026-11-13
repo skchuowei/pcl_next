@@ -152,35 +152,7 @@ namespace PCL
         {
             if (Entry is null)
                 return;
-            Settings.Set("LoginType", Entry.Type);
-            switch (Entry.Type)
-            {
-                case ModLaunch.McLoginType.Ms:
-                    {
-                        Settings.Set("CacheMsV2Name", Entry.Name);
-                        Settings.Set("CacheMsV2OAuthRefresh", Entry.Token);
-                        ModMain.FrmLoginMs?.Reload(false);
-                        break;
-                    }
-                case ModLaunch.McLoginType.Legacy:
-                    {
-                        Promote("LoginLegacyName", Entry.Name);
-                        ModMain.FrmLoginLegacy?.Reload(false);
-                        break;
-                    }
-                case ModLaunch.McLoginType.Nide:
-                    {
-                        Promote("LoginNideEmail", Entry.Name);
-                        ModMain.FrmLoginNide?.Reload(false);
-                        break;
-                    }
-                case ModLaunch.McLoginType.Auth:
-                    {
-                        Promote("LoginAuthEmail", Entry.Name);
-                        ModMain.FrmLoginAuth?.Reload(false);
-                        break;
-                    }
-            }
+            SetCurrent(Entry);
             // 同步启动页「正版 / 离线」单选状态，避免 RefreshPage 依据旧单选状态把 LoginType 覆盖回去。
             // 注意：若当前版本强制了单一登录方式（如「仅正版」），RefreshPage 仍会按其约束纠正 LoginType，
             // 这是版本级的登录要求，属于预期行为。
@@ -192,6 +164,105 @@ namespace PCL
                     Radio.Checked = true;
             }
             ModMain.FrmLaunchLeft?.RefreshPage(false, true);
+        }
+
+        /// <summary>
+        /// 把某个账号设为当前账号：只写设置，不触发界面刷新（供 SwitchTo / 启动页自检使用）。
+        /// </summary>
+        public static void SetCurrent(AccountEntry Entry)
+        {
+            if (Entry is null)
+                return;
+            try
+            {
+                Settings.Set("LoginType", Entry.Type);
+                switch (Entry.Type)
+                {
+                    case ModLaunch.McLoginType.Ms:
+                        {
+                            Settings.Set("CacheMsV2Name", Entry.Name);
+                            Settings.Set("CacheMsV2OAuthRefresh", Entry.Token);
+                            ModMain.FrmLoginMs?.Reload(false);
+                            break;
+                        }
+                    case ModLaunch.McLoginType.Legacy:
+                        {
+                            Promote("LoginLegacyName", Entry.Name);
+                            ModMain.FrmLoginLegacy?.Reload(false);
+                            break;
+                        }
+                    case ModLaunch.McLoginType.Nide:
+                        {
+                            Promote("LoginNideEmail", Entry.Name);
+                            ModMain.FrmLoginNide?.Reload(false);
+                            break;
+                        }
+                    case ModLaunch.McLoginType.Auth:
+                        {
+                            Promote("LoginAuthEmail", Entry.Name);
+                            ModMain.FrmLoginAuth?.Reload(false);
+                            break;
+                        }
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn(ex, "设置当前账号失败：" + (Entry.Name ?? ""));
+            }
+        }
+
+        /// <summary>登录（或新建档案确认）后把账号加入对应类型列表首位，同一种登录方式可以保存多个账号。</summary>
+        public static void AddAccount(ModLaunch.McLoginType Type, string Name, string Password = null)
+        {
+            Name = (Name ?? "").Replace("¨", "").Trim();
+            if (string.IsNullOrEmpty(Name))
+                return;
+            try
+            {
+                switch (Type)
+                {
+                    case ModLaunch.McLoginType.Legacy:
+                        Promote("LoginLegacyName", Name);
+                        break;
+                    case ModLaunch.McLoginType.Nide:
+                        Promote("LoginNideEmail", Name);
+                        if (!string.IsNullOrEmpty(Password))
+                            Promote("LoginNidePass", Password.Replace("¨", "").Trim());
+                        break;
+                    case ModLaunch.McLoginType.Auth:
+                        Promote("LoginAuthEmail", Name);
+                        if (!string.IsNullOrEmpty(Password))
+                            Promote("LoginAuthPass", Password.Replace("¨", "").Trim());
+                        break;
+                }
+                Settings.Set("LoginType", Type);
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn(ex, "保存账号失败：" + Name);
+            }
+        }
+
+        /// <summary>
+        /// 启动页自检：当前 LoginType 指向的账号名已经为空（例如唯一账号被删），
+        /// 但列表里还有别的账号时，自动切到列表第一个账号，保证界面显示与实际启动使用的是同一个账号。
+        /// </summary>
+        public static void EnsureCurrent()
+        {
+            try
+            {
+                var Current = GetCurrent();
+                if (Current is not null && !string.IsNullOrEmpty(Current.Name))
+                    return;
+                var Accounts = GetAll();
+                if (Accounts.Count == 0)
+                    return;
+                SetCurrent(Accounts[0]);
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn(ex, "修正当前账号状态失败");
+            }
         }
 
         /// <summary>删除账号（仅移除本地登录记录，不注销远程账号）。</summary>

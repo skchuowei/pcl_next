@@ -890,7 +890,7 @@ namespace PCL
                 if (!string.IsNullOrEmpty(Settings.Get<string>("Login" + Input.Token + "Pass")))
                     Passwords.AddRange(Settings.Get<string>("Login" + Input.Token + "Pass").Split("¨"));
                 for (int i = 0, loopTo = Emails.Count - 1; i <= loopTo; i++)
-                    Dict.Add(Emails[i], Passwords[i]);
+                    Dict.Add(Emails[i], i < Passwords.Count ? Passwords[i] : "");
                 Dict.Remove(Input.UserName);
                 Emails = new List<string>(Dict.Keys);
                 Emails.Insert(0, Input.UserName);
@@ -901,9 +901,8 @@ namespace PCL
             }
             catch (Exception ex)
             {
+                // 保存失败只记录日志，不能清空已有账号列表，否则会把用户之前登录过的账号一并抹掉
                 Logger.Error(ex, "保存启动记录失败", LogBehavior.Toast);
-                Settings.Set("Login" + Input.Token + "Email", "");
-                Settings.Set("Login" + Input.Token + "Pass", "");
             }
         }
         private static void McLoginLegacyStart(ModLoader.LoaderTask<McLoginLegacy, McLoginResult> Data)
