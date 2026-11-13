@@ -66,3 +66,19 @@
 # Git 钩子必须保持 LF：Windows 检出时被转成 CRLF 会让 #!/bin/sh 解析失败
 ###############################################################################
 scripts/git-hooks/* text eol=lf
+
+###############################################################################
+# GitHub Linguist 语言统计口径（pcl-next）
+#
+# 背景：Windows 线已完成 VB.NET → C# 全量重写（.vb = 0、.vbproj 已移除）。
+# GitHub 仓库页语言条只统计「默认分支」（main），且 Linguist 有后台缓存，
+# 重写合并后可能仍显示旧的 "Visual Basic .NET" 占比，直到重新计算。
+###############################################################################
+*.cs linguist-detectable=true
+
+# VB 源文件不作为主语言统计（历史对照副本、Linux 线迁移中的文件均不应主导占比）
+*.vb linguist-detectable=false
+*.vbproj linguist-detectable=false
+
+# XAML 是标记文件，单独统计会稀释 C# 占比，与「人工可读源码语言」口径不一致
+*.xaml linguist-detectable=false
