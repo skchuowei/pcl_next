@@ -46,11 +46,6 @@ namespace PCL
             this.LabLauncherTheme9Copy.MouseRightButtonUp += (p1, p2) => LabLauncherTheme9Copy_MouseRightButtonUp();
             this.RadioLauncherTheme9.MouseRightButtonUp += (p1, p2) => LabLauncherTheme9Copy_MouseRightButtonUp();
             this.RadioLauncherTheme14.Changed += (p1, p2) => RadioLauncherTheme14_Change((object)p1, (ModBase.RouteEventArgs)p2);
-            // 深色配色：选中项变化时自动切到深色主题；重复点击已选中项时由 PreviewCheck 补一次
-            this.RadioDarkVariantNew.Check += (_, __) => DarkVariant_Apply();
-            this.RadioDarkVariantOld.Check += (_, __) => DarkVariant_Apply();
-            this.RadioDarkVariantNew.PreviewCheck += (p1, p2) => DarkVariant_PreviewCheck((MyRadioBox)p1);
-            this.RadioDarkVariantOld.PreviewCheck += (p1, p2) => DarkVariant_PreviewCheck((MyRadioBox)p1);
             this.SliderLauncherHue.Change += (p1, p2) => HSL_Change();
             this.SliderLauncherLight.Change += (p1, p2) => HSL_Change();
             this.SliderLauncherSat.Change += (p1, p2) => HSL_Change();
@@ -626,45 +621,6 @@ namespace PCL
             if (ModAnimation.AniControlEnabled != 0 || this.SliderLauncherSat is null || !this.SliderLauncherSat.IsLoaded)
                 return;
             ModSecret.ThemeRefresh();
-        }
-
-        /// <summary>
-        /// 重复点击已选中项时 MyRadioBox 不会触发 Check（IsChanged 为 false），
-        /// 但用户此时的意图仍是「让这套深色配色生效」，所以在这里补一次。
-        /// </summary>
-        private void DarkVariant_PreviewCheck(MyRadioBox Box)
-        {
-            if (Box.Checked && ModAnimation.AniControlEnabled == 0)
-                DarkVariant_Apply();
-        }
-
-        /// <summary>
-        /// 若当前不是深色主题，选择「新版 / 旧版深色配色」时自动切换过去，
-        /// 保证点一下就能看到配色差异（此前仅写入设置、亮色主题下零视觉变化）。
-        /// MyRadioBox 构造函数先订阅了 SaveSetting，故本方法执行时
-        /// UiDarkThemeVariant 已写入缓存，ThemeRefresh(100) 能读到刚选的值。
-        /// 已是深色主题时不需要额外动作：Settings 的 OnChanged 会即时 ThemeRefresh()。
-        /// </summary>
-        private void DarkVariant_Apply()
-        {
-            if (ModAnimation.AniControlEnabled != 0)
-                return; // 初始化刷新（RefreshSettings）不是用户操作
-            if (ModSecret.ThemeNow == ModSecret.ThemeDarkId)
-                return; // 已是深色，配色已即时刷新
-            bool IsLegacy = Settings.Get<int>("UiDarkThemeVariant") == 1;
-            Settings.Set("UiLauncherTheme", ModSecret.ThemeDarkId);
-            // 只刷新主题单选区，避免整页 RefreshSettings 触发其它控件的 Change 事件；
-            // 临时抬高动画计数，阻止刷新过程中的 Check 回写设置。
-            ModAnimation.AniControlEnabled += 1;
-            try
-            {
-                SettingService.RefreshSettings(this.PanLauncherTheme);
-            }
-            finally
-            {
-                ModAnimation.AniControlEnabled -= 1;
-            }
-            ModMain.Hint($"已切换到深色主题 · {(IsLegacy ? "旧版（HSL）" : "新版（OKLCh）")}配色", ModMain.HintType.Blue);
         }
 
         #region 功能隐藏
