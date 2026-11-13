@@ -38,7 +38,10 @@ namespace PCL
                                              // 号段按代号阶梯严格递增，且每个代号都占独立区间——
                                              // dev 与 slush 若共用同一号段，切换时代会被判成版本倒退而误弹降级提示。
                                              // 本值由 scripts\Set-VersionInfo.ps1 依据标签写入，不可手工填写。
-        public const int VersionCode = 5010;
+                                             // 2026-11-13 进入 alpha：本目录（PCL_NEXT_Windows_slush）改检出 alpha-Windows，
+                                             // 号段按 §5.2 从 slush 的 5010 移到 alpha 区间（base+20…59），取 5020；
+                                             // 版本名仍为 2.100.0.7（未发布新大版本，仅阶段推进）。
+        public const int VersionCode = 5020;
 
         // 版本信息
         /// <summary>
@@ -699,7 +702,7 @@ namespace PCL
                     FileContent.Append(Pair.Key);
                     FileContent.Append(":");
                     FileContent.Append(Pair.Value);
-                    FileContent.Append(Constants.vbCrLf);
+                    FileContent.Append("\r\n");
                 }
                 if (!FileName.Contains(@":\"))
                     FileName = $@"{Paths.Base}PCL\{FileName}.ini";
@@ -1220,7 +1223,7 @@ namespace PCL
             {
                 Logger.Warn(ex, $"无法打开网页（{Url}）");
                 ClipboardSet(Url, false);
-                ModMain.MyMsgBox("可能由于浏览器未正确配置，PCL Next 无法为你打开网页。" + Constants.vbCrLf + "网址已经复制到剪贴板，若有需要可以手动粘贴访问。" + Constants.vbCrLf + $"网址：{Url}", "无法打开网页");
+                ModMain.MyMsgBox("可能由于浏览器未正确配置，PCL Next 无法为你打开网页。" + "\r\n" + "网址已经复制到剪贴板，若有需要可以手动粘贴访问。" + "\r\n" + $"网址：{Url}", "无法打开网页");
             }
         }
         /// <summary>

@@ -1227,7 +1227,7 @@ namespace PCL
             try
             {
             FeedbackInfo();
-            if (ForceOpenLog || ShowMsgbox && MyMsgBox("若你在汇报一个 Bug，请点击 打开文件夹 按钮，并上传 Log(1~5).txt 中包含错误信息的文件。" + Constants.vbCrLf + "游戏崩溃一般与启动器无关，请不要因为游戏崩溃而提交反馈。", "反馈提交提醒", "打开文件夹", "不需要") == 1)
+            if (ForceOpenLog || ShowMsgbox && MyMsgBox("若你在汇报一个 Bug，请点击 打开文件夹 按钮，并上传 Log(1~5).txt 中包含错误信息的文件。" + "\r\n" + "游戏崩溃一般与启动器无关，请不要因为游戏崩溃而提交反馈。", "反馈提交提醒", "打开文件夹", "不需要") == 1)
             {
                 ModBase.OpenExplorer(Paths.Base + @"PCL\Log1.txt");
             }
@@ -1256,7 +1256,7 @@ namespace PCL
             // [VB Port] On Error Resume Next -> ignore exceptions in the rest of this method
             try
             {
-            Logger.Warn($"诊断信息：{Constants.vbCrLf}" + "操作系统：" + My.Computer.Info.OSFullName + Constants.vbCrLf + "剩余内存：" + Conversion.Int(My.Computer.Info.AvailablePhysicalMemory / 1024d / 1024d) + " M / " + Conversion.Int(My.Computer.Info.TotalPhysicalMemory / 1024d / 1024d) + " M" + Constants.vbCrLf + "DPI：" + ModBase.DPI + "（" + Math.Round(ModBase.DPI / 96d, 2) * 100d + "%）" + Constants.vbCrLf + "MC 文件夹：" + (ModMinecraft.McFolderSelected ?? "Nothing") + Constants.vbCrLf + "文件位置：" + Paths.Base);
+            Logger.Warn($"诊断信息：{"\r\n"}" + "操作系统：" + My.Computer.Info.OSFullName + "\r\n" + "剩余内存：" + Conversion.Int(My.Computer.Info.AvailablePhysicalMemory / 1024d / 1024d) + " M / " + Conversion.Int(My.Computer.Info.TotalPhysicalMemory / 1024d / 1024d) + " M" + "\r\n" + "DPI：" + ModBase.DPI + "（" + Math.Round(ModBase.DPI / 96d, 2) * 100d + "%）" + "\r\n" + "MC 文件夹：" + (ModMinecraft.McFolderSelected ?? "Nothing") + "\r\n" + "文件位置：" + Paths.Base);
             } // [VB Port] end try
             // 对应 ModMain.vb:975-983 的「On Error Resume Next」：诊断信息只供排查使用，任何失败都不应影响主流程。
             catch (System.ComponentModel.Win32Exception)

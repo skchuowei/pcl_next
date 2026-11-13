@@ -55,12 +55,12 @@ namespace PCL
                     {
                         if (PageSetupSystem.IsLauncherNewest() == true)
                         {
-                            if (ModMain.MyMsgBox(DetailText + Constants.vbCrLf + Constants.vbCrLf + "是否反馈此问题？如果不反馈，这个问题可能永远无法得到解决！", "错误", "反馈", "取消", IsWarn: true) == 1)
+                            if (ModMain.MyMsgBox(DetailText + "\r\n" + "\r\n" + "是否反馈此问题？如果不反馈，这个问题可能永远无法得到解决！", "错误", "反馈", "取消", IsWarn: true) == 1)
                                 ModMain.Feedback(false, true);
                         }
                         else
                         {
-                            ModMain.MyMsgBox(DetailText + Constants.vbCrLf + Constants.vbCrLf + "将 PCL Next 更新至最新版或许可以解决这个问题……", "错误", IsWarn: true);
+                            ModMain.MyMsgBox(DetailText + "\r\n" + "\r\n" + "将 PCL Next 更新至最新版或许可以解决这个问题……", "错误", IsWarn: true);
                         }
 
                         break;
@@ -73,12 +73,12 @@ namespace PCL
                             _HandleBehavior_FirstTrigger = false;
                             if (PageSetupSystem.IsLauncherNewest() == true)
                             {
-                                if (Interaction.MsgBox(DetailText + Constants.vbCrLf + Constants.vbCrLf + "是否反馈此问题？如果不反馈，这个问题可能永远无法得到解决！", (MsgBoxStyle)((int)MsgBoxStyle.Critical + (int)MsgBoxStyle.YesNo), "错误") == MsgBoxResult.Yes)
+                                if (Interaction.MsgBox(DetailText + "\r\n" + "\r\n" + "是否反馈此问题？如果不反馈，这个问题可能永远无法得到解决！", (MsgBoxStyle)((int)MsgBoxStyle.Critical + (int)MsgBoxStyle.YesNo), "错误") == MsgBoxResult.Yes)
                                     ModMain.Feedback(false, true);
                             }
                             else
                             {
-                                Interaction.MsgBox(DetailText + Constants.vbCrLf + Constants.vbCrLf + "将 PCL Next 更新至最新版或许可以解决这个问题……", MsgBoxStyle.Critical, "错误");
+                                Interaction.MsgBox(DetailText + "\r\n" + "\r\n" + "将 PCL Next 更新至最新版或许可以解决这个问题……", MsgBoxStyle.Critical, "错误");
                             }
                         }
                         else

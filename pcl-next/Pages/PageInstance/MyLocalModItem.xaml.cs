@@ -431,7 +431,7 @@ namespace PCL
                 NewestName = NewestSegs.Join("-");
                 Entry._Version = CurrentName; // 使用网络信息作为显示的版本号
             }
-            return $"当前版本：{CurrentName}（{StringUtils.FormatTimeSpan(Entry.ProjectVersion.ReleaseDate - DateTime.Now, false)}）{Constants.vbCrLf}最新版本：{NewestName}（{StringUtils.FormatTimeSpan(Entry.UpdateFile.ReleaseDate - DateTime.Now, false)}）";
+            return $"当前版本：{CurrentName}（{StringUtils.FormatTimeSpan(Entry.ProjectVersion.ReleaseDate - DateTime.Now, false)}）{"\r\n"}最新版本：{NewestName}（{StringUtils.FormatTimeSpan(Entry.UpdateFile.ReleaseDate - DateTime.Now, false)}）";
         }
 
         // 懒加载
@@ -470,7 +470,7 @@ namespace PCL
             if (Entry.HasUpdate)
             {
                 this.BtnUpdate.Visibility = Visibility.Visible;
-                this.BtnUpdate.ToolTip = $"{GetUpdateCompareDescription()}{Constants.vbCrLf}点击以更新，右键查看更新日志。";
+                this.BtnUpdate.ToolTip = $"{GetUpdateCompareDescription()}{"\r\n"}点击以更新，右键查看更新日志。";
             }
             else
             {
@@ -667,7 +667,7 @@ namespace PCL
         // 触发更新
         private void BtnUpdate_Click(object sender, EventArgs e)
         {
-            switch (ModMain.MyMsgBox($"是否要更新 {Entry.Display}？{Constants.vbCrLf}{Constants.vbCrLf}{GetUpdateCompareDescription()}", "Mod 更新确认", "更新", "查看更新日志", "取消"))
+            switch (ModMain.MyMsgBox($"是否要更新 {Entry.Display}？{"\r\n"}{"\r\n"}{GetUpdateCompareDescription()}", "Mod 更新确认", "更新", "查看更新日志", "取消"))
             {
                 case 1: // 更新
                     {

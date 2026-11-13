@@ -218,7 +218,7 @@ namespace PCL
             {
                 if (ResourceSourceGate.CurseForgeAvailable)
                     return;
-                this.HintSource.Text = ResourceSourceGate.DegradationNotice + Constants.vbCrLf + "如需启用，请设置环境变量 PCL_CURSEFORGE_API_KEY 后重启启动器。";
+                this.HintSource.Text = ResourceSourceGate.DegradationNotice + "\r\n" + "如需启用，请设置环境变量 PCL_CURSEFORGE_API_KEY 后重启启动器。";
                 this.HintSource.Visibility = Visibility.Visible;
                 bool CurseForgeSelected = false;
                 foreach (MyComboBoxItem Item in this.ComboSearchSource.Items)

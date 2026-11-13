@@ -153,7 +153,7 @@ namespace PCL
                 }
                 catch (Exception) // 未引用异常对象，省略变量名（消除 CS0168）
                 {
-                    Interaction.MsgBox($@"PCL Next 没有对当前文件夹的权限（{Paths.Base}PCL\），请尝试：" + Constants.vbCrLf + "1. 将 PCL Next 移动到其他文件夹" + (PathUtils.GetDiskName(Paths.Base) is { } arg1 && arg1 == 'C' ? "，例如 C 盘和桌面以外的其他位置。" : "。") + Constants.vbCrLf + "2. 删除当前目录中的 PCL 文件夹，然后再试。" + Constants.vbCrLf + "3. 右键 PCL Next 选择属性，打开 兼容性 中的 以管理员身份运行此程序。", MsgBoxStyle.Critical, "运行环境错误");
+                    Interaction.MsgBox($@"PCL Next 没有对当前文件夹的权限（{Paths.Base}PCL\），请尝试：" + "\r\n" + "1. 将 PCL Next 移动到其他文件夹" + (PathUtils.GetDiskName(Paths.Base) is { } arg1 && arg1 == 'C' ? "，例如 C 盘和桌面以外的其他位置。" : "。") + "\r\n" + "2. 删除当前目录中的 PCL 文件夹，然后再试。" + "\r\n" + "3. 右键 PCL Next 选择属性，打开 兼容性 中的 以管理员身份运行此程序。", MsgBoxStyle.Critical, "运行环境错误");
                     Environment.Exit((int)ModBase.ProcessReturnValues.Cancel);
                 }
 
@@ -169,11 +169,11 @@ namespace PCL
                 {
                     if (PathUtils.IsSame(ModBase.PathTemp, Path.GetTempPath() + @"PCL\"))
                     {
-                        ModMain.MyMsgBox("PCL Next 无法访问缓存文件夹，可能导致程序出错或无法正常使用！" + Constants.vbCrLf + Constants.vbCrLf + "错误原因：" + ex.GetDisplay(true), "缓存文件夹不可用");
+                        ModMain.MyMsgBox("PCL Next 无法访问缓存文件夹，可能导致程序出错或无法正常使用！" + "\r\n" + "\r\n" + "错误原因：" + ex.GetDisplay(true), "缓存文件夹不可用");
                     }
                     else
                     {
-                        ModMain.MyMsgBox("手动设置的缓存文件夹不可用，PCL Next 将使用默认缓存文件夹。" + Constants.vbCrLf + Constants.vbCrLf + "错误原因：" + ex.GetDisplay(true), "缓存文件夹不可用");
+                        ModMain.MyMsgBox("手动设置的缓存文件夹不可用，PCL Next 将使用默认缓存文件夹。" + "\r\n" + "\r\n" + "错误原因：" + ex.GetDisplay(true), "缓存文件夹不可用");
                         Settings.Set("SystemSystemCache", "");
                         ModBase.PathTemp = Path.GetTempPath() + @"PCL\";
                         goto RetryCacheCheck;
@@ -183,16 +183,13 @@ namespace PCL
                 DirectoryUtils.Create(Paths.AppDataThenName);
                 // 设置 ToolTipService 默认值
                 ToolTipService.InitialShowDelayProperty.OverrideMetadata(typeof(DependencyObject), new FrameworkPropertyMetadata(100));
-                // 设置网络配置默认值
-                ServicePointManager.Expect100Continue = false;
-                ServicePointManager.DefaultConnectionLimit = 10000;
-                ServicePointManager.UseNagleAlgorithm = false;
-                ServicePointManager.EnableDnsRoundRobin = true;
-                ServicePointManager.ReusePort = true;
-                if (Environment.OSVersion.Version < new Version(6, 2)) // Windows 7 回退（#8519）
-                {
-                    ServicePointManager.SecurityProtocol = SecurityProtocolType.Ssl3 | SecurityProtocolType.Tls | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls12;
-                }
+                // 网络配置：ServicePointManager 在 .NET 10 下已过时，且对 HttpClient / SslStream 完全不生效，
+                // 这里原来的 Expect100Continue / DefaultConnectionLimit / UseNagleAlgorithm / EnableDnsRoundRobin /
+                // ReusePort 五项设置实际上全部落空。连接数上限与证书校验回调已迁移到 ModNet 两个 HttpClient 的
+                // HttpClientHandler（MaxConnectionsPerServer / ServerCertificateCustomValidationCallback）；
+                // 其余四项在 SocketsHttpHandler 上无对应配置项，故不再设置。
+                // 原 Windows 7 回退分支会给 SecurityProtocol 追加 Ssl3，而 .NET 10 已不支持 Ssl3（赋值可能直接抛异常），
+                // 该分支实际不可达也无意义，一并移除。
                 // 设置初始窗口
                 if (Settings.Get<bool>("UiLauncherLogo"))
                 {
@@ -215,7 +212,7 @@ namespace PCL
                 // 检测异常环境
                 if (Paths.Base.Contains(Path.GetTempPath()) || Paths.Base.Contains(@"AppData\Local\Temp\"))
                 {
-                    ModMain.MyMsgBox("请将 PCL Next 从压缩包中解压后再使用！" + Constants.vbCrLf + "如果不会解压，可以在网上寻找教程。", "需要解压！", "我知道了", IsWarn: true, ForceWait: true);
+                    ModMain.MyMsgBox("请将 PCL Next 从压缩包中解压后再使用！" + "\r\n" + "如果不会解压，可以在网上寻找教程。", "需要解压！", "我知道了", IsWarn: true, ForceWait: true);
                     FormMain.EndProgramForce(ModBase.ProcessReturnValues.Cancel);
                 }
                 if (!Environment.Is64BitOperatingSystem)
@@ -238,7 +235,7 @@ namespace PCL
                 catch
                 {
                 }
-                Interaction.MsgBox(ex.GetDisplay(true) + Constants.vbCrLf + "PCL Next 所在路径：" + (string.IsNullOrEmpty(FilePath) ? "获取失败" : FilePath), MsgBoxStyle.Critical, "PCL Next 初始化错误");
+                Interaction.MsgBox(ex.GetDisplay(true) + "\r\n" + "PCL Next 所在路径：" + (string.IsNullOrEmpty(FilePath) ? "获取失败" : FilePath), MsgBoxStyle.Critical, "PCL Next 初始化错误");
                 FormMain.EndProgramForce(ModBase.ProcessReturnValues.Exception);
             }
         }
@@ -371,11 +368,11 @@ namespace PCL
             ModBase.OpenWebsite("https://dotnet.microsoft.com/zh-cn/download/dotnet-framework/thank-you/net48-offline-installer");
             if (ex is null)
             {
-                Logger.Error($"你的 .NET Framework 版本过低或损坏，请下载并重新安装 .NET Framework 4.8！{Constants.vbCrLf}若安装失败，可以先卸载高版本的 .NET Framework 然后再试。", LogBehavior.AlertThenCrash);
+                Logger.Error($"你的 .NET Framework 版本过低或损坏，请下载并重新安装 .NET Framework 4.8！{"\r\n"}若安装失败，可以先卸载高版本的 .NET Framework 然后再试。", LogBehavior.AlertThenCrash);
             }
             else
             {
-                Logger.Error(ex, $"你的 .NET Framework 版本过低或损坏，请下载并重新安装 .NET Framework 4.8！{Constants.vbCrLf}若安装失败，可以先卸载高版本的 .NET Framework 然后再试。", LogBehavior.AlertThenCrash);
+                Logger.Error(ex, $"你的 .NET Framework 版本过低或损坏，请下载并重新安装 .NET Framework 4.8！{"\r\n"}若安装失败，可以先卸载高版本的 .NET Framework 然后再试。", LogBehavior.AlertThenCrash);
             }
         }
 

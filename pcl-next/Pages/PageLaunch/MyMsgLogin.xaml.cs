@@ -64,7 +64,7 @@ namespace PCL
                 ModAnimation.AniStart(ModAnimation.AaColor(ModMain.FrmMain.PanMsg, Panel.BackgroundProperty, (MyConverter.IsWarn ? new ModBase.MyColor(140d, 80d, 0d, 0d) : new ModBase.MyColor(90d, 0d, 0d, 0d)) - ModMain.FrmMain.PanMsg.Background, 200), "PanMsg Background");
                 ModAnimation.AniStart(new[] { ModAnimation.AaOpacity(this, 1d, 120, 60), ModAnimation.AaDouble(i => this.TransformPos.Y = Conversions.ToDouble(Conversions.ToDouble(this.TransformPos.Y) + Conversions.ToDouble(i)), -Conversions.ToDouble(this.TransformPos.Y), 300, 60, new ModAnimation.AniEaseOutBack(ModAnimation.AniEasePower.Weak)), ModAnimation.AaDouble(i => this.TransformRotate.Angle = Conversions.ToDouble(Conversions.ToDouble(this.TransformRotate.Angle) + Conversions.ToDouble(i)), -Conversions.ToDouble(this.TransformRotate.Angle), 300, 60, new ModAnimation.AniEaseOutFluent(ModAnimation.AniEasePower.Weak)) }, "MyMsgBox " + Uuid);
                 // 记录日志
-                Logger.Info($"登录弹窗：{this.LabTitle.Text}{Constants.vbCrLf}{this.LabCaption.Text}");
+                Logger.Info($"登录弹窗：{this.LabTitle.Text}{"\r\n"}{this.LabCaption.Text}");
             }
             catch (Exception ex)
             {
@@ -128,7 +128,7 @@ namespace PCL
                 throw new System.IO.InvalidDataException("微软设备码响应缺少有效的 user_code、device_code、verification_uri 或 interval。");
             // 设置 UI
             this.LabTitle.Text = "登录 Minecraft";
-            this.LabCaption.Text = $"登录网页将自动开启，请在网页中输入 {UserCode}（已自动复制）。" + Constants.vbCrLf + Constants.vbCrLf + $"如果网络环境不佳，网页可能一直加载不出来，届时请使用加速器或 VPN 改善网络环境。" + Constants.vbCrLf + $"你也可以用其他设备打开 {Website} 并输入上述代码。";
+            this.LabCaption.Text = $"登录网页将自动开启，请在网页中输入 {UserCode}（已自动复制）。" + "\r\n" + "\r\n" + $"如果网络环境不佳，网页可能一直加载不出来，届时请使用加速器或 VPN 改善网络环境。" + "\r\n" + $"你也可以用其他设备打开 {Website} 并输入上述代码。";
             CustomEventService.SetEventData(this.Btn1, Website);
             CustomEventService.SetEventData(this.Btn2, UserCode);
             // 启动工作线程

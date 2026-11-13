@@ -211,13 +211,13 @@ namespace PCL
         {
             if (false.Equals(PageSetupSystem.IsLauncherNewest()))
             {
-                if (ModMain.MyMsgBox($"你的 PCL Next 不是最新版，因此无法提交反馈。{Constants.vbCrLf}请在更新后，确认该问题在最新版中依然存在，然后再提交反馈。", "无法提交反馈", "更新", "取消") == 1)
+                if (ModMain.MyMsgBox($"你的 PCL Next 不是最新版，因此无法提交反馈。{"\r\n"}请在更新后，确认该问题在最新版中依然存在，然后再提交反馈。", "无法提交反馈", "更新", "取消") == 1)
                 {
                     ModSecret.UpdateCheckByButton();
                 }
                 return;
             }
-            switch (ModMain.MyMsgBox("在提交新反馈前，建议先搜索反馈列表，以避免重复提交。" + Constants.vbCrLf + "如果无法打开该网页，请使用 VPN 改善网络环境。", "反馈", "提交新反馈", "查看反馈列表", "取消"))
+            switch (ModMain.MyMsgBox("在提交新反馈前，建议先搜索反馈列表，以避免重复提交。" + "\r\n" + "如果无法打开该网页，请使用 VPN 改善网络环境。", "反馈", "提交新反馈", "查看反馈列表", "取消"))
             {
                 case 1:
                     {
@@ -240,7 +240,7 @@ namespace PCL
         }
         public static void TryVote()
         {
-            if (ModMain.MyMsgBox("是否要打开新功能投票网页？" + Constants.vbCrLf + "如果无法打开该网页，请使用 VPN 改善网络环境。", "新功能投票", "打开", "取消") == 2)
+            if (ModMain.MyMsgBox("是否要打开新功能投票网页？" + "\r\n" + "如果无法打开该网页，请使用 VPN 改善网络环境。", "新功能投票", "打开", "取消") == 2)
                 return;
             ModBase.OpenWebsite("https://github.com/Meloong-Git/PCL/discussions/categories/%E5%8A%9F%E8%83%BD%E6%8A%95%E7%A5%A8?discussions_q=category%3A%E5%8A%9F%E8%83%BD%E6%8A%95%E7%A5%A8+sort%3Adate_created");
         }

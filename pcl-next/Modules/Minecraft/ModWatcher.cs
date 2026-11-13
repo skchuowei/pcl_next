@@ -228,7 +228,7 @@ namespace PCL
                 // 预处理
                 if (Text is null)
                     return;
-                Text = Text.ReplaceLineEndings(Constants.vbCrLf);
+                Text = Text.ReplaceLineEndings("\r\n");
                 // If Text.Contains("�����") Then Hint("检测到错误的日志编码：" & Text)
                 // 加入预存储
                 LatestLog.Enqueue(Text);

@@ -46,7 +46,7 @@ namespace PCL
                 // 在此处检查并报错，可以让 NetRequestByClientRetry 等方法进行重试
                 if (RequireJson)
                 {
-                    Result = Result.Trim((Constants.vbCrLf + " ").ToCharArray()); // Authlib-Injector 的结果会在末尾附带一个空行
+                    Result = Result.Trim(("\r\n" + " ").ToCharArray()); // Authlib-Injector 的结果会在末尾附带一个空行
                     if (!(Result.StartsWithF("{") && Result.EndsWithF("}")) && !(Result.StartsWithF("[") && Result.EndsWithF("]")))
                     {
                         throw new FormatException("返回结果并非 JSON 格式：" + (Result.Length > 2000 ? Result.Substring(0, 1000) + "..." + Result.Substring(Result.Length - 1000) : Result));
@@ -316,7 +316,9 @@ namespace PCL
                         RequestClient = CacheCow.Client.ClientExtensions.CreateClient(new ResilientCacheStore(FileStore), new HttpClientHandler()
                         {
                             AutomaticDecompression = DecompressionMethods.Deflate | DecompressionMethods.GZip,
-                            UseCookies = false // 不设为 False 就不能从 Header 手动传入 Cookies
+                            UseCookies = false, // 不设为 False 就不能从 Header 手动传入 Cookies
+                            MaxConnectionsPerServer = 10000, // 见 ThreadClient 处的说明：ServicePointManager 在 .NET 10 下无效
+                            ServerCertificateCustomValidationCallback = ValidateServerCertificate
                         });
                     }
                 }
@@ -381,7 +383,7 @@ namespace PCL
                 if (!Response.IsSuccessStatusCode)
                 {
                     string ResponseMessage = ResponseBytes.GetString(Encoding);
-                    throw new HttpRequestCodeException($"错误码 {Response.StatusCode} ({(int)Response.StatusCode})，{Method}，{Url}" + (string.IsNullOrEmpty(ResponseMessage) ? "" : Constants.vbCrLf + ResponseMessage), Response.StatusCode, ResponseMessage);
+                    throw new HttpRequestCodeException($"错误码 {Response.StatusCode} ({(int)Response.StatusCode})，{Method}，{Url}" + (string.IsNullOrEmpty(ResponseMessage) ? "" : "\r\n" + ResponseMessage), Response.StatusCode, ResponseMessage);
                 }
                 return ResponseBytes;
             }
@@ -420,7 +422,14 @@ namespace PCL
 
         #region 多线程下载引擎
 
-        private static HttpClient ThreadClient = new HttpClient(new HttpClientHandler() { AutomaticDecompression = DecompressionMethods.Deflate | DecompressionMethods.GZip });
+        private static HttpClient ThreadClient = new HttpClient(new HttpClientHandler()
+        {
+            AutomaticDecompression = DecompressionMethods.Deflate | DecompressionMethods.GZip,
+            // .NET 10 下 ServicePointManager 对 HttpClient 完全无效（已过时且不再作用于 SslStream/HttpClient），
+            // 连接数与证书回调必须直接配在 handler 上，否则等于没配（这是从 .NET Framework 迁移时留下的隐性失效）。
+            MaxConnectionsPerServer = 10000,
+            ServerCertificateCustomValidationCallback = ValidateServerCertificate
+        });
 
         /// <summary>
     /// 最大线程数。
@@ -1261,7 +1270,7 @@ namespace PCL
                                 double RequiredSpace = (ModBase.PathTemp.StartsWithF(DriveName) ? ContentLength * 1.1d : 0d) + (LocalPath.StartsWithF(DriveName) ? ContentLength + 5 * 1024 * 1024 : 0L);
                                 if (RequiredSpace > 0d && Drive.TotalFreeSpace < RequiredSpace)
                                 {
-                                    throw new Exception(DriveName + " 盘空间不足，无法进行下载。" + Constants.vbCrLf + "需要至少 " + StringUtils.FormatByteSize((long)Math.Round(RequiredSpace)) + " 空间，但当前仅剩余 " + StringUtils.FormatByteSize(Drive.TotalFreeSpace) + "。" + (ModBase.PathTemp.StartsWithF(DriveName) ? Constants.vbCrLf + Constants.vbCrLf + "下载时需要与文件同等大小的空间存放缓存，你可以在设置中调整缓存文件夹的位置。" : ""));
+                                    throw new Exception(DriveName + " 盘空间不足，无法进行下载。" + "\r\n" + "需要至少 " + StringUtils.FormatByteSize((long)Math.Round(RequiredSpace)) + " 空间，但当前仅剩余 " + StringUtils.FormatByteSize(Drive.TotalFreeSpace) + "。" + (ModBase.PathTemp.StartsWithF(DriveName) ? "\r\n" + "\r\n" + "下载时需要与文件同等大小的空间存放缓存，你可以在设置中调整缓存文件夹的位置。" : ""));
                                 }
                             }
                         }
@@ -2088,8 +2097,8 @@ namespace PCL
                             continue;
                         if (File.Sources.All(s => s.Ex is not null && (s.Ex.IsCanceled() || s.Ex is TimeoutException)))
                             continue;
-                        string Detail = Enumerable.Select((IEnumerable<NetSource>)File.Sources, s => $"{(s.Ex is null ? "无错误信息。" : ExceptionExtensions.GetDisplay(s.Ex, false))}（{s.Url}）").Join(Constants.vbCrLf);
-                        Error = new Exception("文件下载失败：" + File.LocalPath + Constants.vbCrLf + "各下载源的错误如下：" + Constants.vbCrLf + Detail, Error);
+                        string Detail = Enumerable.Select((IEnumerable<NetSource>)File.Sources, s => $"{(s.Ex is null ? "无错误信息。" : ExceptionExtensions.GetDisplay(s.Ex, false))}（{s.Url}）").Join("\r\n");
+                        Error = new Exception("文件下载失败：" + File.LocalPath + "\r\n" + "各下载源的错误如下：" + "\r\n" + Detail, Error);
                         break;
                     }
                     // 在设置 Error 对象后再更改为失败，避免 WaitForExit 无法捕获错误
@@ -2386,28 +2395,32 @@ namespace PCL
     /// </summary>
         public static void ShouldValidateSslCertificateOnLogin(bool Enabled)
         {
-            // VB 原文直接把多行 Lambda 赋给 ServerCertificateValidationCallback（VB 允许宽松委托转换），
-            // C# 需显式构造成 RemoteCertificateValidationCallback，参数顺序与 VB 的 Function(Sender, Certificate, Chain, Failure) 一致。
-            ServicePointManager.ServerCertificateValidationCallback = new System.Net.Security.RemoteCertificateValidationCallback((Sender, Certificate, Chain, Failure) =>
+            // 迁移修正（2026-11-13）：原实现把回调挂到 ServicePointManager.ServerCertificateValidationCallback，
+            // 这在 .NET 10 下对 HttpClient 完全不生效（该 API 已过时、且不再影响 SslStream/HttpClient），
+            // 等于"跳过证书校验"这个功能实际从未生效过。现改为写一个开关字段，由 handler 上的回调读取。
+            sslValidationEnabledOnLogin = Enabled;
+            Logger.Info($"正版登录 SSL 证书校验：{(Enabled ? "开启" : "关闭")}");
+        }
+
+        /// <summary>正版登录时是否校验 SSL 证书（默认 true = 严格校验）。</summary>
+        private static volatile bool sslValidationEnabledOnLogin = true;
+
+        /// <summary>
+        /// HttpClient 的证书校验回调（替代已失效的 ServicePointManager 全局回调）。
+        /// 仅对正版登录相关域名（xboxlive / minecraftservices）按开关决定是否放行，其余一律拒绝。
+        /// </summary>
+        private static bool ValidateServerCertificate(HttpRequestMessage Sender, System.Security.Cryptography.X509Certificates.X509Certificate2 Certificate, System.Security.Cryptography.X509Certificates.X509Chain Chain, System.Net.Security.SslPolicyErrors Failure)
         {
-            HttpWebRequest Request = Sender as HttpWebRequest;
             if (Failure == System.Net.Security.SslPolicyErrors.None)
                 return true; // 已通过验证
+            string Host = Sender?.RequestUri?.Host;
             // 基于 #3018 和 #5879，只在访问正版登录 API 时跳过证书验证
-            Logger.Warn($"未通过 SSL 证书验证（{Failure}），提供的证书为 {Certificate?.Subject}，URL：{Request?.Address}");
-            if (Request is null)
-            {
-                return !Enabled;
-            }
-            else if (Request.Address.Host.Contains("xboxlive") || Request.Address.Host.Contains("minecraftservices"))
-            {
-                return !Enabled; // 根据设置决定是否忽略错误
-            }
-            else
-            {
-                return false;
-            }
-        });
+            Logger.Warn($"未通过 SSL 证书验证（{Failure}），提供的证书为 {Certificate?.Subject}，主机：{Host ?? "未知"}");
+            if (Host is null)
+                return !sslValidationEnabledOnLogin;
+            if (Host.Contains("xboxlive") || Host.Contains("minecraftservices"))
+                return !sslValidationEnabledOnLogin; // 根据设置决定是否忽略错误
+            return false;
         }
 
     }

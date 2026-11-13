@@ -309,7 +309,10 @@ public static class ResourceSearcher
                     }
                     lock (lockObj) { foreach (var p in projectList) searchResults.Add(p); }
                     storage.CurseForgeOffset += requestResult["data"].AsArrayOrEmpty().Count();
-                    storage.CurseForgeTotal = requestResult["pagination"]["totalCount"].AsInt();
+                    var pagination = requestResult["pagination"];
+                    // 修复（2026-11-13）：原写法 requestResult["pagination"]["totalCount"] 在响应缺少 pagination 节点时，
+                    // 会先得到 null 再在 null 上取索引器，抛 NullReferenceException 让整次搜索失败。
+                    storage.CurseForgeTotal = pagination is null ? -1 : pagination["totalCount"].AsInt();
                     DownloadLog.Info($"从 CurseForge 搜索到了 {projectList.Count} 个工程（总计已获取 {storage.CurseForgeOffset} 个，共 {storage.CurseForgeTotal} 个）");
                 }
                 catch (Exception ex)

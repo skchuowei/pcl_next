@@ -2122,7 +2122,7 @@ namespace PCL
             // 确认版本隔离
             if ((SelectedForge is not null || SelectedNeoForge is not null || SelectedFabric is not null) && (Settings.Get<int>("LaunchArgumentIndieV2") == 0 || Settings.Get<int>("LaunchArgumentIndieV2") == 2))
             {
-                if (ModMain.MyMsgBox("你尚未开启版本隔离，多个 MC 版本会共用同一个 Mod 文件夹。" + Constants.vbCrLf + "因此，游戏可能会因为读取到与当前版本不符的 Mod 而崩溃。" + Constants.vbCrLf + "推荐先在 设置 → 启动选项 → 默认版本隔离 中开启版本隔离！", "版本隔离提示", "取消下载", "继续") == 1)
+                if (ModMain.MyMsgBox("你尚未开启版本隔离，多个 MC 版本会共用同一个 Mod 文件夹。" + "\r\n" + "因此，游戏可能会因为读取到与当前版本不符的 Mod 而崩溃。" + "\r\n" + "推荐先在 设置 → 启动选项 → 默认版本隔离 中开启版本隔离！", "版本隔离提示", "取消下载", "继续") == 1)
                 {
                     return;
                 }

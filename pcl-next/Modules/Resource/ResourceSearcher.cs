@@ -555,11 +555,11 @@ return true;
                     // 有结果但是有错误
                     if (Errors.Any(e => e.Source == ResourcePlatforms.CurseForge))
                     {
-                        Storage.ErrorMessage = $"无法连接到 CurseForge，所以目前仅显示了来自 Modrinth 的内容，搜索结果可能不全。{Constants.vbCrLf}请稍后再试，或使用 VPN 改善网络环境。";
+                        Storage.ErrorMessage = $"无法连接到 CurseForge，所以目前仅显示了来自 Modrinth 的内容，搜索结果可能不全。{"\r\n"}请稍后再试，或使用 VPN 改善网络环境。";
                     }
                     else
                     {
-                        Storage.ErrorMessage = $"无法连接到 Modrinth，所以目前仅显示了来自 CurseForge 的内容，搜索结果可能不全。{Constants.vbCrLf}请稍后再试，或使用 VPN 改善网络环境。";
+                        Storage.ErrorMessage = $"无法连接到 Modrinth，所以目前仅显示了来自 CurseForge 的内容，搜索结果可能不全。{"\r\n"}请稍后再试，或使用 VPN 改善网络环境。";
                     }
                 }
             }

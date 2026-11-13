@@ -391,7 +391,7 @@ namespace PCL
             }
             catch (Exception ex)
             {
-                Logger.Warn(ex, $"加载失败的主页内容：{Constants.vbCrLf}{Content}");
+                Logger.Warn(ex, $"加载失败的主页内容：{"\r\n"}{Content}");
                 OnLoadContentFailed(ex);
             }
         }
@@ -403,7 +403,7 @@ namespace PCL
             if (ModBase.ModeDebug || Settings.Get<int>("UiCustomType") == 1)
             {
                 Logger.Warn(ex, "加载主页失败");
-                if (ModMain.MyMsgBox(ex is UnauthorizedAccessException ? ex.Message : $"主页内容编写有误，请根据下列错误信息进行检查：{Constants.vbCrLf}{ex.GetDisplay(false)}", "加载主页失败", "重试", "取消") == 1)
+                if (ModMain.MyMsgBox(ex is UnauthorizedAccessException ? ex.Message : $"主页内容编写有误，请根据下列错误信息进行检查：{"\r\n"}{ex.GetDisplay(false)}", "加载主页失败", "重试", "取消") == 1)
                     ForceRefresh();
             }
             else

@@ -66,7 +66,7 @@ namespace PCL
                 var List = Configs.JavaList.Get();
                 if (List.Any())
                 {
-                    Logger.Info($"共有 {List.Count} 个可用的 Java：{Constants.vbCrLf}- {Enumerable.Select((IEnumerable<Java>)List, j => j.ToString()).Join(Constants.vbCrLf + "- ")}");
+                    Logger.Info($"共有 {List.Count} 个可用的 Java：{"\r\n"}- {Enumerable.Select((IEnumerable<Java>)List, j => j.ToString()).Join("\r\n" + "- ")}");
                     return;
                 }
                 // 如果没有 Java，则触发搜索
@@ -458,7 +458,7 @@ return Results;
                             if (TryFixOrHint)
                             {
                                 SwitchToInstanceSetup(Instance);
-                                ModMain.MyMsgBox($"该版本的版本设置选择了 {ModBase.vbLQ}使用版本文件夹中的 Java{ModBase.vbRQ}，但版本文件夹里没能找到 Java。{Constants.vbCrLf}请先修改启动选项中的 Java 设置，或在版本文件夹中放一个 Java，然后再试。", "未找到 Java", IsWarn: true, ForceWait: true);
+                                ModMain.MyMsgBox($"该版本的版本设置选择了 {ModBase.vbLQ}使用版本文件夹中的 Java{ModBase.vbRQ}，但版本文件夹里没能找到 Java。{"\r\n"}请先修改启动选项中的 Java 设置，或在版本文件夹中放一个 Java，然后再试。", "未找到 Java", IsWarn: true, ForceWait: true);
                             }
                             return null;
                         }
@@ -473,7 +473,7 @@ return Results;
                                 if (TryFixOrHint)
                                 {
                                     SwitchToInstanceSetup(Instance);
-                                    ModMain.MyMsgBox($"该版本的版本设置选择了 {ModBase.vbLQ}使用指定的 Java{ModBase.vbRQ}，但还没有指定任何 Java。{Constants.vbCrLf}请先选择你想使用的 Java，然后再试。", "未选择 Java", IsWarn: true, ForceWait: true);
+                                    ModMain.MyMsgBox($"该版本的版本设置选择了 {ModBase.vbLQ}使用指定的 Java{ModBase.vbRQ}，但还没有指定任何 Java。{"\r\n"}请先选择你想使用的 Java，然后再试。", "未选择 Java", IsWarn: true, ForceWait: true);
                                 }
                                 p?.Skip();
                                 return null; // <==== 设置中未指定 Java
@@ -631,7 +631,7 @@ return Results;
                                     {
                                         Description = $"版本低于 {Range.Upper} 的 Java";
                                     }
-                                    ModMain.MyMsgBox($"PCL Next 没能找到合适的 Java。{Constants.vbCrLf}请在网上搜索并手动安装{Description}， 然后在【设置 → 启动 → 高级选项 → Java 列表】中导入它。", "需要手动安装 Java");
+                                    ModMain.MyMsgBox($"PCL Next 没能找到合适的 Java。{"\r\n"}请在网上搜索并手动安装{Description}， 然后在【设置 → 启动 → 高级选项 → Java 列表】中导入它。", "需要手动安装 Java");
                                     return null;
                                 }
 

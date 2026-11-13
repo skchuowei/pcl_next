@@ -129,7 +129,7 @@ namespace PCL
                 {
                     if (!Settings.Get<bool>("HintHide"))
                     {
-                        if (ModMain.MyMsgBox("确认要从版本列表中隐藏该版本吗？隐藏该版本后，它将不再出现于 PCL Next 显示的版本列表中。" + Constants.vbCrLf + "此后，在版本列表页面按下 F11 才可以查看被隐藏的版本。", "隐藏版本提示", Button2: "取消") != 1)
+                        if (ModMain.MyMsgBox("确认要从版本列表中隐藏该版本吗？隐藏该版本后，它将不再出现于 PCL Next 显示的版本列表中。" + "\r\n" + "此后，在版本列表页面按下 F11 才可以查看被隐藏的版本。", "隐藏版本提示", Button2: "取消") != 1)
                         {
                             this.ComboDisplayType.SelectedIndex = 0;
                             return;
@@ -394,7 +394,7 @@ namespace PCL
                 bool IsHintIndie = PageInstanceLeft.Instance.State != ModMinecraft.McInstance.McInstanceState.Error && (PageInstanceLeft.Instance.PathIndie ?? "") != (ModMinecraft.McFolderSelected ?? "");
                 var SavesFolder = DirectoryUtils.GetInfo(PageInstanceLeft.Instance.PathIndie + @"saves\");
                 var SaveEntries = IsHintIndie && SavesFolder.Exists ? SavesFolder.EnumerateDirectories().OrderByDescending(Save => Save.LastWriteTime).Select(Save => $"{Save.Name}（上次修改：{StringUtils.FormatTimeSpan(Save.LastWriteTime - DateTime.Now, false)}）").ToList() : new List<string>();
-                switch (ModMain.MyMsgBox($"你确定要{(IsShiftPressed ? "永久" : "")}删除版本 {PageInstanceLeft.Instance.Name} 吗？" + (IsHintIndie ? Constants.vbCrLf + "该版本对应的存档、资源包、Mod 等文件也将被一并删除！" + (SaveEntries.Any() ? Constants.vbCrLf + Constants.vbCrLf + "这会删除以下存档：" + Constants.vbCrLf + "· " + SaveEntries.Join(Constants.vbCrLf + "· ") : "") : ""), "版本删除确认", Button2: "取消", IsWarn: IsHintIndie || IsShiftPressed))
+                switch (ModMain.MyMsgBox($"你确定要{(IsShiftPressed ? "永久" : "")}删除版本 {PageInstanceLeft.Instance.Name} 吗？" + (IsHintIndie ? "\r\n" + "该版本对应的存档、资源包、Mod 等文件也将被一并删除！" + (SaveEntries.Any() ? "\r\n" + "\r\n" + "这会删除以下存档：" + "\r\n" + "· " + SaveEntries.Join("\r\n" + "· ") : "") : ""), "版本删除确认", Button2: "取消", IsWarn: IsHintIndie || IsShiftPressed))
                 {
                     case 1:
                         {

@@ -309,7 +309,7 @@ namespace PCL
                 // 确认版本格式标准
                 Id = Id.Replace("_", "-"); // 1.7.10_pre4 在版本列表中显示为 1.7.10-pre4
                 if (Id != "1.0" && Id.EndsWithF(".0"))
-                    Id = Strings.Left(Id, Id.Length - 2); // OptiFine 1.8 的下载会触发此问题，显示版本为 1.8.0
+                    Id = Id[..^2]; // OptiFine 1.8 的下载会触发此问题，显示版本为 1.8.0
                                                           // 获取 Minecraft 版本列表
                 switch (DlClientListLoader.State)
                 {
@@ -344,7 +344,7 @@ namespace PCL
                     if ((string)Version["id"] == Id)
                         return Version["url"].ToString();
                 }
-                Logger.Warn($"未发现版本 {Id} 的 json 下载地址，版本列表返回为：{Constants.vbCrLf}{DlClientListLoader.Output.Value}");
+                Logger.Warn($"未发现版本 {Id} 的 json 下载地址，版本列表返回为：{"\r\n"}{DlClientListLoader.Output.Value}");
                 return null;
             }
             catch (Exception ex)
@@ -422,7 +422,7 @@ namespace PCL
                 set
                 {
                     if (value.EndsWithF(".0"))
-                        value = Strings.Left(value, value.Length - 2);
+                        value = value[..^2];
                     _inherit = value;
                 }
             }
@@ -744,7 +744,7 @@ namespace PCL
                         Inherit = $"1.{Version.Major}.{Version.Minor}";
                     }
                     if (Inherit.EndsWithF(".0"))
-                        Inherit = Strings.Left(Inherit, Inherit.Length - 2);
+                        Inherit = Inherit[..^2];
                     if (VersionName.Contains("+"))
                         Inherit += "-" + VersionName.AfterFirst("+");
                 }

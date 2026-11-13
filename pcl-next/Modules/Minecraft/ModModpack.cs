@@ -283,7 +283,7 @@ namespace PCL
     /// </summary>
         private static void NotifyIncompatibleLoader(string LoaderName)
         {
-            if (ModMain.MyMsgBox($"整合包中存在不兼容的加载器：{LoaderName}{Constants.vbCrLf}如果你知道如何手动安装它，可以先选择跳过，然后在整合包下载结束后手动安装。", "不兼容的加载器", "取消", $"不安装 {LoaderName} 并继续") == 1)
+            if (ModMain.MyMsgBox($"整合包中存在不兼容的加载器：{LoaderName}{"\r\n"}如果你知道如何手动安装它，可以先选择跳过，然后在整合包下载结束后手动安装。", "不兼容的加载器", "取消", $"不安装 {LoaderName} 并继续") == 1)
                 throw new OperationCanceledException();
         }
 
@@ -422,7 +422,7 @@ namespace PCL
                     MissingDesc.Add($"{Project.TranslatedName} (文件 ID {Missing.FileId})");
                 }
             }
-            if (ModMain.MyMsgBox($"未找到该整合包所需的以下内容，它们可能已被原作者删除：{Constants.vbCrLf}- {MissingDesc.Join(Constants.vbCrLf + "- ")}{Constants.vbCrLf}{Constants.vbCrLf}是否继续安装？缺失这些内容可能导致整合包出现异常！", "整合包内容缺失", "继续", "取消", IsWarn: true) == 2)
+            if (ModMain.MyMsgBox($"未找到该整合包所需的以下内容，它们可能已被原作者删除：{"\r\n"}- {MissingDesc.Join("\r\n" + "- ")}{"\r\n"}{"\r\n"}是否继续安装？缺失这些内容可能导致整合包出现异常！", "整合包内容缺失", "继续", "取消", IsWarn: true) == 2)
             {
                 Task.Cancel();
             }
@@ -673,7 +673,7 @@ namespace PCL
                 string TargetPath = Path.Combine(VersionFolder, File["path"].ToString().TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
                 if (!PathUtils.IsParentOf(VersionFolder, TargetPath))
                 {
-                    ModMain.MyMsgBox($"整合包的文件路径超出了版本文件夹，请向整合包作者反馈此问题！{Constants.vbCrLf}目标：{Path.GetFullPath(TargetPath)}{Constants.vbCrLf}错误的文件：{TargetPath}", "文件路径校验失败", IsWarn: true);
+                    ModMain.MyMsgBox($"整合包的文件路径超出了版本文件夹，请向整合包作者反馈此问题！{"\r\n"}目标：{Path.GetFullPath(TargetPath)}{"\r\n"}错误的文件：{TargetPath}", "文件路径校验失败", IsWarn: true);
                     throw new OperationCanceledException();
                 }
                 FileList.Add(new ModNet.NetFile(Urls, TargetPath, new FileChecker() { Hash = File["hashes"]["sha1"].ToString() }, true)); // Modrinth 整合包不应校验文件大小（他们官方自己说的）
@@ -860,7 +860,7 @@ namespace PCL
                             continue;
                         Lines.Add(Line.BeforeFirst("=") + ":" + Line.AfterFirst("="));
                     }
-                    FileUtils.Write(MmcSetupFile, Lines.Join(Constants.vbCrLf));
+                    FileUtils.Write(MmcSetupFile, Lines.Join("\r\n"));
                     // 读取文件
                     if (Conversions.ToBoolean(ModBase.ReadIni(MmcSetupFile, "OverrideCommands", Conversions.ToString(false))))
                     {
@@ -1148,7 +1148,7 @@ namespace PCL
                 if (Launcher is not null)
                     {
                     Logger.Info($"找到压缩包中附带的启动器：{Launcher}");
-                    if (ModMain.MyMsgBox($"整合包里似乎自带了启动器，是否换用它继续安装？{Constants.vbCrLf}即将打开：{Launcher}", "换用整合包启动器？", "换用", "不换用") == 1)
+                    if (ModMain.MyMsgBox($"整合包里似乎自带了启动器，是否换用它继续安装？{"\r\n"}即将打开：{Launcher}", "换用整合包启动器？", "换用", "不换用") == 1)
                         {
                         ModBase.StartProcess(Launcher, "--wait"); // 要求等待已有的 PCL 退出
                         Logger.Info("为换用整合包中的启动器启动，强制结束程序");

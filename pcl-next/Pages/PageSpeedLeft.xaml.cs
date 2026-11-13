@@ -294,7 +294,7 @@ namespace PCL
                         catch (Exception ex)
                         {
                             Logger.Warn(ex, "新建任务管理卡片失败");
-                            Logger.Info($"出错的卡片内容：{Constants.vbCrLf}{CardXAML}");
+                            Logger.Info($"出错的卡片内容：{"\r\n"}{CardXAML}");
                             throw;
                         }
                         ModMain.FrmSpeedRight.PanMain.Children.Insert(0, Card);

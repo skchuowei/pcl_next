@@ -346,7 +346,7 @@ namespace PCL
                         ModMain.Hint("请在其他任务完成后，再移除游戏文件夹！", ModMain.HintType.Red);
                         return;
                     }
-                    switch (ModMain.MyMsgBox("是否需要清理 PCL Next 在该文件夹中的配置文件？" + Constants.vbCrLf + "这包括各个版本的独立设置（如自定义图标、第三方登录配置）等，对游戏本身没有影响。", "配置文件清理", "删除", "保留", "取消"))
+                    switch (ModMain.MyMsgBox("是否需要清理 PCL Next 在该文件夹中的配置文件？" + "\r\n" + "这包括各个版本的独立设置（如自定义图标、第三方登录配置）等，对游戏本身没有影响。", "配置文件清理", "删除", "保留", "取消"))
                     {
                         case 1:
                             {
@@ -386,9 +386,9 @@ namespace PCL
             }
             ModMinecraft.McFolder Target = (ModMinecraft.McFolder)((MyListItem)((System.Windows.Controls.Primitives.Popup)((ContextMenu)((dynamic)sender).Parent).Parent).PlacementTarget).Tag;
             string DeleteText = (Target.Type == ModMinecraft.McFolder.Types.Vanilla || Target.Type == ModMinecraft.McFolder.Types.RenamedVanilla) && (Target.Location ?? "") == (Paths.Base + @".minecraft\" ?? "") && ModMinecraft.McFolderList.IsSingle() ? "清空" : "删除";
-            if (ModMain.MyMsgBox("你确定要" + DeleteText + "这个文件夹吗？" + Constants.vbCrLf + "目标文件夹：" + Target.Location + Constants.vbCrLf + Constants.vbCrLf + "该文件夹中的游戏存档、游戏版本，以及 MC 之外的其他文件，都会永久丢失，不可恢复！", "警告", "取消", "确认", "取消") != 2)
+            if (ModMain.MyMsgBox("你确定要" + DeleteText + "这个文件夹吗？" + "\r\n" + "目标文件夹：" + Target.Location + "\r\n" + "\r\n" + "该文件夹中的游戏存档、游戏版本，以及 MC 之外的其他文件，都会永久丢失，不可恢复！", "警告", "取消", "确认", "取消") != 2)
                 return;
-            if (ModMain.MyMsgBoxInput("删除确认", "该文件夹中的游戏存档、游戏版本，以及 MC 之外的其他文件，都会永久丢失，不可恢复！" + Constants.vbCrLf + "目标文件夹：" + Target.Location + Constants.vbCrLf + Constants.vbCrLf + "如果确实要删除，请在下面输入【Potato】这个单词以继续。", ValidateRules: new System.Collections.ObjectModel.Collection<ValidateType>() { new ValidateSame("Potato", $"请输入 {ModBase.vbLQ}Potato{ModBase.vbRQ}", IgnoreCase: true) }, Button1: "永久删除文件夹", Button2: "取消", IsWarn: true) is null)
+            if (ModMain.MyMsgBoxInput("删除确认", "该文件夹中的游戏存档、游戏版本，以及 MC 之外的其他文件，都会永久丢失，不可恢复！" + "\r\n" + "目标文件夹：" + Target.Location + "\r\n" + "\r\n" + "如果确实要删除，请在下面输入【Potato】这个单词以继续。", ValidateRules: new System.Collections.ObjectModel.Collection<ValidateType>() { new ValidateSame("Potato", $"请输入 {ModBase.vbLQ}Potato{ModBase.vbRQ}", IgnoreCase: true) }, Button1: "永久删除文件夹", Button2: "取消", IsWarn: true) is null)
                 return;
             RemoveFolderFromSetup(Target);
             // 删除文件夹

@@ -90,7 +90,7 @@ namespace PCL
             if (!Settings.Get<bool>("HintDownloadThread"))
             {
                 Settings.Set("HintDownloadThread", true);
-                ModMain.MyMsgBox("如果设置过多的下载线程，可能会导致下载时出现非常严重的卡顿。" + Constants.vbCrLf + "一般设置 64 线程即可满足大多数下载需求，除非你知道你在干什么，否则不建议设置更多的线程数！", "警告", "我知道了", IsWarn: true);
+                ModMain.MyMsgBox("如果设置过多的下载线程，可能会导致下载时出现非常严重的卡顿。" + "\r\n" + "一般设置 64 线程即可满足大多数下载需求，除非你知道你在干什么，否则不建议设置更多的线程数！", "警告", "我知道了", IsWarn: true);
             }
         }
 
@@ -118,7 +118,7 @@ namespace PCL
                 return;
             if (this.ComboSystemActivity.SelectedIndex != 2)
                 return;
-            if (ModMain.MyMsgBox("若选择此项，即使在将来出现严重问题时，你也无法获取相关通知。" + Constants.vbCrLf + "例如，如果发现某个版本游戏存在严重 Bug，你可能就会因为无法得到通知而导致无法预知的后果。" + Constants.vbCrLf + Constants.vbCrLf + "一般选择 仅在有重要通知时显示公告 就可以让你尽量不受打扰了。" + Constants.vbCrLf + "除非你在制作服务器整合包，或时常手动更新启动器，否则极度不推荐选择此项！", "警告", "我知道我在做什么", "取消", IsWarn: true) == 2)
+            if (ModMain.MyMsgBox("若选择此项，即使在将来出现严重问题时，你也无法获取相关通知。" + "\r\n" + "例如，如果发现某个版本游戏存在严重 Bug，你可能就会因为无法得到通知而导致无法预知的后果。" + "\r\n" + "\r\n" + "一般选择 仅在有重要通知时显示公告 就可以让你尽量不受打扰了。" + "\r\n" + "除非你在制作服务器整合包，或时常手动更新启动器，否则极度不推荐选择此项！", "警告", "我知道我在做什么", "取消", IsWarn: true) == 2)
             {
                 if (e.RemovedItems.Count > 0)
                     this.ComboSystemActivity.SelectedItem = e.RemovedItems[0];
@@ -130,7 +130,7 @@ namespace PCL
                 return;
             if (this.ComboSystemUpdate.SelectedIndex != 3)
                 return;
-            if (ModMain.MyMsgBox("若选择此项，即使在启动器将来出现严重问题时，你也无法获取更新并获得修复。" + Constants.vbCrLf + "例如，如果官方修改了登录方式，从而导致现有启动器无法登录，你可能就会因为无法更新而无法开始游戏。" + Constants.vbCrLf + Constants.vbCrLf + "一般选择 仅在有重大漏洞更新时显示提示 就可以让你尽量不受打扰了。" + Constants.vbCrLf + "除非你在制作服务器整合包，或时常手动更新启动器，否则极度不推荐选择此项！", "警告", "我知道我在做什么", "取消", IsWarn: true) == 2)
+            if (ModMain.MyMsgBox("若选择此项，即使在启动器将来出现严重问题时，你也无法获取更新并获得修复。" + "\r\n" + "例如，如果官方修改了登录方式，从而导致现有启动器无法登录，你可能就会因为无法更新而无法开始游戏。" + "\r\n" + "\r\n" + "一般选择 仅在有重大漏洞更新时显示提示 就可以让你尽量不受打扰了。" + "\r\n" + "除非你在制作服务器整合包，或时常手动更新启动器，否则极度不推荐选择此项！", "警告", "我知道我在做什么", "取消", IsWarn: true) == 2)
             {
                 if (e.RemovedItems.Count > 0)
                     this.ComboSystemUpdate.SelectedItem = e.RemovedItems[0];

@@ -110,11 +110,11 @@ namespace PCL
 
             // 设置解锁
             if (!this.RadioLauncherTheme8.IsEnabled)
-                this.LabLauncherTheme8Copy.ToolTip = $"累积赞助达到 ¥23.33 后，在爱发电私信发送【土豆 {ModBase.Identify}】以解锁。" + Constants.vbCrLf + "右键打开赞助页面，如果觉得 PCL Next 做得还不错就支持一下吧 =w=！";
+                this.LabLauncherTheme8Copy.ToolTip = $"累积赞助达到 ¥23.33 后，在爱发电私信发送【土豆 {ModBase.Identify}】以解锁。" + "\r\n" + "右键打开赞助页面，如果觉得 PCL Next 做得还不错就支持一下吧 =w=！";
             this.RadioLauncherTheme8.ToolTip = $"累积赞助达到 ¥23.33 后，在爱发电私信发送【土豆 {ModBase.Identify}】以解锁";
             if (!this.RadioLauncherTheme9.IsEnabled)
-                this.LabLauncherTheme9Copy.ToolTip = "· 反馈一个 Bug，在标记为 [完成] 后回复识别码要求解锁（右键打开反馈页面）" + Constants.vbCrLf + "· 提交一个 Pull Request 或主页预设，在标记为 [完成] 后回复识别码要求解锁";
-            this.RadioLauncherTheme9.ToolTip = "· 反馈一个 Bug，在标记为 [完成] 后回复识别码要求解锁" + Constants.vbCrLf + "· 提交一个 Pull Request 或主页预设，在标记为 [完成] 后回复识别码要求解锁";
+                this.LabLauncherTheme9Copy.ToolTip = "· 反馈一个 Bug，在标记为 [完成] 后回复识别码要求解锁（右键打开反馈页面）" + "\r\n" + "· 提交一个 Pull Request 或主页预设，在标记为 [完成] 后回复识别码要求解锁";
+            this.RadioLauncherTheme9.ToolTip = "· 反馈一个 Bug，在标记为 [完成] 后回复识别码要求解锁" + "\r\n" + "· 提交一个 Pull Request 或主页预设，在标记为 [完成] 后回复识别码要求解锁";
             // 极客蓝的处理在 ThemeCheck 中
 
         }
@@ -194,7 +194,7 @@ namespace PCL
         }
         private void BtnBackgroundClear_Click(object sender, EventArgs e)
         {
-            if (ModMain.MyMsgBox("即将删除背景图片文件夹中的所有文件。" + Constants.vbCrLf + "此操作不可撤销，是否确定？", "警告", Button2: "取消", IsWarn: true) == 1)
+            if (ModMain.MyMsgBox("即将删除背景图片文件夹中的所有文件。" + "\r\n" + "此操作不可撤销，是否确定？", "警告", Button2: "取消", IsWarn: true) == 1)
             {
                 DirectoryUtils.Delete(Paths.Base + @"PCL\Pictures");
                 BackgroundRefresh(false, true);
@@ -258,7 +258,7 @@ namespace PCL
                         {
                             if (ex.Message.Contains("参数无效"))
                             {
-                                Logger.Error($"刷新背景图片失败，该图片文件可能并非标准格式。{Constants.vbCrLf}你可以尝试使用画图打开该文件并重新保存，这会让图片变为标准格式。{Constants.vbCrLf}文件：{Address}", LogBehavior.Alert);
+                                Logger.Error($"刷新背景图片失败，该图片文件可能并非标准格式。{"\r\n"}你可以尝试使用画图打开该文件并重新保存，这会让图片变为标准格式。{"\r\n"}文件：{Address}", LogBehavior.Alert);
                             }
                             else
                             {
@@ -296,7 +296,7 @@ namespace PCL
             {
                 if (ex.Message.Contains("参数无效"))
                 {
-                    Logger.Error($"改变标题栏图片失败，该图片文件可能并非标准格式。{Constants.vbCrLf}你可以尝试使用画图打开该文件并重新保存，这会让图片变为标准格式。{Constants.vbCrLf}文件：{TargetPath}", LogBehavior.Alert);
+                    Logger.Error($"改变标题栏图片失败，该图片文件可能并非标准格式。{"\r\n"}你可以尝试使用画图打开该文件并重新保存，这会让图片变为标准格式。{"\r\n"}文件：{TargetPath}", LogBehavior.Alert);
                 }
                 else
                 {
@@ -325,7 +325,7 @@ namespace PCL
                 {
                     if (ex.Message.Contains("参数无效"))
                     {
-                        Logger.Error($"改变标题栏图片失败，该图片文件可能并非标准格式。{Constants.vbCrLf}你可以尝试使用画图打开该文件并重新保存，这会让图片变为标准格式。{Constants.vbCrLf}文件：{TargetPath}", LogBehavior.Alert);
+                        Logger.Error($"改变标题栏图片失败，该图片文件可能并非标准格式。{"\r\n"}你可以尝试使用画图打开该文件并重新保存，这会让图片变为标准格式。{"\r\n"}文件：{TargetPath}", LogBehavior.Alert);
                     }
                     else
                     {
@@ -409,7 +409,7 @@ namespace PCL
         }
         private void BtnMusicClear_Click(object sender, EventArgs e)
         {
-            if (ModMain.MyMsgBox("即将删除背景音乐文件夹中的所有文件。" + Constants.vbCrLf + "此操作不可撤销，是否确定？", "警告", Button2: "取消", IsWarn: true) == 1)
+            if (ModMain.MyMsgBox("即将删除背景音乐文件夹中的所有文件。" + "\r\n" + "此操作不可撤销，是否确定？", "警告", Button2: "取消", IsWarn: true) == 1)
             {
                 ModBase.RunInThread(() =>
         {
@@ -488,7 +488,7 @@ namespace PCL
         }
         private void BtnCustomTutorial_Click(object sender, EventArgs e)
         {
-            ModMain.MyMsgBox("1. 点击 生成教学文件 按钮，这会在 PCL 文件夹下生成 Custom.xaml 布局文件。" + Constants.vbCrLf + "2. 使用记事本等工具打开这个文件并进行修改，修改完记得保存。" + Constants.vbCrLf + "3. 点击 刷新主页 按钮，查看主页现在长啥样了。" + Constants.vbCrLf + Constants.vbCrLf + "你可以在生成教学文件后直接刷新主页，对照着进行修改，更有助于理解。" + Constants.vbCrLf + "直接将主页文件拖进 PCL Next 窗口也可以快捷加载。", "主页自定义教程");
+            ModMain.MyMsgBox("1. 点击 生成教学文件 按钮，这会在 PCL 文件夹下生成 Custom.xaml 布局文件。" + "\r\n" + "2. 使用记事本等工具打开这个文件并进行修改，修改完记得保存。" + "\r\n" + "3. 点击 刷新主页 按钮，查看主页现在长啥样了。" + "\r\n" + "\r\n" + "你可以在生成教学文件后直接刷新主页，对照着进行修改，更有助于理解。" + "\r\n" + "直接将主页文件拖进 PCL Next 窗口也可以快捷加载。", "主页自定义教程");
         }
         public static void OnMainPageTypeChanged()
         {
@@ -512,7 +512,7 @@ namespace PCL
                         ModMain.FrmSetupUI.PanCustomNet.Visibility = Visibility.Collapsed;
                         ModMain.FrmSetupUI.HintCustom.Visibility = Visibility.Visible;
                         ModMain.FrmSetupUI.HintCustomWarn.Visibility = Settings.Get<bool>("HintCustomWarn") ? Visibility.Collapsed : Visibility.Visible;
-                        ModMain.FrmSetupUI.HintCustom.Text = $"从 PCL 文件夹下的 Custom.xaml 读取主页内容。{Constants.vbCrLf}你可以手动编辑该文件，向主页添加文本、图片、常用网站、快捷启动等功能。";
+                        ModMain.FrmSetupUI.HintCustom.Text = $"从 PCL 文件夹下的 Custom.xaml 读取主页内容。{"\r\n"}你可以手动编辑该文件，向主页添加文本、图片、常用网站、快捷启动等功能。";
                         CustomEventService.SetEventType(ModMain.FrmSetupUI.HintCustom, CustomEvent.EventType.None);
                         break;
                     }
@@ -523,7 +523,7 @@ namespace PCL
                         ModMain.FrmSetupUI.PanCustomNet.Visibility = Visibility.Visible;
                         ModMain.FrmSetupUI.HintCustom.Visibility = Visibility.Visible;
                         ModMain.FrmSetupUI.HintCustomWarn.Visibility = Settings.Get<bool>("HintCustomWarn") ? Visibility.Collapsed : Visibility.Visible;
-                        ModMain.FrmSetupUI.HintCustom.Text = $"从指定网址联网获取主页内容。服主也可以用于动态更新服务器公告。{Constants.vbCrLf}如果你制作了稳定运行的联网主页，可以点击这条提示投稿，若合格即可加入预设！";
+                        ModMain.FrmSetupUI.HintCustom.Text = $"从指定网址联网获取主页内容。服主也可以用于动态更新服务器公告。{"\r\n"}如果你制作了稳定运行的联网主页，可以点击这条提示投稿，若合格即可加入预设！";
                         CustomEventService.SetEventType(ModMain.FrmSetupUI.HintCustom, CustomEvent.EventType.打开网页);
                         CustomEventService.SetEventData(ModMain.FrmSetupUI.HintCustom, "https://github.com/Meloong-Git/PCL/discussions/2528");
                         break;
@@ -570,9 +570,9 @@ namespace PCL
         {
             if (this.LabLauncherTheme11Click.Visibility == Visibility.Collapsed || (this.LabLauncherTheme11Click.ToolTip ?? "").ToString().Contains("点击"))
             {
-                if (ModMain.MyMsgBox("1. 不爬取或攻击相关服务或网站，不盗取相关账号，没有谜题可以或需要以此来解决。" + Constants.vbCrLf + "2. 不得篡改或损毁相关公开信息，请尽量让它们保持原状。" + Constants.vbCrLf + "3. 在你感到迷茫的时候，看看回声洞可能会给你带来惊喜。" + Constants.vbCrLf + Constants.vbCrLf + "若违规，可能会被从任意相关群中踢出！", "解密游戏的基本规则", "我知道了", "恕我拒绝") == 1)
+                if (ModMain.MyMsgBox("1. 不爬取或攻击相关服务或网站，不盗取相关账号，没有谜题可以或需要以此来解决。" + "\r\n" + "2. 不得篡改或损毁相关公开信息，请尽量让它们保持原状。" + "\r\n" + "3. 在你感到迷茫的时候，看看回声洞可能会给你带来惊喜。" + "\r\n" + "\r\n" + "若违规，可能会被从任意相关群中踢出！", "解密游戏的基本规则", "我知道了", "恕我拒绝") == 1)
                 {
-                    ModMain.MyMsgBox("你需要用自己的智慧来找到下一步的线索……" + Constants.vbCrLf + @"初始线索：gnp.dorC61\60\20\0202\moc.x1xa.2s\\:sp" + "T".Lower() + "th", "解密游戏"); // 防止触发病毒检测规则
+                    ModMain.MyMsgBox("你需要用自己的智慧来找到下一步的线索……" + "\r\n" + @"初始线索：gnp.dorC61\60\20\0202\moc.x1xa.2s\\:sp" + "T".Lower() + "th", "解密游戏"); // 防止触发病毒检测规则
                 }
             }
         }

@@ -158,7 +158,7 @@ namespace PCL
                     }
                     catch (Exception ex)
                     {
-                        ModMain.MyMsgBox("失效的 Minecraft 文件夹：" + Constants.vbCrLf + FolderPath + Constants.vbCrLf + Constants.vbCrLf + ex.GetDisplay(false), "Minecraft 文件夹失效", IsWarn: true);
+                        ModMain.MyMsgBox("失效的 Minecraft 文件夹：" + "\r\n" + FolderPath + "\r\n" + "\r\n" + ex.GetDisplay(false), "Minecraft 文件夹失效", IsWarn: true);
                         Logger.Warn(ex, $"无法访问 Minecraft 文件夹 {FolderPath}");
                     }
                 }
@@ -2688,7 +2688,7 @@ namespace PCL
                     else
                     {
                         // 正常
-                        LocalPath = $@"{McFolderSelected}assets\objects\{Strings.Left(File.Value["hash"].ToString(), 2)}\{File.Value["hash"]}";
+                        LocalPath = $@"{McFolderSelected}assets\objects\{File.Value["hash"].ToString()[..2]}\{File.Value["hash"]}";
                     }
                     Result.Add(new McAssetsToken()
                     {
@@ -2716,7 +2716,7 @@ namespace PCL
             // 如果需要检查 Hash，则留到下载时处理，以借助多线程加快检查速度
             if (CheckHash)
             {
-                return McAssetsListGet(Instance).Select((Token) => new ModNet.NetFile(ModDownload.DlSourceAssetsGet($"https://resources.download.minecraft.net/{Strings.Left(Token.Hash, 2)}/{Token.Hash}"), LocalPath: Token.LocalPath, Checker: new FileChecker() { ActualSize = Token.Size == 0L ? -1 : Token.Size, Hash = Token.Hash })).ToList();
+                return McAssetsListGet(Instance).Select((Token) => new ModNet.NetFile(ModDownload.DlSourceAssetsGet($"https://resources.download.minecraft.net/{Token.Hash[..2]}/{Token.Hash}"), LocalPath: Token.LocalPath, Checker: new FileChecker() { ActualSize = Token.Size == 0L ? -1 : Token.Size, Hash = Token.Hash })).ToList();
             }
             // 如果不检查 Hash，则立即处理
             var Result = new List<ModNet.NetFile>();
@@ -2738,7 +2738,7 @@ namespace PCL
                     if (File.Exists && (Token.Size == 0L || Token.Size == File.Length))
                         continue;
                     // 文件不存在，添加下载
-                    Result.Add(new ModNet.NetFile(ModDownload.DlSourceAssetsGet($"https://resources.download.minecraft.net/{Strings.Left(Token.Hash, 2)}/{Token.Hash}"), Token.LocalPath, new FileChecker() { ActualSize = Token.Size == 0L ? -1 : Token.Size, Hash = Token.Hash }));
+                    Result.Add(new ModNet.NetFile(ModDownload.DlSourceAssetsGet($"https://resources.download.minecraft.net/{Token.Hash[..2]}/{Token.Hash}"), Token.LocalPath, new FileChecker() { ActualSize = Token.Size == 0L ? -1 : Token.Size, Hash = Token.Hash }));
                 }
             }
             catch (Exception ex)
@@ -2778,7 +2778,7 @@ namespace PCL
                 if (Version is null)
                     return;
                 DateTime Time = (DateTime)Version["releaseTime"];
-                string MsgBoxText = $"新版本：{VersionName}{Constants.vbCrLf}" + ((DateTime.Now - Time).TotalDays > 1d ? "更新时间：" + Time.ToString() : "更新于：" + StringUtils.FormatTimeSpan(Time - DateTime.Now, false));
+                string MsgBoxText = $"新版本：{VersionName}{"\r\n"}" + ((DateTime.Now - Time).TotalDays > 1d ? "更新时间：" + Time.ToString() : "更新于：" + StringUtils.FormatTimeSpan(Time - DateTime.Now, false));
                 int MsgResult = ModMain.MyMsgBox(MsgBoxText, "Minecraft 更新提示", "确定", ModDownloadPolicy.RestrictMcDownload ? "" : "下载", (DateTime.Now - Time).TotalHours > 3d ? "更新日志" : "", Button3Action: () => ModDownloadLib.McUpdateLogShow(Version));
                 // 弹窗结果
                 if (MsgResult == 2)
@@ -2813,7 +2813,7 @@ namespace PCL
             string AccessToken = ModLaunch.McLoginLoader.Output.AccessToken;
             if (AccessToken is not null && AccessToken.Length >= 10 && Raw.ContainsIgnoreCase(AccessToken) && (ModLaunch.McLoginLoader.Output.Uuid ?? "") != (ModLaunch.McLoginLoader.Output.AccessToken ?? "")) // UUID 和 AccessToken 一样则不打码
             {
-                Raw = Raw.Replace(AccessToken, Strings.Left(AccessToken, 5) + new string(FilterChar, AccessToken.Length - 10) + Strings.Right(AccessToken, 5));
+                Raw = Raw.Replace(AccessToken, AccessToken[..5] + new string(FilterChar, AccessToken.Length - 10) + AccessToken[^5..]);
             }
             return Raw;
         }

@@ -116,8 +116,8 @@ namespace PCL
             }
             if (LatestLog is not null && LatestLog.Any())
             {
-                string RawOutput = LatestLog.Join(Constants.vbCrLf);
-                Logger.Info($"以下为游戏输出的最后一段内容：{Constants.vbCrLf}{RawOutput}");
+                string RawOutput = LatestLog.Join("\r\n");
+                Logger.Info($"以下为游戏输出的最后一段内容：{"\r\n"}{RawOutput}");
                 FileUtils.Write(TempFolder + "RawOutput.log", RawOutput);
                 AnalyzeRawFiles.Add(new KeyValuePair<string, string[]>(TempFolder + "RawOutput.log", LatestLog.ToArray()));
                 LatestLog.Clear();
@@ -341,7 +341,7 @@ namespace PCL
                                     {
                                         if (HasLauncherMark)
                                         {
-                                            LogMc += Line + Constants.vbLf;
+                                            LogMc += Line + "\n";
                                         }
                                         else if (Line.Contains("以下为游戏输出的最后一段内容"))
                                         {
@@ -352,7 +352,7 @@ namespace PCL
                                     // 导入后 500 行
                                     if (!HasLauncherMark)
                                         LogMc += GetHeadTailLines(CurrentLog.Value, 0, 500);
-                                    LogMc = LogMc.TrimEnd(Constants.vbCrLf.ToCharArray());
+                                    LogMc = LogMc.TrimEnd("\r\n".ToCharArray());
                                     Logger.Info($"导入分析：{CurrentLog.Key}，作为启动器日志");
                                     break;
                                 }
@@ -437,7 +437,7 @@ namespace PCL
         private string GetHeadTailLines(string[] Raw, int HeadLines, int TailLines)
         {
             if (Raw.Length <= HeadLines + TailLines)
-                return Raw.Distinct().Join(Constants.vbLf);
+                return Raw.Distinct().Join("\n");
             var Lines = new List<string>();
             int RealHeadLines = 0;
             int ViewedLines;
@@ -467,7 +467,7 @@ namespace PCL
                 if (string.IsNullOrEmpty(Line))
                     continue;
                 Result.Append(Line);
-                Result.Append(Constants.vbLf);
+                Result.Append("\n");
             }
             return Result.ToString();
         }
@@ -657,7 +657,7 @@ namespace PCL
                 if (LogCrash.Contains("Unable to make protected final java.lang.Class java.lang.ClassLoader.defineClass"))
                     AppendReason(CrashReason.Java版本过高);
                 if (LogCrash.Contains("Failed loading config file "))
-                    AppendReason(CrashReason.Mod配置文件导致游戏崩溃, new[] { TryAnalyzeModName((LogCrash.RegexSeek(@"(?<=Failed loading config file .+ for modid )[^\n]+") ?? "").TrimEnd(Conversions.ToChar(Constants.vbCrLf))).First(), (LogCrash.RegexSeek("(?<=Failed loading config file ).+(?= of type)") ?? "").TrimEnd(Conversions.ToChar(Constants.vbCrLf)) }); // #7071
+                    AppendReason(CrashReason.Mod配置文件导致游戏崩溃, new[] { TryAnalyzeModName((LogCrash.RegexSeek(@"(?<=Failed loading config file .+ for modid )[^\n]+") ?? "").TrimEnd(Conversions.ToChar("\r\n"))).First(), (LogCrash.RegexSeek("(?<=Failed loading config file ).+(?= of type)") ?? "").TrimEnd(Conversions.ToChar("\r\n")) }); // #7071
             }
 
             // 游戏日志分析
@@ -712,7 +712,7 @@ namespace PCL
                 if (LogMc.Contains("1282: Invalid operation"))
                     AppendReason(CrashReason.光影或资源包导致OpenGL1282错误);
                 if (LogMc.Contains("signer information does not match signer information of other classes in the same package"))
-                    AppendReason(CrashReason.文件或内容校验失败, (LogMc.RegexSeek("(?<=class \")[^']+(?=\"'s signer information)") ?? "").TrimEnd(Conversions.ToChar(Constants.vbCrLf)));
+                    AppendReason(CrashReason.文件或内容校验失败, (LogMc.RegexSeek("(?<=class \")[^']+(?=\"'s signer information)") ?? "").TrimEnd(Conversions.ToChar("\r\n")));
                 if (LogMc.Contains("Maybe try a lower resolution resourcepack?"))
                     AppendReason(CrashReason.材质过大或显卡配置不足);
                 if (LogMc.Contains("java.lang.NoSuchMethodError: net.minecraft.world.server.ChunkManager$ProxyTicketManager.shouldForceTicks(J)Z") && LogMc.Contains("OptiFine"))
@@ -752,7 +752,7 @@ namespace PCL
                 }
                 // 确定的 Mod 导致崩溃
                 if (LogMc.Contains("Caught exception from "))
-                    AppendReason(CrashReason.确定Mod导致游戏崩溃, TryAnalyzeModName(LogMc.RegexSeek(@"(?<=Caught exception from )[^\n]+?")?.TrimEnd((Constants.vbCrLf + " ").ToCharArray())));
+                    AppendReason(CrashReason.确定Mod导致游戏崩溃, TryAnalyzeModName(LogMc.RegexSeek(@"(?<=Caught exception from )[^\n]+?")?.TrimEnd(("\r\n" + " ").ToCharArray())));
                 // Mod 重复 / 前置问题
                 if (LogMc.Contains("DuplicateModsFoundException"))
                     AppendReason(CrashReason.Mod重复安装, LogMc.RegexSearch(@"(?<=\n\t[\w]+ : [A-Z]:[^\n]+(/|\\))[^/\\\n]+?.jar", System.Text.RegularExpressions.RegexOptions.IgnoreCase));
@@ -764,11 +764,11 @@ namespace PCL
                     AppendReason(CrashReason.Mod重复安装, (LogMc.RegexSeek(@"ModResolutionException: Duplicate[^\n]+") ?? "").RegexSearch(@"[^\\/]+.jar", System.Text.RegularExpressions.RegexOptions.IgnoreCase));
                 if (LogMc.Contains("Incompatible mods found!")) // #5006, #5115
                 {
-                    AppendReason(CrashReason.Mod互不兼容, (LogMc.RegexSeek(@"(?<=Incompatible mods found![\s\S]+: )[\s\S]+?(?=\tat )") ?? "").BeforeFirst("更多信息：").Replace("Some of your mods are incompatible with the game or each other!", "").Trim((Constants.vbCrLf + " ").ToCharArray()));
+                    AppendReason(CrashReason.Mod互不兼容, (LogMc.RegexSeek(@"(?<=Incompatible mods found![\s\S]+: )[\s\S]+?(?=\tat )") ?? "").BeforeFirst("更多信息：").Replace("Some of your mods are incompatible with the game or each other!", "").Trim(("\r\n" + " ").ToCharArray()));
                 }
                 if (LogMc.Contains("Missing or unsupported mandatory dependencies:"))
                 {
-                    AppendReason(CrashReason.Mod缺少前置或MC版本错误, LogMc.RegexSearch(@"(?<=Missing or unsupported mandatory dependencies:)([\n\r]+\t(.*))+", System.Text.RegularExpressions.RegexOptions.IgnoreCase).Select(s => s.Trim((Constants.vbCrLf + Constants.vbTab + " ").ToCharArray())).Distinct().ToList());
+                    AppendReason(CrashReason.Mod缺少前置或MC版本错误, LogMc.RegexSearch(@"(?<=Missing or unsupported mandatory dependencies:)([\n\r]+\t(.*))+", System.Text.RegularExpressions.RegexOptions.IgnoreCase).Select(s => s.Trim(("\r\n" + "\t" + " ").ToCharArray())).Distinct().ToList());
                 }
             }
 
@@ -809,19 +809,19 @@ namespace PCL
                     string LogCrashMod = LogCrash.Between("-- MOD ", "Failure message:");
                     if (LogCrashMod.ContainsIgnoreCase(".jar"))
                     {
-                        AppendReason(CrashReason.确定Mod导致游戏崩溃, (LogCrashMod.RegexSeek("(?<=Mod File: ).+") ?? "").TrimEnd((Constants.vbCrLf + " ").ToCharArray()));
+                        AppendReason(CrashReason.确定Mod导致游戏崩溃, (LogCrashMod.RegexSeek("(?<=Mod File: ).+") ?? "").TrimEnd(("\r\n" + " ").ToCharArray()));
                     }
                     else
                     {
-                        AppendReason(CrashReason.Mod加载器报错, (LogCrash.RegexSeek(@"(?<=Failure message: )[\w\W]+?(?=\tMod)") ?? "").Replace(Constants.vbTab, " ").TrimEnd((Constants.vbCrLf + " ").ToCharArray()));
+                        AppendReason(CrashReason.Mod加载器报错, (LogCrash.RegexSeek(@"(?<=Failure message: )[\w\W]+?(?=\tMod)") ?? "").Replace("\t", " ").TrimEnd(("\r\n" + " ").ToCharArray()));
                     }
                 }
                 if (LogCrash.Contains("Multiple entries with same key: "))
-                    AppendReason(CrashReason.确定Mod导致游戏崩溃, TryAnalyzeModName((LogCrash.RegexSeek("(?<=Multiple entries with same key: )[^=]+") ?? "").TrimEnd((Constants.vbCrLf + " ").ToCharArray())));
+                    AppendReason(CrashReason.确定Mod导致游戏崩溃, TryAnalyzeModName((LogCrash.RegexSeek("(?<=Multiple entries with same key: )[^=]+") ?? "").TrimEnd(("\r\n" + " ").ToCharArray())));
                 if (LogCrash.Contains("LoaderExceptionModCrash: Caught exception from "))
-                    AppendReason(CrashReason.确定Mod导致游戏崩溃, TryAnalyzeModName((LogCrash.RegexSeek(@"(?<=LoaderExceptionModCrash: Caught exception from )[^\n]+") ?? "").TrimEnd((Constants.vbCrLf + " ").ToCharArray())));
+                    AppendReason(CrashReason.确定Mod导致游戏崩溃, TryAnalyzeModName((LogCrash.RegexSeek(@"(?<=LoaderExceptionModCrash: Caught exception from )[^\n]+") ?? "").TrimEnd(("\r\n" + " ").ToCharArray())));
                 if (LogCrash.Contains("Failed loading config file "))
-                    AppendReason(CrashReason.Mod配置文件导致游戏崩溃, new[] { TryAnalyzeModName((LogCrash.RegexSeek(@"(?<=Failed loading config file .+ for modid )[^\n]+") ?? "").TrimEnd(Conversions.ToChar(Constants.vbCrLf))).First(), (LogCrash.RegexSeek("(?<=Failed loading config file ).+(?= of type)") ?? "").TrimEnd(Conversions.ToChar(Constants.vbCrLf)) });
+                    AppendReason(CrashReason.Mod配置文件导致游戏崩溃, new[] { TryAnalyzeModName((LogCrash.RegexSeek(@"(?<=Failed loading config file .+ for modid )[^\n]+") ?? "").TrimEnd(Conversions.ToChar("\r\n"))).First(), (LogCrash.RegexSeek("(?<=Failed loading config file ).+(?= of type)") ?? "").TrimEnd(Conversions.ToChar("\r\n")) });
             }
 
         }
@@ -844,7 +844,7 @@ namespace PCL
                     ModName = LogText.RegexSeek(@"(?<=for mod )[^.\/ ]+(?= failed)");
                 if (ModName is not null)
                 {
-                    AppendReason(CrashReason.ModMixin失败, TryAnalyzeModName(ModName.TrimEnd((Constants.vbCrLf + " ").ToCharArray())));
+                    AppendReason(CrashReason.ModMixin失败, TryAnalyzeModName(ModName.TrimEnd(("\r\n" + " ").ToCharArray())));
                     return true;
                 }
                 // JSON 名称匹配
@@ -865,16 +865,16 @@ namespace PCL
                 bool IsMixin = MixinAnalyze(LogMc);
                 // 常规信息
                 if (LogMc.Contains("An exception was thrown, the game will display an error screen and halt."))
-                    AppendReason(CrashReason.Forge报错, LogMc.RegexSeek(@"(?<=the game will display an error screen and halt.[\n\r]+[^\n]+?Exception: )[\s\S]+?(?=\n\tat)")?.Trim(Conversions.ToChar(Constants.vbCrLf)));
+                    AppendReason(CrashReason.Forge报错, LogMc.RegexSeek(@"(?<=the game will display an error screen and halt.[\n\r]+[^\n]+?Exception: )[\s\S]+?(?=\n\tat)")?.Trim(Conversions.ToChar("\r\n")));
                 if (LogMc.Contains("A potential solution has been determined:"))
-                    AppendReason(CrashReason.Fabric报错并给出解决方案, (LogMc.RegexSeek(@"(?<=A potential solution has been determined:\n)(\s+ - [^\n]+\n)+") ?? "").RegexSearch(@"(?<=\s+)[^\n]+").Join(Constants.vbLf));
+                    AppendReason(CrashReason.Fabric报错并给出解决方案, (LogMc.RegexSeek(@"(?<=A potential solution has been determined:\n)(\s+ - [^\n]+\n)+") ?? "").RegexSearch(@"(?<=\s+)[^\n]+").Join("\n"));
                 if (LogMc.Contains("A potential solution has been determined, this may resolve your problem:"))
-                    AppendReason(CrashReason.Fabric报错并给出解决方案, (LogMc.RegexSeek(@"(?<=A potential solution has been determined, this may resolve your problem:\n)(\s+ - [^\n]+\n)+") ?? "").RegexSearch(@"(?<=\s+)[^\n]+").Join(Constants.vbLf));
+                    AppendReason(CrashReason.Fabric报错并给出解决方案, (LogMc.RegexSeek(@"(?<=A potential solution has been determined, this may resolve your problem:\n)(\s+ - [^\n]+\n)+") ?? "").RegexSearch(@"(?<=\s+)[^\n]+").Join("\n"));
                 if (LogMc.Contains("确定了一种可能的解决方法，这样做可能会解决你的问题："))
-                    AppendReason(CrashReason.Fabric报错并给出解决方案, (LogMc.RegexSeek(@"(?<=确定了一种可能的解决方法，这样做可能会解决你的问题：\n)(\s+ - [^\n]+\n)+") ?? "").RegexSearch(@"(?<=\s+)[^\n]+").Join(Constants.vbLf));
+                    AppendReason(CrashReason.Fabric报错并给出解决方案, (LogMc.RegexSeek(@"(?<=确定了一种可能的解决方法，这样做可能会解决你的问题：\n)(\s+ - [^\n]+\n)+") ?? "").RegexSearch(@"(?<=\s+)[^\n]+").Join("\n"));
                 if (!IsMixin && LogMc.Contains("due to errors, provided by ")) // 在 #3104 的情况下，这一句导致 OptiFabric 的 Mixin 失败错判为 Fabric Loader 加载失败
                 {
-                    AppendReason(CrashReason.确定Mod导致游戏崩溃, TryAnalyzeModName((LogMc.RegexSeek("(?<=due to errors, provided by ')[^']+") ?? "").TrimEnd((Constants.vbCrLf + " ").ToCharArray())));
+                    AppendReason(CrashReason.确定Mod导致游戏崩溃, TryAnalyzeModName((LogMc.RegexSeek("(?<=due to errors, provided by ')[^']+") ?? "").TrimEnd(("\r\n" + " ").ToCharArray())));
                 }
             }
 
@@ -916,17 +916,17 @@ namespace PCL
                     AppendReason(CrashReason.Mod加载器报错);
                 // Mixin 失败可以导致大量 Mod 实例创建失败，因此需要放到低优先级中
                 if (LogMc.Contains("Failed to create mod instance."))
-                    AppendReason(CrashReason.Mod初始化失败, TryAnalyzeModName((LogMc.RegexSeek("(?<=Failed to create mod instance. ModID: )[^,]+") ?? LogMc.RegexSeek(@"(?<=Failed to create mod instance. ModId )[^\n]+(?= for )") ?? "").TrimEnd(Conversions.ToChar(Constants.vbCrLf))));
+                    AppendReason(CrashReason.Mod初始化失败, TryAnalyzeModName((LogMc.RegexSeek("(?<=Failed to create mod instance. ModID: )[^,]+") ?? LogMc.RegexSeek(@"(?<=Failed to create mod instance. ModId )[^\n]+(?= for )") ?? "").TrimEnd(Conversions.ToChar("\r\n"))));
                 // 注意：Fabric 的 Warnings were found! 不一定是崩溃原因，它可能是单纯的警报
             }
 
             // 崩溃报告分析
             if (LogCrash is not null)
             {
-                if (LogCrash.Contains(Constants.vbTab + "Block location: World: "))
+                if (LogCrash.Contains("\t" + "Block location: World: "))
                     AppendReason(CrashReason.特定方块导致崩溃, (LogCrash.RegexSeek(@"(?<=\tBlock: Block\{)[^\}]+") ?? "") + " " + (LogCrash.RegexSeek(@"(?<=\tBlock location: World: )\([^\)]+\)") ?? ""));
-                if (LogCrash.Contains(Constants.vbTab + "Entity's Exact location: "))
-                    AppendReason(CrashReason.特定实体导致崩溃, (LogCrash.RegexSeek(@"(?<=\tEntity Type: )[^\n]+(?= \()") ?? "") + " (" + (LogCrash.RegexSeek(@"(?<=\tEntity's Exact location: )[^\n]+") ?? "").TrimEnd(Constants.vbCrLf.ToCharArray()) + ")");
+                if (LogCrash.Contains("\t" + "Entity's Exact location: "))
+                    AppendReason(CrashReason.特定实体导致崩溃, (LogCrash.RegexSeek(@"(?<=\tEntity Type: )[^\n]+(?= \()") ?? "") + " (" + (LogCrash.RegexSeek(@"(?<=\tEntity's Exact location: )[^\n]+") ?? "").TrimEnd("\r\n".ToCharArray()) + ")");
             }
 
         }
@@ -935,7 +935,7 @@ namespace PCL
     /// </summary>
         private List<string> AnalyzeStackKeyword(string ErrorStack)
         {
-            ErrorStack = Constants.vbLf + (ErrorStack ?? "") + Constants.vbLf;
+            ErrorStack = "\n" + (ErrorStack ?? "") + "\n";
 
             // 进行正则匹配
             var StackSearchResults = new List<string>();
@@ -1027,9 +1027,9 @@ namespace PCL
                 // [Forge] 获取所有包含 .jar 的行
                 // [Fabric] 获取所有包含 Mod 信息的行
                 var ModNameLines = new List<string>();
-                foreach (var Line in Details.Split(Constants.vbLf))
+                foreach (var Line in Details.Split("\n"))
                 {
-                    if (Line.ContainsIgnoreCase(".jar") && Line.Length - Line.Replace(".jar", "").Length == 4 || IsFabricDetail && Line.StartsWithF(Constants.vbTab + Constants.vbTab) && !Line.RegexCheck(@"\t\tfabric[\w-]*: Fabric")) // 只有一个 .jar
+                    if (Line.ContainsIgnoreCase(".jar") && Line.Length - Line.Replace(".jar", "").Length == 4 || IsFabricDetail && Line.StartsWithF("\t" + "\t") && !Line.RegexCheck(@"\t\tfabric[\w-]*: Fabric")) // 只有一个 .jar
                         ModNameLines.Add(Line);
                 }
                 Logger.Info($"崩溃报告中找到 {ModNameLines.Count} 个可能的 Mod 项目行");
@@ -1045,7 +1045,7 @@ namespace PCL
                             continue;
                         if (RealModString.Contains("minecraft.jar") || RealModString.Contains(" forge-") || RealModString.Contains(" mixin-"))
                             continue;
-                        HintLines.Add(ModString.Trim(Constants.vbCrLf.ToCharArray()));
+                        HintLines.Add(ModString.Trim("\r\n".ToCharArray()));
                         break;
                     }
                 }
@@ -1151,7 +1151,7 @@ namespace PCL
             ModMain.FrmMain.ShowWindowToTop();
             string Detail = GetAnalyzeResult(IsManualAnalyze);
             // 弹窗选择：查看输出
-            switch (ModMain.MyMsgBox(Detail, IsManualAnalyze ? "错误报告分析结果" : "Minecraft 出现错误", "确定", IsManualAnalyze || DirectFile is null ? "" : "查看输出", IsManualAnalyze ? "" : "导出错误报告", Button2Action: IsManualAnalyze || DirectFile is null ? null : new Action(() => { if (FileUtils.Exists(DirectFile.Value.Key)) { ModBase.StartProcess(DirectFile.Value.Key); } else { string FilePath = ModBase.PathTemp + "Crash.txt"; FileUtils.Write(FilePath, DirectFile.Value.Value.Join(Constants.vbCrLf)); ModBase.StartProcess(FilePath); } })))
+            switch (ModMain.MyMsgBox(Detail, IsManualAnalyze ? "错误报告分析结果" : "Minecraft 出现错误", "确定", IsManualAnalyze || DirectFile is null ? "" : "查看输出", IsManualAnalyze ? "" : "导出错误报告", Button2Action: IsManualAnalyze || DirectFile is null ? null : new Action(() => { if (FileUtils.Exists(DirectFile.Value.Key)) { ModBase.StartProcess(DirectFile.Value.Key); } else { string FilePath = ModBase.PathTemp + "Crash.txt"; FileUtils.Write(FilePath, DirectFile.Value.Value.Join("\r\n")); ModBase.StartProcess(FilePath); } })))
             {
                 case 3:
                     {
@@ -1232,7 +1232,7 @@ namespace PCL
                 }
                 else
                 {
-                    return $"很抱歉，你的游戏出现了一些问题……{Constants.vbCrLf}如果要寻求帮助，请把错误报告文件发给对方，而不是发送这个窗口的照片或者截图。";
+                    return $"很抱歉，你的游戏出现了一些问题……{"\r\n"}如果要寻求帮助，请把错误报告文件发给对方，而不是发送这个窗口的照片或者截图。";
                 }
             }
 
@@ -1616,7 +1616,7 @@ namespace PCL
                 }
             }
 
-            return Results.Join(@"\n\n此外，").Replace(@"\n", Constants.vbCrLf).Replace(@"\h", "").Replace(@"\e", IsHandAnalyze ? "" : Constants.vbCrLf + "你可以查看错误报告了解错误具体是如何发生的。").ReplaceLineEndings(Constants.vbCrLf).Trim(Constants.vbCrLf.ToCharArray()) + (!Results.Any(r => r.EndsWithF(@"\h")) || IsHandAnalyze ? "" : Constants.vbCrLf + "如果要寻求帮助，请把错误报告文件发给对方，而不是发送这个窗口的照片或者截图。" + (PageSetupSystem.IsLauncherNewest() ?? true ? "" : Constants.vbCrLf + Constants.vbCrLf + "此外，你正在使用老版本 PCL Next，更新 PCL Next 或许也能解决这个问题。" + Constants.vbCrLf + "你可以点击 [设置 → 其他 → 启动器 → 检查更新] 更新 PCL Next。"));
+            return Results.Join(@"\n\n此外，").Replace(@"\n", "\r\n").Replace(@"\h", "").Replace(@"\e", IsHandAnalyze ? "" : "\r\n" + "你可以查看错误报告了解错误具体是如何发生的。").ReplaceLineEndings("\r\n").Trim("\r\n".ToCharArray()) + (!Results.Any(r => r.EndsWithF(@"\h")) || IsHandAnalyze ? "" : "\r\n" + "如果要寻求帮助，请把错误报告文件发给对方，而不是发送这个窗口的照片或者截图。" + (PageSetupSystem.IsLauncherNewest() ?? true ? "" : "\r\n" + "\r\n" + "此外，你正在使用老版本 PCL Next，更新 PCL Next 或许也能解决这个问题。" + "\r\n" + "你可以点击 [设置 → 其他 → 启动器 → 检查更新] 更新 PCL Next。"));
         }
 
     }

@@ -618,7 +618,7 @@ namespace PCL
                 return;
             if (this.ComboArgumentVisibie.SelectedIndex == 0)
             {
-                if (ModMain.MyMsgBox("若在游戏启动后立即关闭启动器，崩溃检测、更改游戏标题等功能将失效。" + Constants.vbCrLf + "如果想保留这些功能，可以选择让启动器在游戏启动后隐藏，游戏退出后自动关闭。", "提醒", "继续", "取消") == 2)
+                if (ModMain.MyMsgBox("若在游戏启动后立即关闭启动器，崩溃检测、更改游戏标题等功能将失效。" + "\r\n" + "如果想保留这些功能，可以选择让启动器在游戏启动后隐藏，游戏退出后自动关闭。", "提醒", "继续", "取消") == 2)
                 {
                     if (e.RemovedItems.Count > 0)
                         this.ComboArgumentVisibie.SelectedItem = e.RemovedItems[0];
@@ -633,7 +633,7 @@ namespace PCL
                 return;
             if (!this.CheckArgumentRam.Checked)
                 return;
-            if (ModMain.MyMsgBox("内存优化会显著延长启动耗时，建议仅在内存不足时开启。" + Constants.vbCrLf + "如果你在使用机械硬盘，这还可能导致一小段时间的严重卡顿。" + (WindowsUtils.HasAdminRole() ? "" : $"{Constants.vbCrLf}{Constants.vbCrLf}每次启动游戏，PCL Next 都需要申请管理员权限以进行内存优化。{Constants.vbCrLf}若想自动授予权限，可以右键 PCL Next，打开 属性 → 兼容性 → 以管理员身份运行此程序。"), "提醒", "确定", "取消") == 2)
+            if (ModMain.MyMsgBox("内存优化会显著延长启动耗时，建议仅在内存不足时开启。" + "\r\n" + "如果你在使用机械硬盘，这还可能导致一小段时间的严重卡顿。" + (WindowsUtils.HasAdminRole() ? "" : $"{"\r\n"}{"\r\n"}每次启动游戏，PCL Next 都需要申请管理员权限以进行内存优化。{"\r\n"}若想自动授予权限，可以右键 PCL Next，打开 属性 → 兼容性 → 以管理员身份运行此程序。"), "提醒", "确定", "取消") == 2)
             {
                 this.CheckArgumentRam.Checked = false;
             }
@@ -644,7 +644,7 @@ namespace PCL
         {
             if (ModAnimation.AniControlEnabled != 0)
                 return;
-            ModMain.MyMsgBox("本设置仅会对之后新安装的版本生效。" + Constants.vbCrLf + "如果要修改已安装的版本的隔离方式，请在它的版本独立设置中调整。");
+            ModMain.MyMsgBox("本设置仅会对之后新安装的版本生效。" + "\r\n" + "如果要修改已安装的版本的隔离方式，请在它的版本独立设置中调整。");
         }
 
         #endregion

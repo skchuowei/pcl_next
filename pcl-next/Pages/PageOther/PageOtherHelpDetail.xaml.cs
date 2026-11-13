@@ -60,7 +60,7 @@ namespace PCL
             }
             catch (Exception ex)
             {
-                Logger.Info($"自定义信息内容：{Constants.vbCrLf}{Content}");
+                Logger.Info($"自定义信息内容：{"\r\n"}{Content}");
                 Logger.Error(ex, "加载帮助 XAML 文件失败", LogBehavior.Alert);
                 return false;
             }

@@ -1142,7 +1142,7 @@ namespace PCL
             var Warnings = new List<string>();
             if ((SelectedForge is not null || SelectedNeoForge is not null || SelectedFabric is not null) && !PathUtils.IsSame(TargetInstance.PathIndie, TargetInstance.PathVersion))
             {
-                Warnings.Add("该版本尚未开启版本隔离，可能与别的 MC 版本共用同一个 Mod 和存档文件夹。" + Constants.vbCrLf + "修改版本后，已有的 Mod、存档等需要手动迁移到新的游戏目录。");
+                Warnings.Add("该版本尚未开启版本隔离，可能与别的 MC 版本共用同一个 Mod 和存档文件夹。" + "\r\n" + "修改版本后，已有的 Mod、存档等需要手动迁移到新的游戏目录。");
             }
             bool IsMinecraftVersionChanged = (InitialTarget.MinecraftVersion ?? "") != (Target.MinecraftVersion ?? "");
             if (!IsVanillaVersionReliable && !IsMinecraftVersionChanged)
@@ -1172,7 +1172,7 @@ namespace PCL
             }
             if (Warnings.Any())
             {
-                if (ModMain.MyMsgBox("请注意：" + Constants.vbCrLf + "• " + Warnings.Join(Constants.vbCrLf + "• "), "修改确认", "开始修改", "取消", IsWarn: true) != 1)
+                if (ModMain.MyMsgBox("请注意：" + "\r\n" + "• " + Warnings.Join("\r\n" + "• "), "修改确认", "开始修改", "取消", IsWarn: true) != 1)
                     return;
             }
             if (!Configs.HintModifyInstanceWarning.Get())

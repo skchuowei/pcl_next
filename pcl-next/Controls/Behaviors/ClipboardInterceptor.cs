@@ -261,7 +261,7 @@ namespace PCL.Controls.Behaviors
 
             foreach (var row in rowGroups)
             {
-                string rowText = string.Join(Constants.vbTab, row.Select(cell =>
+                string rowText = string.Join("\t", row.Select(cell =>
 {
     TextBlock tb = cell.Column.GetCellContent(cell.Item) as TextBlock;
     return tb is not null ? tb.Text : "";

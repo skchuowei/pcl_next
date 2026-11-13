@@ -482,7 +482,7 @@ namespace PCL
         // LittleSkin
         private void BtnServerAuthLittle_Click(object sender, EventArgs e)
         {
-            if (!string.IsNullOrEmpty(this.TextServerAuthServer.Text) && this.TextServerAuthServer.Text != "https://littleskin.cn/api/yggdrasil" && ModMain.MyMsgBox("即将把第三方登录设置覆盖为 LittleSkin 登录。" + Constants.vbCrLf + "除非你是服主，或者服主要求你这样做，否则请不要继续。" + Constants.vbCrLf + Constants.vbCrLf + "是否确实需要覆盖当前设置？", "设置覆盖确认", "继续", "取消") == 2)
+            if (!string.IsNullOrEmpty(this.TextServerAuthServer.Text) && this.TextServerAuthServer.Text != "https://littleskin.cn/api/yggdrasil" && ModMain.MyMsgBox("即将把第三方登录设置覆盖为 LittleSkin 登录。" + "\r\n" + "除非你是服主，或者服主要求你这样做，否则请不要继续。" + "\r\n" + "\r\n" + "是否确实需要覆盖当前设置？", "设置覆盖确认", "继续", "取消") == 2)
                 return;
             this.TextServerAuthServer.Text = "https://littleskin.cn/api/yggdrasil";
             this.TextServerAuthRegister.Text = "https://littleskin.cn/auth/register";
@@ -530,7 +530,7 @@ namespace PCL
                             }
                             else
                             {
-                                this.HintArgumentJava.Text = $"该版本的版本文件夹中没有发现任何 Java！{Constants.vbCrLf}请点击此处打开版本文件夹，然后将 Java 文件夹复制进去。";
+                                this.HintArgumentJava.Text = $"该版本的版本文件夹中没有发现任何 Java！{"\r\n"}请点击此处打开版本文件夹，然后将 Java 文件夹复制进去。";
                                 this.HintArgumentJava.Theme = MyHint.Themes.Red;
                             }
                         }
@@ -571,7 +571,7 @@ namespace PCL
                         }
                         else if (JavaWorker.LastResult is null)
                         {
-                            this.HintArgumentJava.Text = $"你的电脑上没有任何 Java 符合该版本范围！{Constants.vbCrLf}如果 Mojang 提供了对应版本的 Java，PCL Next 会在启动游戏时自动下载。";
+                            this.HintArgumentJava.Text = $"你的电脑上没有任何 Java 符合该版本范围！{"\r\n"}如果 Mojang 提供了对应版本的 Java，PCL Next 会在启动游戏时自动下载。";
                             this.HintArgumentJava.Theme = MyHint.Themes.Yellow;
                         }
                         else
@@ -699,7 +699,7 @@ namespace PCL
                 return;
             if (_ComboArgumentIndieV2_SelectionChanged_IsReverting)
                 return;
-            if (ModMain.MyMsgBox("调整版本隔离设置后，你需要游戏存档、Mod 等文件手动迁移到新的游戏文件夹中。" + Constants.vbCrLf + "如果发现存档消失，把这项设置改回来就能恢复。" + Constants.vbCrLf + "如果你不会迁移存档，不建议修改这项设置！", "警告", "我知道我在做什么", "取消", IsWarn: true) == 2)
+            if (ModMain.MyMsgBox("调整版本隔离设置后，你需要游戏存档、Mod 等文件手动迁移到新的游戏文件夹中。" + "\r\n" + "如果发现存档消失，把这项设置改回来就能恢复。" + "\r\n" + "如果你不会迁移存档，不建议修改这项设置！", "警告", "我知道我在做什么", "取消", IsWarn: true) == 2)
             {
                 _ComboArgumentIndieV2_SelectionChanged_IsReverting = true;
                 if (e.RemovedItems.Count > 0)

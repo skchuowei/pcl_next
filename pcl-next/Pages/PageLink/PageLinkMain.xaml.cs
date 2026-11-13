@@ -122,7 +122,7 @@ namespace PCL
         private void Create_MouseLeftButtonUp()
         {
             // 输入端口号
-            string Port = ModMain.MyMsgBoxInput("输入端口", $"在单人游戏的暂停菜单选择 {ModBase.vbLQ}对局域网开放{ModBase.vbRQ}，然后输入端口数字。{Constants.vbCrLf}甚至可以输入其他游戏的端口……嗯……", ValidateRules: new Collection<ValidateType>() { new ValidateInteger(1024, 65535) }, HintText: "端口号");
+            string Port = ModMain.MyMsgBoxInput("输入端口", $"在单人游戏的暂停菜单选择 {ModBase.vbLQ}对局域网开放{ModBase.vbRQ}，然后输入端口数字。{"\r\n"}甚至可以输入其他游戏的端口……嗯……", ValidateRules: new Collection<ValidateType>() { new ValidateInteger(1024, 65535) }, HintText: "端口号");
             if (Port is null)
                 return;
             // 基础信息
@@ -371,7 +371,7 @@ namespace PCL
             if (IsServerSide)
             {
                 this.LabFinishTitle.Text = "已创建房间";
-                this.LabFinishDesc.Text = $"把邀请码发给朋友，让大家加入房间吧！{Constants.vbCrLf}邀请码：{GetInviteCode()}";
+                this.LabFinishDesc.Text = $"把邀请码发给朋友，让大家加入房间吧！{"\r\n"}邀请码：{GetInviteCode()}";
                 this.BtnFinishExit.Text = "关闭";
                 this.BtnFinishPing.ToolTip = "网络延迟";
                 this.BtnFinishCopy.Visibility = Visibility.Visible;
@@ -386,7 +386,7 @@ namespace PCL
             else
             {
                 this.LabFinishTitle.Text = "已加入房间";
-                this.LabFinishDesc.Text = $"在多人游戏页面的最下方就能找到联机房间！{Constants.vbCrLf}注意：使用离线登录时不要手动输入 IP！";
+                this.LabFinishDesc.Text = $"在多人游戏页面的最下方就能找到联机房间！{"\r\n"}注意：使用离线登录时不要手动输入 IP！";
                 this.BtnFinishExit.Text = "离开";
                 this.BtnFinishPing.ToolTip = "与房主的延迟";
                 this.BtnFinishCopy.Visibility = Visibility.Collapsed;
@@ -421,7 +421,7 @@ namespace PCL
             {
                 if (IsServerSide && PeopleCount > 1)
                 {
-                    if (ModMain.MyMsgBox("你确定要关闭联机房间吗？" + Constants.vbCrLf + "所有玩家都需要重新输入邀请码才可加入游戏！", "退出联机", "确定", "取消", IsWarn: true) == 2)
+                    if (ModMain.MyMsgBox("你确定要关闭联机房间吗？" + "\r\n" + "所有玩家都需要重新输入邀请码才可加入游戏！", "退出联机", "确定", "取消", IsWarn: true) == 2)
                         return true;
                 }
                 else if (Closing)
@@ -509,7 +509,7 @@ namespace PCL
             string versionBranchMain = ModSecret.VersionBranchMain;
             if (versionBranchMain != "Official")
             {
-                throw new Exception($"$开源版无法联网获取配置。{Constants.vbCrLf}你可以在 PCL 官方版的缓存文件夹下查看 ServerConfig 的当前内容， 并在代码中进行相应修改。");
+                throw new Exception($"$开源版无法联网获取配置。{"\r\n"}你可以在 PCL 官方版的缓存文件夹下查看 ServerConfig 的当前内容， 并在代码中进行相应修改。");
             }
             ModSecret.ServerLoader.WaitForExit(LoaderToSyncProgress: Task);
             if (ModSecret.ServerConfig is null)
@@ -606,7 +606,7 @@ namespace PCL
             {
                 if (DiscoverNodeID == -2 && !IsServerSide)
                 {
-                    Panic("未填写自定义节点设置", $"$你必须在 {ModBase.vbLQ}自定义节点{ModBase.vbRQ} 设置中填写与房主相同的内容，{Constants.vbCrLf}才能进入该房间！");
+                    Panic("未填写自定义节点设置", $"$你必须在 {ModBase.vbLQ}自定义节点{ModBase.vbRQ} 设置中填写与房主相同的内容，{"\r\n"}才能进入该房间！");
                     return;
                 }
                 RawPeers = GetTargetPeers();
@@ -704,7 +704,7 @@ namespace PCL
                     {
                         case -1: // CLI 无返回
                             {
-                                Panic("无法启动联机模块", "近期日志：" + Constants.vbCrLf + LogHistory.Join(Constants.vbCrLf));
+                                Panic("无法启动联机模块", "近期日志：" + "\r\n" + LogHistory.Join("\r\n"));
                                 break;
                             }
                         case 0: // CLI 有返回，但未连接到任何节点
@@ -715,7 +715,7 @@ namespace PCL
 
                         default:
                             {
-                                Panic("无法连接到房主", $"可能的原因：{Constants.vbCrLf}- 你或者房主的网络环境不佳{Constants.vbCrLf}- 房主已关闭房间{Constants.vbCrLf}- 邀请码输错了");
+                                Panic("无法连接到房主", $"可能的原因：{"\r\n"}- 你或者房主的网络环境不佳{"\r\n"}- 房主已关闭房间{"\r\n"}- 邀请码输错了");
                                 break;
                             }
                     }
@@ -927,7 +927,7 @@ namespace PCL
             // 常见原因分析
             if (Detail.Contains("failed to listen on "))
             {
-                Detail = $"监听端口失败。{Constants.vbCrLf}请点击重试，如果还是出现此错误，可以重启电脑解决。{Constants.vbCrLf}{Constants.vbCrLf}{Detail}";
+                Detail = $"监听端口失败。{"\r\n"}请点击重试，如果还是出现此错误，可以重启电脑解决。{"\r\n"}{"\r\n"}{Detail}";
             }
             // 显示信息
             if (LinkState == LinkStates.Loading)
@@ -1113,9 +1113,9 @@ namespace PCL
                 string CliResult = ""; // StartProcessAndGetOutput(PathEasyTier & "联机模块 CLI.exe", $"-o json -p 127.0.0.1:{RPCPort} peer", 2000, Encoding:=Encoding.UTF8, PrintLog:=False)
                                        // 解析
                 if (!CliResult.Contains("lat_ms"))
-                    throw new Exception("CLI 调用失败：" + Constants.vbCrLf + CliResult);
+                    throw new Exception("CLI 调用失败：" + "\r\n" + CliResult);
                 if (ModBase.GetUuid() % (ModBase.ModeDebug ? 23 : 103) == 0)
-                    Logger.Info($"CLI 输出抽样：{Constants.vbCrLf}{CliResult}");
+                    Logger.Info($"CLI 输出抽样：{"\r\n"}{CliResult}");
                 var NewPeers = new List<Peer>();
                 foreach (JObject Line in (JArray)CliResult.DeserializeJson())
                 {
@@ -1369,7 +1369,7 @@ namespace PCL
         {
             if (ProcessCore is not null && !ProcessCore.HasExited)
                 return;
-            Panic("联机模块已崩溃", "近期日志：" + Constants.vbCrLf + LogHistory.Join(Constants.vbCrLf));
+            Panic("联机模块已崩溃", "近期日志：" + "\r\n" + LogHistory.Join("\r\n"));
         }
 
         #endregion

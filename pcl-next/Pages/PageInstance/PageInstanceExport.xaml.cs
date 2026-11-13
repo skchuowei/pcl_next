@@ -511,7 +511,7 @@ namespace PCL
                 ConfigLines.Add(Sperator);
                 ConfigLines.AddRange(GetExtraFileLines());
                 // 结束
-                FileUtils.Write(ConfigPath, ConfigLines.Join(Constants.vbCrLf));
+                FileUtils.Write(ConfigPath, ConfigLines.Join("\r\n"));
                 ModMain.Hint("已保存配置文件：" + ConfigPath, ModMain.HintType.Green);
                 ModBase.OpenExplorer(ConfigPath);
             }
@@ -611,7 +611,7 @@ namespace PCL
                 catch (Exception ex)
                 {
                     Logger.Warn(ex, $"无法使用配置文件中指定的导出路径（{ConfigPackPath}）");
-                    if (ModMain.MyMsgBox($"指定的路径：{ConfigPackPath}{Constants.vbCrLf}{Constants.vbCrLf}{ex.GetDisplay(true)}", "无法使用配置文件中指定的导出路径", "确定", "取消") == 2)
+                    if (ModMain.MyMsgBox($"指定的路径：{ConfigPackPath}{"\r\n"}{"\r\n"}{ex.GetDisplay(true)}", "无法使用配置文件中指定的导出路径", "确定", "取消") == 2)
                         return;
                 }
             }
@@ -815,12 +815,12 @@ namespace PCL
             // 若失败，确认是否继续
             if (FailedExceptions.Count == 1)
             {
-                if (ModMain.MyMsgBox("联网获取部分文件信息失败，是否继续导出？" + Constants.vbCrLf + Constants.vbCrLf + "若继续，无法获取信息的文件将被直接打包。" + Constants.vbCrLf + "由于二次分发可能违反使用协议，请尽量不要公开发布导出的整合包！", "部分文件信息获取失败", "继续", "取消") == 2)
+                if (ModMain.MyMsgBox("联网获取部分文件信息失败，是否继续导出？" + "\r\n" + "\r\n" + "若继续，无法获取信息的文件将被直接打包。" + "\r\n" + "由于二次分发可能违反使用协议，请尽量不要公开发布导出的整合包！", "部分文件信息获取失败", "继续", "取消") == 2)
                     throw FailedExceptions.First();
             }
             else if (FailedExceptions.Count > 1)
             {
-                if (ModMain.MyMsgBox("联网获取文件信息失败，是否继续导出？" + Constants.vbCrLf + Constants.vbCrLf + "若继续，所有文件都将被直接打包。" + Constants.vbCrLf + "由于二次分发可能违反使用协议，请尽量不要公开发布导出的整合包！", "文件信息获取失败", "继续", "取消") == 2)
+                if (ModMain.MyMsgBox("联网获取文件信息失败，是否继续导出？" + "\r\n" + "\r\n" + "若继续，所有文件都将被直接打包。" + "\r\n" + "由于二次分发可能违反使用协议，请尽量不要公开发布导出的整合包！", "文件信息获取失败", "继续", "取消") == 2)
                     throw FailedExceptions.First();
             }
         })

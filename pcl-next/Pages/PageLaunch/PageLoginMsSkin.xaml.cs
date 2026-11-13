@@ -151,7 +151,7 @@ namespace PCL
                     goto Retry;
                 }
                 // 获取新皮肤地址
-                Logger.Info($"皮肤修改返回值：{Constants.vbCrLf}{Result}");
+                Logger.Info($"皮肤修改返回值：{"\r\n"}{Result}");
                 if (Result.DeserializeJson() is not JObject ResultJson)
                     throw new System.IO.InvalidDataException("皮肤修改响应不是有效的 JSON 对象。");
                 string ErrorMessage = ResultJson["errorMessage"]?.ToString();

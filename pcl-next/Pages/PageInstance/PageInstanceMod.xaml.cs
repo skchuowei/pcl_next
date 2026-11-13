@@ -670,7 +670,7 @@ namespace PCL
                             // 同时存在两个名称的 Mod
                             if ((CryptographyUtils.ComputeFileHash(ModEntity.File.FullName) ?? "") != (CryptographyUtils.ComputeFileHash(NewPath) ?? ""))
                             {
-                                ModMain.MyMsgBox($"目前同时存在启用和禁用的两个 Mod 文件：{Constants.vbCrLf} - {PathUtils.GetLastPart(NewPath)}{Constants.vbCrLf} - {ModEntity.File.Name}{Constants.vbCrLf}{Constants.vbCrLf}注意，这两个文件的内容并不相同。{Constants.vbCrLf}在手动删除或重命名其中一个文件后，才能继续操作。", "存在文件冲突");
+                                ModMain.MyMsgBox($"目前同时存在启用和禁用的两个 Mod 文件：{"\r\n"} - {PathUtils.GetLastPart(NewPath)}{"\r\n"} - {ModEntity.File.Name}{"\r\n"}{"\r\n"}注意，这两个文件的内容并不相同。{"\r\n"}在手动删除或重命名其中一个文件后，才能继续操作。", "存在文件冲突");
                                 continue;
                             }
                         }
@@ -749,7 +749,7 @@ namespace PCL
             // 更新前警告
             if (!Settings.Get<bool>("HintUpdateMod") || ModList.Count() >= 15)
             {
-                if (ModMain.MyMsgBox($"新版本 Mod 可能不兼容旧存档或者其他 Mod，这可能导致游戏崩溃，甚至永久损坏存档！{Constants.vbCrLf}如果你在游玩整合包，请千万不要自行更新 Mod！{Constants.vbCrLf}{Constants.vbCrLf}在更新前，请先备份存档，并检查 Mod 的更新日志。{Constants.vbCrLf}如果更新后出现问题，你也可以在回收站找回更新前的 Mod。", "Mod 更新警告", "我已了解风险，继续更新", "取消", IsWarn: true) == 1)
+                if (ModMain.MyMsgBox($"新版本 Mod 可能不兼容旧存档或者其他 Mod，这可能导致游戏崩溃，甚至永久损坏存档！{"\r\n"}如果你在游玩整合包，请千万不要自行更新 Mod！{"\r\n"}{"\r\n"}在更新前，请先备份存档，并检查 Mod 的更新日志。{"\r\n"}如果更新后出现问题，你也可以在回收站找回更新前的 Mod。", "Mod 更新警告", "我已了解风险，继续更新", "取消", IsWarn: true) == 1)
                 {
                     Settings.Set("HintUpdateMod", true);
                 }
@@ -993,7 +993,7 @@ namespace PCL
                     // 获取信息
                     var ContentLines = new List<string>();
                     if (ModEntry.Description is not null)
-                        ContentLines.Add(ModEntry.Description + Constants.vbCrLf);
+                        ContentLines.Add(ModEntry.Description + "\r\n");
                     ContentLines.Add("文件：" + ModEntry.File.Name + "（" + StringUtils.FormatByteSize(ModEntry.File.Length) + "）");
                     if (ModEntry.Version is not null)
                         ContentLines.Add("版本：" + ModEntry.Version);
@@ -1019,7 +1019,7 @@ namespace PCL
                     }
                     ModSearchName = ModSearchName.Replace("++", "+").Replace("pti+Fine", "ptiFine");
                     // 百科搜索链接
-                    if (ModMain.MyMsgBox(ContentLines.Join(Constants.vbCrLf), ModEntry.Display, "百科搜索", "返回") == 1)
+                    if (ModMain.MyMsgBox(ContentLines.Join("\r\n"), ModEntry.Display, "百科搜索", "返回") == 1)
                     {
                         ModBase.OpenWebsite("https://www.mcmod.cn/s?key=" + ModSearchName + "&site=all&filter=0");
                     }

@@ -227,7 +227,7 @@ namespace PCL
                             Arg = Arg.Replace(@"\", "/");
                             if (!Arg.Contains("://") || Arg.StartsWithF("file", true)) // 为了支持更多协议（#2200）
                             {
-                                ModMain.MyMsgBox("EventData 必须为一个网址。" + Constants.vbCrLf + "如果想要启动程序，请将 EventType 改为 打开文件。", "事件执行失败");
+                                ModMain.MyMsgBox("EventData 必须为一个网址。" + "\r\n" + "如果想要启动程序，请将 EventType 改为 打开文件。", "事件执行失败");
                                 return;
                             }
                             ModMain.Hint("正在开启，请稍候：" + Arg);
@@ -355,13 +355,13 @@ namespace PCL
                         {
                             if (Args.Length == 1)
                                 throw new Exception($"EventType {Type} 需要至少 2 个以 | 分割的参数，例如 弹窗标题|弹窗内容");
-                            ModMain.MyMsgBox(Arg1.BeforeLast("|").Replace(@"\n", Constants.vbCrLf), Arg0.Replace(@"\n", Constants.vbCrLf), Args.Length > 2 ? Arg1.AfterLast("|") : "确定");
+                            ModMain.MyMsgBox(Arg1.BeforeLast("|").Replace(@"\n", "\r\n"), Arg0.Replace(@"\n", "\r\n"), Args.Length > 2 ? Arg1.AfterLast("|") : "确定");
                             break;
                         }
 
                     case EventType.弹出提示:
                         {
-                            ModMain.Hint(Arg0.Replace(@"\n", Constants.vbCrLf), Args.Length == 1 ? ModMain.HintType.Blue : EnumUtils.FromString<ModMain.HintType>(Arg1));
+                            ModMain.Hint(Arg0.Replace(@"\n", "\r\n"), Args.Length == 1 ? ModMain.HintType.Blue : EnumUtils.FromString<ModMain.HintType>(Arg1));
                             break;
                         }
 
@@ -401,10 +401,10 @@ namespace PCL
                             Arg0 = Arg0.Replace(@"\", "/");
                             if (!(Arg0.StartsWithF("http://", true) || Arg0.StartsWithF("https://", true)))
                             {
-                                ModMain.MyMsgBox("EventData 必须为以 http:// 或 https:// 开头的网址。" + Constants.vbCrLf + "PCL Next 不支持其他乱七八糟的下载协议。", "事件执行失败");
+                                ModMain.MyMsgBox("EventData 必须为以 http:// 或 https:// 开头的网址。" + "\r\n" + "PCL Next 不支持其他乱七八糟的下载协议。", "事件执行失败");
                                 return;
                             }
-                            if (!EventSafetyConfirm("即将从该网址下载文件：" + Constants.vbCrLf + Arg0))
+                            if (!EventSafetyConfirm("即将从该网址下载文件：" + "\r\n" + Arg0))
                                 return;
                             ModBase.RunInUi(() => { try { switch (Args.Length) { case 1: { PageOtherTest.StartCustomDownload(Arg0, PathUtils.GetLastPart(Arg0)); break; } case 2: { PageOtherTest.StartCustomDownload(Arg0, Arg1); break; } default: { PageOtherTest.StartCustomDownload(Arg0, Args[1], Args[2]); break; } } } catch { PageOtherTest.StartCustomDownload(Arg0, "未知"); } });
                             break;
@@ -454,7 +454,7 @@ namespace PCL
 
                     default:
                         {
-                            ModMain.MyMsgBox("未知的事件类型：" + ((int)Type).ToString() + Constants.vbCrLf + "请检查事件类型填写是否正确，或者 PCL Next 是否为最新版本。", "事件执行失败");
+                            ModMain.MyMsgBox("未知的事件类型：" + ((int)Type).ToString() + "\r\n" + "请检查事件类型填写是否正确，或者 PCL Next 是否为最新版本。", "事件执行失败");
                             break;
                         }
                 }
@@ -489,7 +489,7 @@ namespace PCL
                 }
                 catch (Exception ex)
                 {
-                    throw new Exception("联网帮助页面须指向一个帮助 JSON 文件，并在同路径下包含相应 XAML 文件！" + Constants.vbCrLf + "例如：" + Constants.vbCrLf + " - https://www.baidu.com/test.json（填写这个路径）" + Constants.vbCrLf + " - https://www.baidu.com/test.xaml（同时也需要包含这个文件）", ex);
+                    throw new Exception("联网帮助页面须指向一个帮助 JSON 文件，并在同路径下包含相应 XAML 文件！" + "\r\n" + "例如：" + "\r\n" + " - https://www.baidu.com/test.json（填写这个路径）" + "\r\n" + " - https://www.baidu.com/test.xaml（同时也需要包含这个文件）", ex);
                 }
                 // 下载文件
                 string LocalTemp = ModMain.RequestTaskTempFolder() + RawFileName;
@@ -501,7 +501,7 @@ namespace PCL
                 }
                 catch (Exception ex)
                 {
-                    throw new Exception("下载指定的文件失败！" + Constants.vbCrLf + "注意，联网帮助页面须指向一个帮助 JSON 文件，并在同路径下包含相应 XAML 文件！" + Constants.vbCrLf + "例如：" + Constants.vbCrLf + " - https://www.baidu.com/test.json（填写这个路径）" + Constants.vbCrLf + " - https://www.baidu.com/test.xaml（同时也需要包含这个文件）", ex);
+                    throw new Exception("下载指定的文件失败！" + "\r\n" + "注意，联网帮助页面须指向一个帮助 JSON 文件，并在同路径下包含相应 XAML 文件！" + "\r\n" + "例如：" + "\r\n" + " - https://www.baidu.com/test.json（填写这个路径）" + "\r\n" + " - https://www.baidu.com/test.xaml（同时也需要包含这个文件）", ex);
                 }
                 RelativeUrl = LocalTemp;
             }
@@ -559,7 +559,7 @@ namespace PCL
         {
             if (Settings.Get<bool>("HintCustomCommand"))
                 return true;
-            switch (ModMain.MyMsgBox(Message + Constants.vbCrLf + "请在确认没有安全隐患后再继续。", "执行确认", "继续", "继续且今后不再要求确认", "取消"))
+            switch (ModMain.MyMsgBox(Message + "\r\n" + "请在确认没有安全隐患后再继续。", "执行确认", "继续", "继续且今后不再要求确认", "取消"))
             {
                 case 1:
                     {

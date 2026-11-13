@@ -393,7 +393,7 @@ namespace PCL
             {
                 ContentList.Add((FeatureCount > 0 ? FeatureCount + " 项小调整与修改" : "") + (FeatureCount > 0 && BugCount > 0 ? "，" : "") + (BugCount > 0 ? "修复了 " + BugCount + " 个 Bug" : "") + "，详见完整更新日志");
             }
-            string Content = "· " + ContentList.Join(Constants.vbCrLf + "· ");
+            string Content = "· " + ContentList.Join("\r\n" + "· ");
             // 输出更新日志
             ModBase.RunInNewThread(() => { if (ModMain.MyMsgBox(Content, "PCL Next 已更新至" + ModBase.VersionDisplay, "确定", "完整更新日志") == 2) { ModBase.OpenWebsite("https://meloong.com/afd/a/LTCat?tab=feed"); } }, "UpdateLog Output");
         }
@@ -594,7 +594,7 @@ namespace PCL
             const int EulaVersion = 2;
             if (Settings.Get<int>("SystemEulaVersion") < EulaVersion)
             {
-                switch (ModMain.MyMsgBox(Settings.Get<int>("SystemEulaVersion") == 0 ? "在使用 PCL Next 前，请先阅读用户协议与免责声明。" : $"PCL Next 的用户协议与免责声明已更新。{Constants.vbCrLf}请阅读更新后的用户协议与免责声明。", "协议授权", "同意", "拒绝", "查看用户协议与免责声明", Button3Action: () => ModBase.OpenWebsite("https://shimo.im/docs/rGrd8pY8xWkt6ryW")))
+                switch (ModMain.MyMsgBox(Settings.Get<int>("SystemEulaVersion") == 0 ? "在使用 PCL Next 前，请先阅读用户协议与免责声明。" : $"PCL Next 的用户协议与免责声明已更新。{"\r\n"}请阅读更新后的用户协议与免责声明。", "协议授权", "同意", "拒绝", "查看用户协议与免责声明", Button3Action: () => ModBase.OpenWebsite("https://shimo.im/docs/rGrd8pY8xWkt6ryW")))
                 {
                     case 1:
                         {
@@ -658,17 +658,17 @@ namespace PCL
                 {
                     case ModBuildChannel.Channels.Alpha:
                         {
-                            ModMain.MyMsgBox("欢迎使用 PCL Next 内测版！" + Constants.vbCrLf + Constants.vbCrLf + "内测版仅面向少量受邀用户，可能存在已知缺陷，甚至会导致配置丢失或游戏崩溃。" + Constants.vbCrLf + "请务必先备份好 PCL Next 的配置与整合包，遇到无法接受的问题请及时反馈。", "内测版使用说明");
+                            ModMain.MyMsgBox("欢迎使用 PCL Next 内测版！" + "\r\n" + "\r\n" + "内测版仅面向少量受邀用户，可能存在已知缺陷，甚至会导致配置丢失或游戏崩溃。" + "\r\n" + "请务必先备份好 PCL Next 的配置与整合包，遇到无法接受的问题请及时反馈。", "内测版使用说明");
                             break;
                         }
                     case ModBuildChannel.Channels.Beta:
                         {
-                            ModMain.MyMsgBox("欢迎使用 PCL Next 公测版！" + Constants.vbCrLf + Constants.vbCrLf + "公测版面向所有用户开放试跑，只修复阻塞使用的问题，仍可能存在少量已知缺陷。" + Constants.vbCrLf + "请不要将公测版用于正式生产环境，遇到无法接受的崩溃请反馈。", "公测版使用说明");
+                            ModMain.MyMsgBox("欢迎使用 PCL Next 公测版！" + "\r\n" + "\r\n" + "公测版面向所有用户开放试跑，只修复阻塞使用的问题，仍可能存在少量已知缺陷。" + "\r\n" + "请不要将公测版用于正式生产环境，遇到无法接受的崩溃请反馈。", "公测版使用说明");
                             break;
                         }
                     case ModBuildChannel.Channels.Slush:
                         {
-                            ModMain.MyMsgBox("欢迎使用 PCL Next 收敛版！" + Constants.vbCrLf + Constants.vbCrLf + "这是功能冻结后的内部候选构建，仅供内部测试使用，请不要对外分发。", "收敛版使用说明");
+                            ModMain.MyMsgBox("欢迎使用 PCL Next 收敛版！" + "\r\n" + "\r\n" + "这是功能冻结后的内部候选构建，仅供内部测试使用，请不要对外分发。", "收敛版使用说明");
                             break;
                         }
                 }
@@ -679,7 +679,7 @@ namespace PCL
                 {
                     if (ModSecret.ThemeUnlock(6, false))
                     {
-                        ModMain.MyMsgBox("你已经使用了 99 次 PCL Next 啦，感谢你长期以来的支持！" + Constants.vbCrLf + "隐藏主题 铁杆粉 已解锁！", "提示");
+                        ModMain.MyMsgBox("你已经使用了 99 次 PCL Next 啦，感谢你长期以来的支持！" + "\r\n" + "隐藏主题 铁杆粉 已解锁！", "提示");
                     }
                 }
             }
@@ -730,7 +730,7 @@ namespace PCL
                 var UnlockedTheme = new List<string>(Settings.Get<string>("UiLauncherThemeHide2").ToString().Split("|"));
                 UnlockedTheme.Remove("13");
                 Settings.Set("UiLauncherThemeHide2", UnlockedTheme.Join('|'));
-                ModMain.MyMsgBox("由于新版 PCL Next 修改了欧皇彩的解锁方式，你需要重新解锁欧皇彩。" + Constants.vbCrLf + "多谢各位的理解啦！", "重新解锁提醒");
+                ModMain.MyMsgBox("由于新版 PCL Next 修改了欧皇彩的解锁方式，你需要重新解锁欧皇彩。" + "\r\n" + "多谢各位的理解啦！", "重新解锁提醒");
             }
             // 重置滑稽彩
             if (LastVersionCode <= 152 && Settings.Get<string>("UiLauncherThemeHide2").ToString().Split("|").Contains("12"))
@@ -738,7 +738,7 @@ namespace PCL
                 var UnlockedTheme = new List<string>(Settings.Get<string>("UiLauncherThemeHide2").ToString().Split("|"));
                 UnlockedTheme.Remove("12");
                 Settings.Set("UiLauncherThemeHide2", UnlockedTheme.Join('|'));
-                ModMain.MyMsgBox("由于新版 PCL Next 修改了滑稽彩的解锁方式，你需要重新解锁滑稽彩。" + Constants.vbCrLf + "多谢各位的理解啦！", "重新解锁提醒");
+                ModMain.MyMsgBox("由于新版 PCL Next 修改了滑稽彩的解锁方式，你需要重新解锁滑稽彩。" + "\r\n" + "多谢各位的理解啦！", "重新解锁提醒");
             }
             // 移动自定义皮肤
             if (LastVersionCode <= 161 && FileUtils.Exists(Paths.Base + @"PCL\CustomSkin.png") && !FileUtils.Exists(Paths.AppDataThenName + "CustomSkin.png"))
@@ -1394,7 +1394,7 @@ namespace PCL
                             if (AuthlibServer == "https://littleskin.cn/api/yggdrasil")
                             {
                                 // LittleSkin
-                                if (ModMain.MyMsgBox($"是否要在版本 {Target.Name} 中开启 LittleSkin 登录？" + Constants.vbCrLf + "你可以在 版本设置 → 设置 → 服务器选项 中修改登录方式。", "第三方登录开启确认", "确定", "取消") == 2)
+                                if (ModMain.MyMsgBox($"是否要在版本 {Target.Name} 中开启 LittleSkin 登录？" + "\r\n" + "你可以在 版本设置 → 设置 → 服务器选项 中修改登录方式。", "第三方登录开启确认", "确定", "取消") == 2)
                                 {
                                     return;
                                 }
@@ -1406,7 +1406,7 @@ namespace PCL
                             else
                             {
                                 // 第三方 Authlib 服务器
-                                if (ModMain.MyMsgBox($"是否要在版本 {Target.Name} 中开启第三方登录？" + Constants.vbCrLf + $"登录服务器：{AuthlibServer}" + Constants.vbCrLf + Constants.vbCrLf + "你可以在 版本设置 → 设置 → 服务器选项 中修改登录方式。", "第三方登录开启确认", "确定", "取消") == 2)
+                                if (ModMain.MyMsgBox($"是否要在版本 {Target.Name} 中开启第三方登录？" + "\r\n" + $"登录服务器：{AuthlibServer}" + "\r\n" + "\r\n" + "你可以在 版本设置 → 设置 → 服务器选项 中修改登录方式。", "第三方登录开启确认", "确定", "取消") == 2)
                                 {
                                     return;
                                 }

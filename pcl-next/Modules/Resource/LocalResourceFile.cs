@@ -110,7 +110,7 @@ namespace PCL
             {
                 if (_Description is null && value is not null && value.Count() > 2)
                 {
-                    _Description = value.ToString().Trim(Conversions.ToChar(Constants.vbLf));
+                    _Description = value.ToString().Trim(Conversions.ToChar("\n"));
                     // 优化显示：若以 [a-zA-Z0-9] 结尾，加上小数点句号
                     if (_Description.Lower().LastIndexOfAny("qwertyuiopasdfghjklzxcvbnm0123456789".ToCharArray()) == _Description.Count() - 1)
                         _Description += ".";

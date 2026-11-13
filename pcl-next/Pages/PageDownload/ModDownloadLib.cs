@@ -1312,10 +1312,10 @@ pause";
                         // 检查是否安装成功：最后 5 行中是否有 true（true 可能在倒数数行，见 #832）
                         if (LastResults.Reverse().Take(5).Any(l => l == "true"))
                             return;
-                        Logger.Warn(LastResults.Join(Constants.vbCrLf));
+                        Logger.Warn(LastResults.Join("\r\n"));
                         string LastLines = "";
                         for (int i = Math.Max(0, LastResults.Count - 5), loopTo = LastResults.Count - 1; i <= loopTo; i++) // 最后 5 行
-                            LastLines += Constants.vbCrLf + LastResults.ElementAtOrDefault(i);
+                            LastLines += "\r\n" + LastResults.ElementAtOrDefault(i);
                         throw new Exception($"{LoaderName} 安装器出错，日志结束部分为：" + LastLines);
                     }
                 }
