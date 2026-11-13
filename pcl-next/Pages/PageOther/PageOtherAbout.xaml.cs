@@ -33,10 +33,12 @@ namespace PCL
 
             this.ItemAboutPcl.Info = this.ItemAboutPcl.Info.Replace("%VERSION%", ModBase.VersionDisplay).Replace("%VERSIONCODE%", ModBase.VersionCode.ToString()).Replace("%BRANCH%", ((int)ModBase.BuildType).ToString());
             // 构建版本：用于判断这份 exe 是否包含某次提交（规则见《分支与发布规范》§5.2.1）
-            string buildInfo = $"{ModBuildInfo.BuildSmall} · #{ModBuildInfo.BuildCommit} · 第 {ModBuildInfo.BuildCommitCount} 个提交";
+            string buildInfo = $"{ModBuildInfo.BuildSmall} · #{ModBuildInfo.BuildCommit} · 第 {ModBuildInfo.BuildCommitCount} 个提交 · 内容 {ModBuildInfo.BuildContentId}";
             if (ModBuildInfo.BuildIsDirty)
                 buildInfo += " · 含未提交改动";
             this.ItemAboutBuild.Info = buildInfo;
+            // 完整标识与 UUID 放 ToolTip：反馈问题时可直接从这里核对是哪一个构建
+            this.ItemAboutBuild.ToolTip = $"完整构建标识：{ModBuildInfo.BuildToken}\nUUID：{ModBuildInfo.BuildUuid}\n提交：{ModBuildInfo.BuildCommitFull}";
             // 开发版不展示上游 PCL 的赞助入口——赞助属于上游作者，与本项目无关
             if (ModBuildChannel.ChannelIsInternal)
             {

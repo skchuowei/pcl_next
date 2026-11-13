@@ -95,6 +95,7 @@ $BuildSmall = $BuildInfo.BuildSmall
 if (-not $BuildSmall) {
     throw "无法取得构建号；请检查 scripts\Get-BuildSmallVersion.ps1 是否可执行。"
 }
+Write-Host "==> 构建标识：$($BuildInfo.Token)  UUID $($BuildInfo.Uuid)"
 
 # --- 2. 从工程配置查询三段输出路径（唯一真相源：Directory.Build.props 的 PclGuiTreeRoot） ---
 # 本脚本**不再自己拼路径**，也不再向 MSBuild 传 -p:OutputPath。

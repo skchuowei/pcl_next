@@ -134,6 +134,25 @@
     只对显式声明 <PclUseTreePath>true</PclUseTreePath> 的工程生效，避免误伤测试工程
     （PCL.Download.Tests 等只需普通 bin\ 即可）。
   -->
+  <!--
+    2026-11-13：禁止用命令行 -p:PclVersionDir=<任意字符串> 手工改写版本段。
+    11-12 曾为了绕开「正在运行的 exe 锁住输出目录」，把版本段写成
+    2.100.0.6-0.94-fix / -blur / -badge 等带后缀的名字，导致编号看着更大、
+    实际是旧件的新旧误判。PclTreePathGuard 只检查 OutDir 是否「包含」版本段字符串，
+    手工传什么就认什么，拦不住这类覆盖。
+    这里用「必须等于 PclVersion + 缓存构建号」作机械校验：命令行只能改 PclVersionDir，
+    改不动由工程文件与缓存决定的两个分量，一比即发现。
+  -->
+  <Target Name="PclVersionDirGuard" BeforeTargets="BeforeBuild"
+          Condition="'$(PclVersion)' != ''">
+    <PropertyGroup>
+      <_PclExpectedVersionDir Condition="'$(PclBuildSmall)' != ''">$(PclVersion)-$(PclBuildSmall)</_PclExpectedVersionDir>
+      <_PclExpectedVersionDir Condition="'$(PclBuildSmall)' == ''">$(PclVersion)</_PclExpectedVersionDir>
+    </PropertyGroup>
+    <Error Condition="'$(PclVersionDir)' != '$(_PclExpectedVersionDir)'"
+           Text="产物路径护栏：PclVersionDir 被命令行覆盖为「$(PclVersionDir)」，应为「$(_PclExpectedVersionDir)」。禁止用 -p:PclVersionDir 手工加 -fix / -blur 等后缀；版本段必须由 scripts\Get-BuildSmallVersion.ps1 推导（见 AGENTS §0.1 / §0.3.2）。" />
+  </Target>
+
   <Target Name="PclTreePathGuard" BeforeTargets="BeforeBuild"
           Condition="'$(PclUseTreePath)' == 'true'">
 

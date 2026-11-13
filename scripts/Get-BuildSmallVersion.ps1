@@ -25,6 +25,20 @@
          在提交信息末尾追加 `Build: <M.mm>`；
       3. 排查期：手工执行本脚本查看当前值。
 
+    2026-11-13 起构建标识扩展为四层（用户裁决「同号不同物就没意义」）：
+      · BuildSmall      M.mm，提交阶梯号（算法不变，目录名仍只用它）
+      · BuildCommit     HEAD 短哈希 / BuildCommitFull 完整哈希，「包含到哪个提交」
+      · BuildContentId  SHA256(HEAD + 工作树改动 diff + status + 未跟踪源码) 前 12 位，
+                        「这一份产物实际有哪些代码」；同一提交号下内容不同即不同
+      · BuildUuid       UUID v4，与 ContentId 绑定缓存：内容变了才换，内容没变则复用，
+                        保证一次构建里多个调用点 / 多个工程拿到同一个 ID
+    AssemblyInformationalVersion 形如 0.93.g1a2b3c.c0f1e2d3a4b5[.dirty]。
+    缓存 pcl-next\obj\pcl-build.uuid（obj\ 已被忽略），单行 "<uuid>|<contentId>"。
+
+.PARAMETER ForceNewUuid
+    即使内容指纹未变也强制生成新 UUID，用于「同一份代码重新出件」的场景。
+    正常构建不要传，否则同一次构建的多个调用点会拿到不同 UUID。
+
 .PARAMETER RepoRoot
     仓库根目录（含 .git 的那一层）。默认取脚本所在目录的上一级。
 
@@ -62,7 +76,8 @@ param(
     [string]$RepoRoot = (Split-Path -Parent $PSScriptRoot),
     [string]$OutFile,
     [string]$CacheFile,
-    [switch]$Json
+    [switch]$Json,
+    [switch]$ForceNewUuid
 )
 
 $ErrorActionPreference = 'Stop'
@@ -75,9 +90,19 @@ $AnchorSha = '85c17f13003322a4025e09379bb1ed2d852ea63c'
 
 function Invoke-Git {
     param([string[]]$Arguments)
-    $output = & git -C $RepoRoot @Arguments 2>$null
-    if ($LASTEXITCODE -ne 0) { return $null }
-    return (($output | Out-String).Trim())
+    # PowerShell 5.1 会把原生命令的 stderr 包装成 NativeCommandError；在
+    # $ErrorActionPreference='Stop' 下，git 的 autocrlf 提示（例如
+    # "LF will be replaced by CRLF"）会直接终止整个脚本。
+    # 2026-11-13 实测：本脚本因此长期退出码 1，而 csproj 的 IgnoreExitCode
+    # 把失败吞掉，导致 PclBuildInfo.g.cs 与构建号缓存从 11-12 起再未刷新。
+    $prevPref = $ErrorActionPreference
+    $ErrorActionPreference = 'SilentlyContinue'
+    try {
+        $output = & git -C $RepoRoot @Arguments 2>$null
+        if ($LASTEXITCODE -ne 0) { return $null }
+        return (($output | Out-String).Trim())
+    }
+    finally { $ErrorActionPreference = $prevPref }
 }
 
 # ---- 独立仓库的编号继承基数（2026-11-08 架构裁决）----
@@ -133,11 +158,108 @@ else {
     $dirty = -not [string]::IsNullOrWhiteSpace($porcelain)
 }
 
+# ---- 内容指纹：这份产物实际包含哪些代码（2026-11-13）------------------------
+# BuildSmall 只数提交，同一提交下 dirty 工作树反复编译会「同号不同物」：
+# 0.90 能对应三份内容不同的 exe。ContentId 把 HEAD、已跟踪改动的 diff、
+# status 与未跟踪源码的内容一起哈希，改动内容变了指纹必变；干净工作树则只由 HEAD 决定。
+function Get-Sha256Hex {
+    param([string]$Text)
+    $bytes = [System.Text.Encoding]::UTF8.GetBytes($Text)
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    try { return (-join ($sha.ComputeHash($bytes) | ForEach-Object { $_.ToString('x2') })) }
+    finally { $sha.Dispose() }
+}
+
+function Get-FileSha256Hex {
+    param([string]$Path)
+    try {
+        $item = Get-Item -LiteralPath $Path -ErrorAction Stop
+        # 大文件不读内容：指纹材料里记大小即可，避免编译期拖慢
+        if ($item.Length -gt 2097152) { return "size=$($item.Length)" }
+        $sha = [System.Security.Cryptography.SHA256]::Create()
+        try {
+            $stream = [System.IO.File]::OpenRead($Path)
+            try { return (-join ($sha.ComputeHash($stream) | ForEach-Object { $_.ToString('x2') })) }
+            finally { $stream.Dispose() }
+        }
+        finally { $sha.Dispose() }
+    }
+    catch { return 'missing' }
+}
+
+$headFull = 'nogit'
+$diffText = ''
+$statusText = ''
+$untrackedEntries = @()
+if ($isRepo -eq 'true') {
+    $headFull = Invoke-Git @('rev-parse', 'HEAD')
+    if ([string]::IsNullOrWhiteSpace($headFull)) { $headFull = 'nogit' }
+
+    # 中文路径：core.quotepath=false + UTF-8 控制台编码，尽量让路径可解析。
+    # 个别路径若仍解析不到文件，Get-FileSha256Hex 返回 missing，指纹依旧稳定，
+    # 只是该未跟踪文件的内容变化不参与指纹（已跟踪文件由 diff 完整覆盖，不受影响）。
+    $prevEnc = [Console]::OutputEncoding
+    $prevPref = $ErrorActionPreference
+    # 同 Invoke-Git：禁止 git 的 stderr 警告在 Stop 模式下终止脚本
+    $ErrorActionPreference = 'SilentlyContinue'
+    try {
+        [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+        # 用 -join 而不是 Out-String：后者受宿主宽度影响可能折行，且末尾多一个换行，
+        # 会让内容指纹难以在别的语言里复算核对。-join "`n" 是确定性的。
+        $diffText = (@(& git -C $RepoRoot -c core.quotepath=false diff HEAD --no-ext-diff --unified=0 2>$null) -join "`n")
+        $statusLines = @(& git -C $RepoRoot -c core.quotepath=false status --porcelain=v1 --untracked-files=all 2>$null)
+        $statusText = ($statusLines -join "`n")
+        $untracked = @(& git -C $RepoRoot -c core.quotepath=false ls-files --others --exclude-standard 2>$null)
+    }
+    finally {
+        [Console]::OutputEncoding = $prevEnc
+        $ErrorActionPreference = $prevPref
+    }
+
+    # 只纳入源码 / 配置类未跟踪文件；产物目录 bin-net10\ 与 publish\ 已被 .gitignore 排除，
+    # 不会进入 status，因此「每次编译都换指纹」的抖动不会发生。
+    $extAllow = @('.cs', '.vb', '.xaml', '.props', '.targets', '.csproj', '.vbproj',
+                  '.ps1', '.md', '.json', '.yml', '.yaml', '.ini', '.sh', '.bat', '.resx', '.pubxml')
+    foreach ($rel in $untracked) {
+        if ([string]::IsNullOrWhiteSpace($rel)) { continue }
+        $rel = $rel.Trim('"')
+        if (-not ($extAllow -contains [System.IO.Path]::GetExtension($rel).ToLowerInvariant())) { continue }
+        $untrackedEntries += "$rel=$(Get-FileSha256Hex (Join-Path $RepoRoot $rel))"
+    }
+}
+$untrackedEntries = @($untrackedEntries | Sort-Object)
+$material = "HEAD=$headFull`nDIFF=$diffText`nSTATUS=$statusText`nUNTRACKED=$($untrackedEntries -join "`n")"
+$contentId = (Get-Sha256Hex $material).Substring(0, 12)
+
+# ---- UUID：与内容指纹绑定缓存 ------------------------------------------------
+# 内容不变 → 复用；内容变化 → 换新。-ForceNewUuid 强制换新。
+# 所有调用模式都走这一段，故 Build.ps1 / 编译目标 / 制品复制 / 钩子拿到同一个值。
+$uuidCacheFile = Join-Path $RepoRoot 'pcl-next\obj\pcl-build.uuid'
+$buildUuid = ''
+if (-not $ForceNewUuid -and (Test-Path -LiteralPath $uuidCacheFile)) {
+    $rawUuid = (Get-Content -LiteralPath $uuidCacheFile -Raw).Trim()
+    $sep = $rawUuid.IndexOf('|')
+    if ($sep -gt 0 -and $rawUuid.Substring($sep + 1) -eq $contentId) {
+        $candidate = $rawUuid.Substring(0, $sep)
+        if ($candidate -match '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$') {
+            $buildUuid = $candidate
+        }
+    }
+}
+if ([string]::IsNullOrWhiteSpace($buildUuid)) {
+    $buildUuid = [guid]::NewGuid().ToString('D')
+    $uuidDir = Split-Path -Parent $uuidCacheFile
+    if ($uuidDir -and -not (Test-Path -LiteralPath $uuidDir)) {
+        New-Item -ItemType Directory -Path $uuidDir -Force | Out-Null
+    }
+    [System.IO.File]::WriteAllText($uuidCacheFile, "$buildUuid|$contentId`r`n", (New-Object System.Text.UTF8Encoding $false))
+}
+
 # ---- 计算编号：提交数 × 0.01，满 100 进 1 ----
 $major = [int][math]::Floor($commits / 100)
 $minor = [int]($commits % 100)
 $buildSmall = '{0}.{1:00}' -f $major, $minor
-$token = "$buildSmall.g$commit"
+$token = "$buildSmall.g$commit.c$contentId"
 if ($dirty) { $token = "$token.dirty" }
 
 # ---- 可选：把编号落盘成缓存，供 MSBuild 求值期读取（目录名用）----
@@ -168,6 +290,10 @@ if ($Json) {
         Commit          = $commit
         Dirty           = [bool]$dirty
         Token           = $token
+        ContentId       = $contentId
+        Uuid            = $buildUuid
+        CommitFull      = $headFull
+        UuidCacheFile   = $uuidCacheFile
     }
     ($result | ConvertTo-Json -Compress) | Write-Output
     return
@@ -195,6 +321,9 @@ if ($OutFile) {
         $generated += '// </auto-generated>' + $nl
         $generated += $nl
         $generated += "[assembly: System.Reflection.AssemblyInformationalVersion(`"$token`")]" + $nl
+        $generated += "[assembly: System.Reflection.AssemblyMetadata(`"PclBuildUuid`", `"$buildUuid`")]" + $nl
+        $generated += "[assembly: System.Reflection.AssemblyMetadata(`"PclBuildContentId`", `"$contentId`")]" + $nl
+        $generated += "[assembly: System.Reflection.AssemblyMetadata(`"PclBuildCommitFull`", `"$headFull`")]" + $nl
         $generated += $nl
         # VB 的 Friend 类会被 RootNamespace 自动收进 PCL 命名空间，C# 不会，
         # 这里必须显式写 namespace，否则生成的代码找不到 PCL.PclBuildInfoGenerated。
@@ -215,6 +344,14 @@ if ($OutFile) {
         $generated += "        internal const string BuildAnchor = `"$anchor`";" + $nl
         $generated += '        /// <summary>自锚点以来的提交数。</summary>' + $nl
         $generated += "        internal const int BuildCommitCount = $commits;" + $nl
+        $generated += '        /// <summary>完整版本标识，与 AssemblyInformationalVersion 一致。</summary>' + $nl
+        $generated += "        internal const string BuildToken = `"$token`";" + $nl
+        $generated += '        /// <summary>构建时 HEAD 的完整 40 位哈希。</summary>' + $nl
+        $generated += "        internal const string BuildCommitFull = `"$headFull`";" + $nl
+        $generated += '        /// <summary>源码内容指纹（12 位 hex）：同一提交号下内容不同即不同。</summary>' + $nl
+        $generated += "        internal const string BuildContentId = `"$contentId`";" + $nl
+        $generated += '        /// <summary>本版本 UUID v4，与内容指纹绑定（内容不变则复用）。</summary>' + $nl
+        $generated += "        internal const string BuildUuid = `"$buildUuid`";" + $nl
         $generated += '    }' + $nl
         $generated += '}' + $nl
     }
@@ -225,6 +362,9 @@ if ($OutFile) {
     $generated += "' </auto-generated>" + $nl
     $generated += $nl
     $generated += "<Assembly: System.Reflection.AssemblyInformationalVersion(`"$token`")>" + $nl
+    $generated += "<Assembly: System.Reflection.AssemblyMetadata(`"PclBuildUuid`", `"$buildUuid`")>" + $nl
+    $generated += "<Assembly: System.Reflection.AssemblyMetadata(`"PclBuildContentId`", `"$contentId`")>" + $nl
+    $generated += "<Assembly: System.Reflection.AssemblyMetadata(`"PclBuildCommitFull`", `"$headFull`")>" + $nl
     $generated += $nl
     $generated += "''' <summary>编译期生成的构建标识数据（编译前由项目目标生成，不纳入版本库）。</summary>" + $nl
     $generated += 'Friend NotInheritable Class PclBuildInfoGenerated' + $nl
@@ -243,6 +383,12 @@ if ($OutFile) {
     $generated += "    Friend Const BuildAnchor As String = `"$anchor`"" + $nl
     $generated += "    ''' <summary>自锚点以来的提交数。</summary>" + $nl
     $generated += "    Friend Const BuildCommitCount As Integer = $commits" + $nl
+    $generated += $nl
+    $generated += "    ''' <summary>完整版本标识，与 AssemblyInformationalVersion 一致。</summary>" + $nl
+    $generated += "    Friend Const BuildToken As String = `"$token`"" + $nl
+    $generated += "    Friend Const BuildCommitFull As String = `"$headFull`"" + $nl
+    $generated += "    Friend Const BuildContentId As String = `"$contentId`"" + $nl
+    $generated += "    Friend Const BuildUuid As String = `"$buildUuid`"" + $nl
     $generated += 'End Class' + $nl
     }
 

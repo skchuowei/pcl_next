@@ -38,20 +38,21 @@ namespace PCL
         /// <summary>自锚点以来的提交数。</summary>
         public static int BuildCommitCount { get; private set; } = PCL.PclBuildInfoGenerated.BuildCommitCount;
 
+        /// <summary>构建时 HEAD 的完整 40 位哈希，便于直接 git show 定位提交。</summary>
+        public static string BuildCommitFull { get; private set; } = PCL.PclBuildInfoGenerated.BuildCommitFull;
+
+        /// <summary>源码内容指纹（12 位 hex）：同一提交号下内容不同即不同。</summary>
+        public static string BuildContentId { get; private set; } = PCL.PclBuildInfoGenerated.BuildContentId;
+
+        /// <summary>本版本 UUID v4，与内容指纹绑定（内容不变则复用）。</summary>
+        public static string BuildUuid { get; private set; } = PCL.PclBuildInfoGenerated.BuildUuid;
+
         /// <summary>
-    /// 构建标识，形如 <c>2.27.g211b6dc</c>；含未提交改动时追加 <c>.dirty</c>。
-    /// 与程序集 AssemblyInformationalVersion 一致。
+    /// 完整构建标识，形如 <c>2.27.g211b6dc.c0f1e2d3a4b5[.dirty]</c>，
+    /// 与程序集 AssemblyInformationalVersion 一致。由编译期脚本生成、不在运行时拼接，
+    /// 避免公式在两处漂移（2026-11-13）。
     /// </summary>
-        public static string BuildToken
-        {
-            get
-            {
-                string result = $"{BuildSmall}.g{BuildCommit}";
-                if (BuildIsDirty)
-                    result += ".dirty";
-                return result;
-            }
-        }
+        public static string BuildToken { get; private set; } = PCL.PclBuildInfoGenerated.BuildToken;
 
         /// <summary>
     /// 日志与界面用的构建说明，形如「构建 2.27，#211b6dc」；
@@ -61,7 +62,7 @@ namespace PCL
         {
             get
             {
-                string result = $"构建 {BuildSmall}，#{BuildCommit}";
+                string result = $"构建 {BuildSmall}，#{BuildCommit}，内容 {BuildContentId}，UUID {BuildUuid}";
                 if (BuildIsDirty)
                     result += "，含未提交改动";
                 return result;
