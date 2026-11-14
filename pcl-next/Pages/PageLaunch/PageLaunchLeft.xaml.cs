@@ -1052,7 +1052,8 @@ namespace PCL
                     Texture = ModBase.PathImage + "Skins/" + Sex + ".png";
                 }
                 string Folder = ModBase.PathTemp + @"Cache\AccountHead\";
-                string File = Folder + Entry.Type + "_" + Entry.Name.GetStableHashCode() + "_" + Texture.GetStableHashCode() + "_" + Size + ".png";
+                // 缓存键带版本号：头像绘制算法变化后旧缓存必须失效，否则会一直用旧图
+                string File = Folder + Entry.Type + "_" + Entry.Name.GetStableHashCode() + "_" + Texture.GetStableHashCode() + "_" + Size + "_v2.png";
                 if (FileUtils.Exists(File))
                     return File;
                 if (!System.IO.Directory.Exists(Folder))
@@ -1060,14 +1061,41 @@ namespace PCL
                 var Skin = new MyBitmap(Texture);
                 using (var Head = new System.Drawing.Bitmap(Size, Size, System.Drawing.Imaging.PixelFormat.Format32bppArgb))
                 {
+                    // 与社区版一致：脸层只占 7/8，外圈留给帽子层，双层皮肤才会露出头发/帽子边框；
+                    // 直接把脸铺满 8×8 会让第二层被脸挡住，看起来像只画了第一层。
+                    int Scale = Math.Max(1, Skin.Pic.Width / 64);
+                    int FaceSize = Size - Size / 8;
+                    int Offset = Size / 16;
                     using (var G = System.Drawing.Graphics.FromImage(Head))
                     {
                         G.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.NearestNeighbor;
                         G.PixelOffsetMode = System.Drawing.Drawing2D.PixelOffsetMode.Half;
-                        G.DrawImage(Skin.Pic, new System.Drawing.Rectangle(0, 0, Size, Size), 8, 8, 8, 8, System.Drawing.GraphicsUnit.Pixel);
-                        // 64×32 的旧版皮肤没有帽子层，直接跳过
-                        if (Skin.Pic.Width >= 64)
-                            G.DrawImage(Skin.Pic, new System.Drawing.Rectangle(0, 0, Size, Size), 40, 8, 8, 8, System.Drawing.GraphicsUnit.Pixel);
+                        G.DrawImage(Skin.Pic, new System.Drawing.Rectangle(Offset, Offset, FaceSize, FaceSize),
+                            8 * Scale, 8 * Scale, 8 * Scale, 8 * Scale, System.Drawing.GraphicsUnit.Pixel);
+                    }
+                    // 64×32 的旧版皮肤没有帽子层；64×64 / 128×128 才有第二层
+                    if (Skin.Pic.Width >= 64 && Skin.Pic.Height >= 64)
+                    {
+                        using (var Hair = new System.Drawing.Bitmap(Size, Size, System.Drawing.Imaging.PixelFormat.Format32bppArgb))
+                        {
+                            using (var G = System.Drawing.Graphics.FromImage(Hair))
+                            {
+                                G.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.NearestNeighbor;
+                                G.PixelOffsetMode = System.Drawing.Drawing2D.PixelOffsetMode.Half;
+                                G.DrawImage(Skin.Pic, new System.Drawing.Rectangle(0, 0, Size, Size),
+                                    40 * Scale, 8 * Scale, 8 * Scale, 8 * Scale, System.Drawing.GraphicsUnit.Pixel);
+                            }
+                            // 逐像素叠加非透明部分，保留第二层原有的透明度
+                            for (int X = 0; X < Size; X++)
+                            {
+                                for (int Y = 0; Y < Size; Y++)
+                                {
+                                    var Pixel = Hair.GetPixel(X, Y);
+                                    if (Pixel.A > 0)
+                                        Head.SetPixel(X, Y, Pixel);
+                                }
+                            }
+                        }
                     }
                     Head.Save(File, System.Drawing.Imaging.ImageFormat.Png);
                 }
