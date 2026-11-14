@@ -286,6 +286,12 @@ namespace PCL
         public class McInstance
         {
 
+            // 版本继承（A → B → A）会导致 JsonObject 的 getter 逐层递归 new McInstance，
+            // 递归深度不受控时最终是 StackOverflow——这是进程级崩溃，连 catch 都救不回来。
+            // 这里按线程记录当前继承链深度的近似值：只用于拦截病态 JSON，不参与正常判断。
+            [ThreadStatic]
+            private static int _JsonInheritDepth;
+
             public enum McInstanceState
             {
                 Error,
@@ -549,6 +555,11 @@ namespace PCL
                     if (_JsonObject is null)
                     {
                         string Text = JsonText; // 触发 JsonText 的 Get 事件
+                        // 取到 JSON 文本之后才可能进入下面的继承合并（会递归构造父版本），
+                        // 因此在合并前后记账，作为继承链深度护栏。
+                        if (_JsonInheritDepth > 8)
+                            throw new Exception($"版本继承层级过深，疑似存在循环依赖：{Name}");
+                        _JsonInheritDepth += 1;
                         try
                         {
                             _JsonObject = (JObject)Text.DeserializeJson();
@@ -634,8 +645,10 @@ namespace PCL
                         }
                         catch (Exception ex)
                         {
+                            _JsonInheritDepth -= 1;
                             throw new Exception("初始化版本 JSON 时失败（" + (Name ?? "null") + "）", ex);
                         }
+                        _JsonInheritDepth -= 1;
                     }
                     return _JsonObject;
                 }

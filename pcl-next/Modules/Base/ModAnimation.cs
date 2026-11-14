@@ -1371,6 +1371,9 @@ namespace PCL
                         {
                             string Text = Conversions.ToString(((dynamic)Ani.Value)[0]);
                             int TextCount = (int)Math.Round((double)(Conversions.ToBoolean(((dynamic)Ani.Value)[1]) ? Text.Length : 0) + Math.Round((double)(Text.Length * (Conversions.ToBoolean(((dynamic)Ani.Value)[1]) ? -1 : 1)) * Ani.Ease.GetDelta(Ani.TimeFinished / Ani.TimeTotal, 0d)));
+                            // 回弹类缓动（AniEaseBack）会让进度越过 0~1，取整后的下标可能落到 [0, Length] 之外，
+                            // 直接 Substring 会抛 ArgumentOutOfRangeException，这里按文本长度钳制。
+                            TextCount = TextCount.Clamp(0, Text.Length);
                             string NewText = Text.Substring(0, TextCount);
                             // 添加乱码
                             if (TextCount < Text.Length)

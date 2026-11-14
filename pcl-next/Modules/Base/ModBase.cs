@@ -1084,6 +1084,25 @@ namespace PCL
             StartInfo.FileName = PathUtils.ToShortPath(StartInfo.FileName);
             if (!string.IsNullOrEmpty(StartInfo.WorkingDirectory))
                 StartInfo.WorkingDirectory = PathUtils.ToShortPath(StartInfo.WorkingDirectory);
+            // .NET Core 起 ProcessStartInfo.UseShellExecute 默认为 false（.NET Framework 默认为 true），
+            // 原版所有「靠 shell 解析目标」的调用在 .NET 10 下全部失效：
+            //   · StartProcess("https://…")：系统找不到指定的文件（打开网页、反馈链接一律失败）；
+            //   · 打开目录或用默认程序打开 .txt 日志：拒绝访问 / 找不到文件；
+            //   · Verb = "runas"：UseShellExecute 为 false 时被忽略，等于没有提权。
+            // 按目标类型在这里统一判定，避免每个调用点各写一遍。
+            if (!StartInfo.UseShellExecute)
+            {
+                string Target = StartInfo.FileName ?? "";
+                string Extension = Path.GetExtension(Target).ToLowerInvariant();
+                bool IsUrl = Target.StartsWithF("http://", true)
+                    || Target.StartsWithF("https://", true)
+                    || Target.StartsWithF("minecraft:", true)
+                    || Target.StartsWithF("minecraft-preview:", true);
+                // .exe / .com 可以由 CreateProcess 直接启动；其余（.txt、.jar……）必须交给 shell 找关联程序。
+                bool IsDirectlyExecutable = Extension == ".exe" || Extension == ".com";
+                if (!string.IsNullOrEmpty(StartInfo.Verb) || IsUrl || Directory.Exists(Target) || File.Exists(Target) && !IsDirectlyExecutable)
+                    StartInfo.UseShellExecute = true;
+            }
             Logger.Info($"启动进程：{StartInfo.FileName} {StartInfo.Arguments}");
             return Process.Start(StartInfo);
         }

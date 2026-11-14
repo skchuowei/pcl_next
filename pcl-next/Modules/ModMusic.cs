@@ -72,10 +72,12 @@ namespace PCL
         {
             string Result;
             // 初始化，确保存在音乐
-            if (MusicAllList is null || !MusicAllList.Any() || !MusicWaitingList.Any())
+            // MusicWaitingList 在初始化失败（例如 Musics 目录无权访问）时可能保持 Nothing，
+            // 原写法直接调用 .Any() 会抛空引用，这里的判空与 MusicAllList 同等对待。
+            if (MusicAllList is null || !MusicAllList.Any() || MusicWaitingList is null || !MusicWaitingList.Any())
                 MusicListInit(false);
             // 出列下一个音乐，如果出列结束则生成新列表
-            if (MusicWaitingList.Any())
+            if (MusicWaitingList is not null && MusicWaitingList.Any())
             {
                 Result = MusicWaitingList[0];
                 MusicWaitingList.RemoveAt(0);
@@ -84,7 +86,7 @@ namespace PCL
             {
                 Result = null;
             }
-            if (!MusicWaitingList.Any())
+            if (MusicWaitingList is null || !MusicWaitingList.Any())
                 MusicListInit(false, Result);
             return Result;
         }

@@ -19,6 +19,10 @@ namespace PCL
     /// </summary>
         public static string Validate(string Text, IEnumerable<ValidateType> ValidateRules)
         {
+            // TextBox 的 Text 在某些绑定/清空场景下可能为 Nothing，而各条 Validate 实现都直接按字符串使用它
+            // （ValidateInteger.Str.Length、ValidateExcept.Str.IndexOfF……）。在这里统一兜底，
+            // 比在十几条规则里各加一遍判空更可靠。
+            Text ??= "";
             string Result = "";
             foreach (ValidateType ValidateRule in ValidateRules)
             {

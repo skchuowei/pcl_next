@@ -156,7 +156,17 @@ namespace PCL
                 }
                 catch (Exception ex)
                 {
-                    Pic = (System.Drawing.Bitmap)My.Application.TryFindResource(FilePathOrResourceName);
+                    // TryFindResource 返回的是 WPF 资源对象，可能是 System.Drawing.Bitmap、BitmapSource 或 ImageBrush。
+                    // 原写法一律强转 Bitmap，遇到后两种会在异常处理里再抛一次 InvalidCastException，
+                    // 于是真正的原因被吞掉，只剩一句「加载 MyBitmap 意外失败」。
+                    object Fallback = My.Application.TryFindResource(FilePathOrResourceName);
+                    Pic = null;
+                    if (Fallback is System.Drawing.Bitmap BitmapFallback)
+                        Pic = BitmapFallback;
+                    else if (Fallback is BitmapSource BitmapSourceFallback)
+                        Pic = new MyBitmap((ImageSource)BitmapSourceFallback).Pic;
+                    else if (Fallback is ImageBrush ImageBrushFallback && ImageBrushFallback.ImageSource is BitmapSource BrushSourceFallback)
+                        Pic = new MyBitmap((ImageSource)BrushSourceFallback).Pic;
                     if (Pic is null)
                     {
                         Pic = new System.Drawing.Bitmap(1, 1);

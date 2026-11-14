@@ -109,7 +109,9 @@ namespace PCL
 
         private void RefreshText()
         {
-            ModBase.RunInUi(() => { if (InnerState == MyLoadingState.Error) { if (TextErrorInherit && State.IsLoader) { Exception Ex = ((dynamic)(Exception)((object)State)).Error; if (Ex is null) { this.LabText.Text = "未知错误"; } else { this.LabText.Text = Ex.GetDisplay(false); } } else { this.LabText.Text = TextError; } } else if (ShowProgress && State.IsLoader) { this.LabText.Text = Conversions.ToString(Operators.ConcatenateObject(Operators.ConcatenateObject(Text + " - ", Math.Floor(Operators.MultiplyObject(((dynamic)((object)State)).Progress, 100))), "%")); } else { this.LabText.Text = Text; } });
+            ModBase.RunInUi(() => { if (InnerState == MyLoadingState.Error) { if (TextErrorInherit && State.IsLoader) { // 原写法 ((dynamic)(Exception)((object)State)) 把 ILoadingTrigger 强转成 Exception，
+                // 只要走「用加载器的错误文本」这条分支就必抛 InvalidCastException（登录失败等场景直接看不到错误原因）。
+                Exception Ex = State is ModLoader.LoaderBase LoaderTrigger ? LoaderTrigger.Error : null; if (Ex is null) { this.LabText.Text = "未知错误"; } else { this.LabText.Text = Ex.GetDisplay(false); } } else { this.LabText.Text = TextError; } } else if (ShowProgress && State.IsLoader) { this.LabText.Text = Conversions.ToString(Operators.ConcatenateObject(Operators.ConcatenateObject(Text + " - ", Math.Floor(Operators.MultiplyObject(((dynamic)((object)State)).Progress, 100))), "%")); } else { this.LabText.Text = Text; } });
         }
 
         #endregion

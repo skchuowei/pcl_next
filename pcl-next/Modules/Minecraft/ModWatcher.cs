@@ -19,13 +19,20 @@ namespace PCL
 
         // 对全体的监视
         public static List<Watcher> McWatcherList = new List<Watcher>();
+        // Watcher 的构造函数（启动游戏线程）与状态变更回调（日志 / 时钟线程）会同时读写这个列表：
+        // 构造函数是「整表替换」，涉及「读旧表 → 建新表 → 写回」三步，并发时可能丢掉刚加入的监视器。
+        // 列表本身一经发布不再修改，因此只需要用锁把「读-换」这一步串起来，读取方取到引用即可安全枚举。
+        private static readonly object McWatcherListLock = new object();
         private static bool IsWatcherRunning = false;
         public static bool HasRunningMinecraft = false;
         private static void WatcherStateChanged()
         {
             bool IsRunning = false;
             bool TriggerLauncherShutdown = true;
-            foreach (var Watcher in McWatcherList)
+            List<Watcher> Snapshot;
+            lock (McWatcherListLock)
+                Snapshot = McWatcherList;
+            foreach (var Watcher in Snapshot)
             {
                 if (Watcher.State == Watcher.MinecraftState.Loading || Watcher.State == Watcher.MinecraftState.Running || Watcher.State == Watcher.MinecraftState.Crashed && !Watcher.GameProcess.HasExited)
                 {
@@ -116,15 +123,18 @@ namespace PCL
                     WatcherLog("要求窗口标题：" + WindowTitle);
 
                 // 更改列表
-                var NewWatcherList = new List<Watcher>();
-                foreach (var Watch in McWatcherList)
+                lock (McWatcherListLock)
                 {
-                    if (Watch.State == MinecraftState.Crashed || Watch.State == MinecraftState.Ended || Watch.State == MinecraftState.Canceled)
-                        continue;
-                    NewWatcherList.Add(Watch);
+                    var NewWatcherList = new List<Watcher>();
+                    foreach (var Watch in McWatcherList)
+                    {
+                        if (Watch.State == MinecraftState.Crashed || Watch.State == MinecraftState.Ended || Watch.State == MinecraftState.Canceled)
+                            continue;
+                        NewWatcherList.Add(Watch);
+                    }
+                    NewWatcherList.Add(this);
+                    McWatcherList = NewWatcherList;
                 }
-                NewWatcherList.Add(this);
-                McWatcherList = NewWatcherList;
                 WatcherStateChanged();
 
                 // 初始化进程与日志读取
@@ -204,7 +214,7 @@ namespace PCL
                             WatcherLog("Minecraft 尚未加载完成，可能已崩溃", LogLevel.Error);
                             Crashed();
                         }
-                        else if (GameProcess.ExitCode != 0 && State == MinecraftState.Running && Instance.ReleaseTime.Year >= 2012)
+                        else if (GameProcess.ExitCode != 0 && State == MinecraftState.Running && Instance is not null && Instance.ReleaseTime.Year >= 2012)
                         {
                             // 返回值不为 0 且未结束
                             WatcherLog("Minecraft 返回值异常，可能已崩溃", LogLevel.Error);

@@ -697,7 +697,25 @@ namespace PCL
             }
             // 尝试加载
             Loader.WaitForExit(Data.Input, McLoginLoader, Data.IsForceRestarting);
-            Data.Output = ((dynamic)(McLoginResult)((object)Loader)).Output;
+            // VB 原文是 Loader.Output 的晚绑定调用：Loader 声明成 Object，运行时才按实际加载器类型取 Output。
+            // 迁移器把它写成 ((dynamic)(McLoginResult)((object)Loader)).Output，多插的强转把 LoaderBase
+            // 先转成 McLoginResult，必然抛 InvalidCastException——结果是**所有登录方式都失败**，
+            // 启动页一直停在「登录失败」，无法启动游戏（2026-11-14 修复）。
+            // LoaderBase 上没有 Output 属性，Output 只存在于各 LoaderTask<TIn, TOut> 上，因此按实际类型取。
+            switch (Loader)
+            {
+                case ModLoader.LoaderTask<McLoginMs, McLoginResult> MsLoader:
+                    Data.Output = MsLoader.Output;
+                    break;
+                case ModLoader.LoaderTask<McLoginLegacy, McLoginResult> LegacyLoader:
+                    Data.Output = LegacyLoader.Output;
+                    break;
+                case ModLoader.LoaderTask<McLoginServer, McLoginResult> ServerLoader:
+                    Data.Output = ServerLoader.Output;
+                    break;
+                default:
+                    throw new Exception($"未知的登录加载器：{(Loader is null ? "null" : Loader.GetType().Name)}");
+            }
             ModBase.RunInUi(() => ModMain.FrmLaunchLeft.RefreshPage(true, false)); // 刷新自动填充列表
             McLaunchLog("登录加载已结束");
         }

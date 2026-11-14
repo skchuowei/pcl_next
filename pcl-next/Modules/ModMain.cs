@@ -1246,6 +1246,11 @@ namespace PCL
             {
                 // 上述两处权限不足：同理忽略。
             }
+            catch (Exception ex)
+            {
+                // 对应 VB 的 On Error Resume Next：弹窗、剪贴板、日志任一环节出错都不应把异常抛回 UI 线程。
+                Logger.Warn(ex, "反馈流程执行异常，已忽略");
+            }
         }
         /// <summary>
     /// 在日志中输出系统诊断信息。
