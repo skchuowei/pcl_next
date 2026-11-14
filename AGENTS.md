@@ -5,20 +5,20 @@
 > 用户 2026-11-13 指示：分支只留 `<开发代号>-<平台>`，代号固定 `dev / slush / alpha / beta / rc`，
 > **禁止版本号后缀**（`dev.5` / `dev.6`）与随意新增改名；旧分支已删、每个代号分支已建并暂时填充最新版；
 > 最稳定版本（C# 重写完成 + bug 基本修复，**不含新功能**）已发布 GitHub；
-> 宣布进入 `slush` 阶段、Windows 线 VB 迁移全部完成、进入内测；`dev` 渠道**不冻结、但禁止发布**；
+> 宣布进入 `slush` 阶段、Windows 线 VB 迁移全部完成、进入内测；`dev` 渠道**不冻结**，仅禁止把 dev 版本发布到 GitHub；
 > 新功能可进 `dev`；`main` 与 `slush` 一致。
 >
 > 1. **分支命名唯一体系**：`<代号>-<平台>`，如 `slush-Windows` / `dev-linux`。
 >    详细定义、现行远端矩阵、旧分支清理记录见《分支与发布规范.md》**§0E**（该节为唯一真源）。
 >    本文与规范中一切 `<代号>.<序号>-<平台>`（如 `dev.6-Windows`）写法**已废止**，仅作历史追溯。
-> 2. **当前代号 `slush`**：`dev` **不冻结**（正常接收开发与新功能，2026-11-13 取消冻结线），
->    但 **dev 渠道禁止发布版本**——不打 `v<版本名>-dev.<序号>-<平台>` tag、不建 GitHub Release、
->    不 `dotnet publish` 分发，只允许编译进 `bin-net10\Dev\` 供本地验证（§0E.5）。
+> 2. **`dev` 渠道**：**不冻结**（正常接收开发与新功能，2026-11-13 取消冻结线）；
+>    唯一限制是**不得把 dev 版本发布到 GitHub**——不推 `v<版本名>-dev.<序号>-<平台>` tag、不建 GitHub Release；
+>    本地编译、验证、publish 与归档均不受限（§0E.5）。
 > 3. **VB.NET 迁移**：Windows 线完成（`.vb` = 0、`.vbproj` 已移除）；Linux / Android 线各仍有 122 个 `.vb`，
 >    对外表述必须限定为「Windows 线完成」。
 > 4. **发布事实**：`v2.100.0.7-slush.1-Windows`，制品 `pcl-next.exe`（win-x64 自包含单文件），
 >    归档 `ReleaseArtifacts/Slush/2.100.0.7/win-x64/`（含 `更新日志.md`、`修复bug.md`），GitHub Release 为 prerelease（内测）。
-> 5. **新功能去向**：可进 `dev`（`dev-Windows` 分支 / `PCL_NEXT_Windows` 目录）；`slush` 线仍**不收新功能**。
+> 5. **新功能去向**：可进 `dev`（`dev-Windows` 分支 / `PCL_NEXT_Windows` 目录）；`slush` / `alpha` 线仍**不收新功能**。
 >    先前暂存在 `local/backup-features-20261113` 与 `D:\bing\MC\pcl_x\.wip\20261113-newfeatures\` 的功能
 >    （毛玻璃、OKLCh 深色配色、账号列表页、高级设置、颜色编辑器）可按需合并回 `dev`；
 >    仍**禁止**跨分支手工拷贝未走提交流程的文件。
