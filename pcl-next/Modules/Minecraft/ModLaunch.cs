@@ -530,7 +530,7 @@ namespace PCL
                     {
                         if (string.IsNullOrEmpty(Settings.Get<string>("CacheMsV2OAuthRefresh")))
                         {
-                            return ModMain.FrmLoginMs.IsVaild();
+                            return PageLoginMs.IsVaild((McLoginMs)PageLoginMs.GetLoginData());
                         }
                         else
                         {
@@ -539,13 +539,14 @@ namespace PCL
                     }
                 case McLoginType.Legacy:
                     {
-                        return ModMain.FrmLoginLegacy.IsVaild();
+                        // 完成态下 ModMain.FrmLoginLegacy 可能尚未创建，不能直接调用实例方法
+                        return PageLoginLegacy.IsVaild((McLoginLegacy)PageLoginLegacy.GetLoginData());
                     }
                 case McLoginType.Nide:
                     {
                         if (string.IsNullOrEmpty(Settings.Get<string>("CacheNideAccess")))
                         {
-                            return ModMain.FrmLoginNide.IsVaild();
+                            return PageLoginNide.IsVaild(PageLoginNide.GetLoginData());
                         }
                         else
                         {
@@ -556,7 +557,7 @@ namespace PCL
                     {
                         if (string.IsNullOrEmpty(Settings.Get<string>("CacheAuthAccess")))
                         {
-                            return ModMain.FrmLoginAuth.IsVaild();
+                            return PageLoginAuth.IsVaild(PageLoginAuth.GetLoginData());
                         }
                         else
                         {
@@ -697,7 +698,9 @@ namespace PCL
             }
             // 尝试加载
             Loader.WaitForExit(Data.Input, McLoginLoader, Data.IsForceRestarting);
-            Data.Output = ((dynamic)(McLoginResult)((object)Loader)).Output;
+            // LoaderBase 是所有具体登录加载器的基类，Output 字段按具体泛型实例存放，
+            // 这里只能通过 dynamic 取回（原 VB 实现就是晚绑定）；直接强转 Loader 会抛 InvalidCastException
+            Data.Output = (McLoginResult)((dynamic)Loader).Output;
             ModBase.RunInUi(() => ModMain.FrmLaunchLeft.RefreshPage(true, false)); // 刷新自动填充列表
             McLaunchLog("登录加载已结束");
         }

@@ -57,7 +57,8 @@ namespace PCL
             string Server = ModMinecraft.McInstanceSelected == null ? Settings.Get<string>("CacheNideServer") : Settings.Get<string>("VersionServerNide", Instance: ModMinecraft.McInstanceSelected);
             if (ModMain.FrmLoginNide is null)
             {
-                return new ModLaunch.McLoginServer(ModLaunch.McLoginType.Nide) { Token = "Nide", UserName = "", Password = "", Description = "统一通行证", Type = ModLaunch.McLoginType.Nide, BaseUrl = "https://auth.mc-user.com:233/" + Server + "/authserver" };
+                // 完成态下登录页可能不存在，回退到已保存的当前账号，避免启动时被判成「账号不能为空」
+                return new ModLaunch.McLoginServer(ModLaunch.McLoginType.Nide) { Token = "Nide", UserName = (Settings.Get<string>("LoginNideEmail") ?? "").BeforeFirst("¨").Trim(), Password = (Settings.Get<string>("LoginNidePass") ?? "").BeforeFirst("¨").Trim(), Description = "统一通行证", Type = ModLaunch.McLoginType.Nide, BaseUrl = "https://auth.mc-user.com:233/" + Server + "/authserver" };
             }
             else
             {

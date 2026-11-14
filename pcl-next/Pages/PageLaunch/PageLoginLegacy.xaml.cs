@@ -55,7 +55,11 @@ namespace PCL
     /// </summary>
         public static ModLaunch.McLoginData GetLoginData()
         {
-            string UserName = ModMain.FrmLoginLegacy is null ? "" : ModMain.FrmLoginLegacy.ComboName.Text.Replace("¨", "").Trim();
+            // 完成态下登录页可能从未创建（FrmLoginLegacy 为 null），
+            // 此时必须回退到已保存的当前账号，否则启动时会被判成「玩家名不能为空」
+            string UserName = ModMain.FrmLoginLegacy is null
+                ? (Settings.Get<string>("LoginLegacyName") ?? "").BeforeFirst("¨").Trim()
+                : ModMain.FrmLoginLegacy.ComboName.Text.Replace("¨", "").Trim();
             return new ModLaunch.McLoginLegacy() { UserName = UserName, SkinType = Settings.Get<int>("LaunchSkinType"), SkinName = Settings.Get<string>("LaunchSkinID") };
         }
         /// <summary>

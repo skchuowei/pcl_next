@@ -193,13 +193,13 @@ namespace PCL
                         }
                     case ModLaunch.McLoginType.Nide:
                         {
-                            Promote("LoginNideEmail", Entry.Name);
+                            PromotePair("LoginNideEmail", "LoginNidePass", Entry.Name, null);
                             ModMain.FrmLoginNide?.Reload(false);
                             break;
                         }
                     case ModLaunch.McLoginType.Auth:
                         {
-                            Promote("LoginAuthEmail", Entry.Name);
+                            PromotePair("LoginAuthEmail", "LoginAuthPass", Entry.Name, null);
                             ModMain.FrmLoginAuth?.Reload(false);
                             break;
                         }
@@ -225,14 +225,10 @@ namespace PCL
                         Promote("LoginLegacyName", Name);
                         break;
                     case ModLaunch.McLoginType.Nide:
-                        Promote("LoginNideEmail", Name);
-                        if (!string.IsNullOrEmpty(Password))
-                            Promote("LoginNidePass", Password.Replace("¨", "").Trim());
+                        PromotePair("LoginNideEmail", "LoginNidePass", Name, Password);
                         break;
                     case ModLaunch.McLoginType.Auth:
-                        Promote("LoginAuthEmail", Name);
-                        if (!string.IsNullOrEmpty(Password))
-                            Promote("LoginAuthPass", Password.Replace("¨", "").Trim());
+                        PromotePair("LoginAuthEmail", "LoginAuthPass", Name, Password);
                         break;
                 }
                 Settings.Set("LoginType", Type);
@@ -290,11 +286,11 @@ namespace PCL
                         ModMain.FrmLoginLegacy?.Reload(false);
                         break;
                     case ModLaunch.McLoginType.Nide:
-                        Settings.Set("LoginNideEmail", string.Join("¨", (Settings.Get<string>("LoginNideEmail") ?? "").Split("¨").Where(p => p.Trim() != Entry.Name)));
+                        RemovePair("LoginNideEmail", "LoginNidePass", Entry.Name);
                         ModMain.FrmLoginNide?.Reload(false);
                         break;
                     case ModLaunch.McLoginType.Auth:
-                        Settings.Set("LoginAuthEmail", string.Join("¨", (Settings.Get<string>("LoginAuthEmail") ?? "").Split("¨").Where(p => p.Trim() != Entry.Name)));
+                        RemovePair("LoginAuthEmail", "LoginAuthPass", Entry.Name);
                         ModMain.FrmLoginAuth?.Reload(false);
                         break;
                 }
@@ -309,10 +305,65 @@ namespace PCL
         /// <summary>把指定名称提到 ¨ 分隔列表的首位，使其成为当前账号。</summary>
         private static void Promote(string Key, string Name)
         {
-            var Parts = (Settings.Get<string>(Key) ?? "").Split("¨").Where(p => !string.IsNullOrEmpty(p.Trim())).ToList();
-            Parts.Remove(Name.Trim());
+            var Parts = SplitList(Key).Where(p => !string.IsNullOrEmpty(p.Trim())).ToList();
+            Parts.RemoveAll(p => p.Trim() == Name.Trim());
             Parts.Insert(0, Name.Trim());
             Settings.Set(Key, string.Join("¨", Parts));
+        }
+
+        /// <summary>
+        /// 名称与密码是两个平行的 ¨ 分隔列表：切换账号时必须把同一行的密码一起提到首位，
+        /// 否则「显示的账号」与「实际登录用的密码」会错位（表现为切换后登录失败）。
+        /// </summary>
+        private static void PromotePair(string NameKey, string PasswordKey, string Name, string Password)
+        {
+            Name = (Name ?? "").Replace("¨", "").Trim();
+            if (string.IsNullOrEmpty(Name))
+                return;
+            var Names = SplitList(NameKey).Where(p => !string.IsNullOrEmpty(p.Trim())).ToList();
+            var Passes = SplitList(PasswordKey);
+            int Index = Names.FindIndex(p => p.Trim() == Name);
+            string OldPassword = Index >= 0 && Index < Passes.Count ? Passes[Index] : "";
+            if (Index >= 0)
+            {
+                Names.RemoveAt(Index);
+                if (Index < Passes.Count)
+                    Passes.RemoveAt(Index);
+            }
+            Names.Insert(0, Name);
+            Passes.Insert(0, Password is null ? OldPassword : Password.Replace("¨", "").Trim());
+            // 两个列表长度必须一致，否则下一次按下标取值会错行
+            while (Passes.Count < Names.Count)
+                Passes.Add("");
+            while (Passes.Count > Names.Count)
+                Passes.RemoveAt(Passes.Count - 1);
+            Settings.Set(NameKey, string.Join("¨", Names));
+            Settings.Set(PasswordKey, string.Join("¨", Passes));
+        }
+
+        private static List<string> SplitList(string Key)
+        {
+            var Raw = Settings.Get<string>(Key) ?? "";
+            return Raw.Length == 0 ? new List<string>() : Raw.Split("¨").ToList();
+        }
+
+        /// <summary>删除账号时同步删除与之同行的密码，避免邮箱列表与密码列表错位。</summary>
+        private static void RemovePair(string NameKey, string PasswordKey, string Name)
+        {
+            var Names = SplitList(NameKey);
+            var Passes = SplitList(PasswordKey);
+            int Index = Names.FindIndex(p => p.Trim() == (Name ?? "").Trim());
+            if (Index < 0)
+                return;
+            Names.RemoveAt(Index);
+            if (Index < Passes.Count)
+                Passes.RemoveAt(Index);
+            Settings.Set(NameKey, string.Join("¨", Names.Where(p => !string.IsNullOrEmpty(p.Trim()))));
+            while (Passes.Count < Names.Count)
+                Passes.Add("");
+            while (Passes.Count > Names.Count)
+                Passes.RemoveAt(Passes.Count - 1);
+            Settings.Set(PasswordKey, string.Join("¨", Passes));
         }
 
         /// <summary>复制账号名称到剪贴板。</summary>

@@ -59,7 +59,8 @@ namespace PCL
             string Server = (ModMinecraft.McInstanceSelected == null ? Settings.Get<string>("CacheAuthServerServer") : Settings.Get<string>("VersionServerAuthServer", Instance: ModMinecraft.McInstanceSelected)) + "/authserver";
             if (ModMain.FrmLoginAuth is null)
             {
-                return new ModLaunch.McLoginServer(ModLaunch.McLoginType.Auth) { Token = "Auth", BaseUrl = Server, UserName = "", Password = "", Description = "Authlib-Injector", Type = ModLaunch.McLoginType.Auth };
+                // 完成态下登录页可能不存在，回退到已保存的当前账号，避免启动时被判成「账号不能为空」
+                return new ModLaunch.McLoginServer(ModLaunch.McLoginType.Auth) { Token = "Auth", BaseUrl = Server, UserName = (Settings.Get<string>("LoginAuthEmail") ?? "").BeforeFirst("¨").Trim(), Password = (Settings.Get<string>("LoginAuthPass") ?? "").BeforeFirst("¨").Trim(), Description = "Authlib-Injector", Type = ModLaunch.McLoginType.Auth };
             }
             else
             {

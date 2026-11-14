@@ -35,6 +35,15 @@ namespace PCL
             this.BtnLaunch.Loaded += (p1, p2) => RefreshButtonsUI();
             this.BtnCancel.Click += (p1, p2) => BtnCancel_Click();
             this.BtnMore.Click += (p1, p2) => BtnMore_Click();
+            this.PanCenter.MouseEnter += (p1, p2) => ShowCompactButtons(true);
+            this.PanCenter.MouseLeave += (p1, p2) => ShowCompactButtons(false);
+            // 切换账号后面板内容会被整体重建，此时鼠标仍停留在面板内、收不到新的 MouseEnter，
+            // 这里用 MouseMove 兜底，保证重建后卡片依然按悬停状态显示
+            this.PanCenter.MouseMove += (p1, p2) =>
+            {
+                if (this.PanCompactCard is not null && this.PanCompactCard.Opacity < 1d)
+                    ShowCompactButtons(true);
+            };
             // 账号区三态
             SetupCompactButton(this.BtnCompactSkin, LogoCompactSkin, "更换皮肤（前往「我的账号」）");
             SetupCompactButton(this.BtnCompactEdit, ModBase.Logo.IconButtonEdit, "编辑账号（前往「我的账号」）");
@@ -548,23 +557,21 @@ namespace PCL
         private AccountPanelMode AccountMode = AccountPanelMode.Compact;
         private PageType _CurrentPageType = PageType.None;
         private int _LastAccountCount = -1;
-        // 新建档案对话框里选中的验证类型，取值即 LoginPageType：1 正版 / 4 第三方 / 2 离线
-        private int _NewTypeChoice = 0;
         // >= 0 时 RefreshPage 优先采用该登录页类型（新建档案时不写回设置）
         private int _LoginPageTypeOverride = -1;
 
         // 图标（全部为线框风格：外轮廓 + 内缩轮廓构成空心环，Path 迷你语言的默认填充规则是 EvenOdd）
-        // 皮肤：T 恤线框
+        // 皮肤：T 恤线框，线宽与铅笔 / 切换图标一致，避免看起来像另一种画风
         private const string LogoCompactSkin =
-            "M7.6,2.4 L10,4.2 L14,4.2 L16.4,2.4 L20.6,6.4 L17.6,9.4 L16.2,8.6 L16.2,21.4 L7.8,21.4 L7.8,8.6 L6.4,9.4 L3.4,6.4 Z " +
-            "M8.8,4 L10.4,5.5 L13.6,5.5 L15.2,4 L18.6,6.6 L17.1,8.2 L14.8,7.2 L14.8,20 L9.2,20 L9.2,7.2 L6.9,8.2 L5.4,6.6 Z";
-        // 新建账号：线框人形 + 细线加号
+            "M7.3,2.1 L10.4,3.6 L13.6,3.6 L16.7,2.1 L21.3,6.2 L17.7,10 L16.4,8.9 L16.4,21.9 L7.6,21.9 L7.6,8.9 L6.3,10 L2.7,6.2 Z " +
+            "M8.2,4.3 L10.7,5.2 L13.3,5.2 L15.8,4.3 L18.5,6.4 L16.6,8.3 L14.9,7.3 L14.9,20.3 L9.1,20.3 L9.1,7.3 L7.4,8.3 L5.5,6.4 Z";
+        // 新建账号：线框人形 + 加号（加号是单个多边形，避免 EvenOdd 下重叠区域被打穿）
         private const string LogoNewAccount =
-            "M8,1.5 A3.1,3.1 0 1 1 8,7.7 A3.1,3.1 0 1 1 8,1.5 Z " +
-            "M8,2.8 A1.8,1.8 0 1 1 8,6.4 A1.8,1.8 0 1 1 8,2.8 Z " +
-            "M2,20 C2,14.6 4.6,11.4 8,11.4 C11.4,11.4 14,14.6 14,20 Z " +
-            "M4,20 C4,15.9 5.9,12.9 8,12.9 C10.1,12.9 12,15.9 12,20 Z " +
-            "M18.2,9.6 L20.2,9.6 L20.2,12 L22.4,12 L22.4,14 L20.2,14 L20.2,16.4 L18.2,16.4 L18.2,14 L16,14 L16,12 L18.2,12 Z";
+            "M8,1.4 A3.5,3.5 0 1 1 8,8.4 A3.5,3.5 0 1 1 8,1.4 Z " +
+            "M8,3.2 A1.7,1.7 0 1 1 8,6.6 A1.7,1.7 0 1 1 8,3.2 Z " +
+            "M1.6,21.8 C1.6,15.4 4.2,10.8 8,10.8 C11.8,10.8 14.4,15.4 14.4,21.8 Z " +
+            "M4.3,20 C4.3,16.4 6,13.4 8,13.4 C10,13.4 11.7,16.4 11.7,20 Z " +
+            "M17.2,11.7 L19.2,11.7 L19.2,13.6 L21.1,13.6 L21.1,15.6 L19.2,15.6 L19.2,17.5 L17.2,17.5 L17.2,15.6 L15.3,15.6 L15.3,13.6 L17.2,13.6 Z";
 
         private Brush GetBrush(string Key)
         {
@@ -641,6 +648,8 @@ namespace PCL
             this.LabCompactName.Text = string.IsNullOrEmpty(Current?.Name) ? "未登录" : Current.Name;
             this.LabCompactInfo.Text = Current is null ? "" : Current.InfoText;
             string Head = Current is null ? "" : GetAccountHead(Current, Current, 128);
+            // 操作卡片只在鼠标位于账号区时显示（切回完成态时鼠标通常还在区内，直接给到 1）
+            this.PanCompactCard.Opacity = this.PanCenter.IsMouseOver ? 1d : 0d;
             try
             {
                 this.ImgCompactHead.Source = string.IsNullOrEmpty(Head) || !FileUtils.Exists(Head) ? null : new MyBitmap(Head);
@@ -659,100 +668,89 @@ namespace PCL
             foreach (var Entry in Accounts)
             {
                 bool IsCurrent = Current != null && Current.Type == Entry.Type && (Current.Name ?? "") == (Entry.Name ?? "");
-                this.PanAccountList.Children.Add(CreateAccountRow(Entry, Current, IsCurrent));
+                this.PanAccountList.Children.Add(CreateAccountItem(Entry, Current, IsCurrent));
             }
             this.PanAccountList.Children.Add(CreateNewAccountButton());
         }
 
-        private FrameworkElement CreateAccountRow(AccountEntry Entry, AccountEntry Current, bool IsCurrent)
+        /// <summary>
+        /// 账号行直接使用项目自带列表项（与下载页版本列表同一套控件）：
+        /// 选中样式照「下载页版本列表」（图2）——浅蓝底 + 蓝色标题，未选中为普通行；
+        /// 悬停缩放与右侧操作按钮淡入由 MyListItem 自己完成。
+        /// </summary>
+        private FrameworkElement CreateAccountItem(AccountEntry Entry, AccountEntry Current, bool IsCurrent)
         {
-            var Row = new Grid();
-            Row.ColumnDefinitions.Add(new ColumnDefinition() { Width = GridLength.Auto });
-            Row.ColumnDefinitions.Add(new ColumnDefinition() { Width = new GridLength(1, GridUnitType.Star) });
-            Row.ColumnDefinitions.Add(new ColumnDefinition() { Width = GridLength.Auto });
-
-            var Head = new Image() { Width = 30, Height = 30, Stretch = Stretch.Fill, VerticalAlignment = VerticalAlignment.Center };
-            RenderOptions.SetBitmapScalingMode(Head, BitmapScalingMode.NearestNeighbor);
-            string HeadPath = GetAccountHead(Entry, Current, 64);
-            if (!string.IsNullOrEmpty(HeadPath) && FileUtils.Exists(HeadPath))
+            var Item = new MyListItem()
             {
-                try
-                {
-                    Head.Source = new MyBitmap(HeadPath);
-                }
-                catch (Exception ex)
-                {
-                    Logger.Warn(ex, "加载账号头像失败：" + Entry.Name);
-                }
-            }
-            Grid.SetColumn(Head, 0);
-            Row.Children.Add(Head);
-
-            var Name = new TextBlock()
-            {
-                Text = Entry.Name,
-                FontSize = 14,
-                FontWeight = IsCurrent ? FontWeights.SemiBold : FontWeights.Normal,
-                TextTrimming = TextTrimming.CharacterEllipsis,
-                Foreground = GetBrush("ColorBrush1")
+                Title = Entry.Name,
+                Info = Entry.InfoText,
+                Height = 42d,
+                Margin = new Thickness(4, 0, 4, 0),
+                LogoScale = 0.92d,
+                Type = MyListItem.CheckType.Clickable,
+                Tag = Entry
             };
-            var Info = new TextBlock()
+            string Head = GetAccountHead(Entry, Current, 64);
+            if (!string.IsNullOrEmpty(Head) && FileUtils.Exists(Head))
+                Item.Logo = Head;
+            if (IsCurrent)
             {
-                Text = Entry.InfoText,
-                FontSize = 11.5,
-                Margin = new Thickness(0, 1, 0, 0),
-                TextTrimming = TextTrimming.CharacterEllipsis,
-                Foreground = GetBrush("ColorBrushGray2")
-            };
-            var Texts = new StackPanel() { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(10, 0, 0, 0) };
-            Texts.Children.Add(Name);
-            Texts.Children.Add(Info);
-            Grid.SetColumn(Texts, 1);
-            Row.Children.Add(Texts);
-
-            var Card = new Border()
-            {
-                CornerRadius = new CornerRadius(6),
-                Margin = new Thickness(0, 0, 0, 6),
-                Padding = new Thickness(10, 7, 8, 7),
-                Background = IsCurrent ? Brushes.Transparent : GetBrush("ColorBrush7"),
-                Child = Row,
-                Cursor = Cursors.Hand
-            };
-            // 当前账号不提供编辑 / 删除，点它本身就是收起列表
-            if (!IsCurrent)
-            {
-                var Buttons = new StackPanel() { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
-                var BtnEdit = new MyIconButton() { ToolTip = "编辑账号", Logo = ModBase.Logo.IconButtonEdit, Height = 26, Width = 26, Margin = new Thickness(4, 0, 0, 0) };
-                SetupSquareButton(BtnEdit);
-                BtnEdit.Click += (s, e) => OpenAccountSetupPage();
-                var BtnDelete = new MyIconButton() { ToolTip = "删除账号", Logo = ModBase.Logo.IconButtonDelete, Height = 26, Width = 26, Margin = new Thickness(4, 0, 0, 0), Theme = MyIconButton.Themes.Red };
-                SetupSquareButton(BtnDelete);
-                BtnDelete.Click += (s, e) =>
+                // MyListItem 的 Loaded 会按 Checked 重置前景色，这里在加载后再覆盖成选中色
+                Item.Loaded += (s, e) =>
                 {
-                    ModAccountList.Delete(Entry);
-                    RefreshPage(false, true);
+                    try
+                    {
+                        Item.SetResourceReference(MyListItem.ForegroundProperty, "ColorBrush2");
+                        if (Item.FindName("LabTitle") is TextBlock TitleText)
+                            TitleText.FontWeight = FontWeights.Bold;
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Warn(ex, "设置账号选中样式失败");
+                    }
                 };
-                Buttons.Children.Add(BtnEdit);
-                Buttons.Children.Add(BtnDelete);
-                Grid.SetColumn(Buttons, 2);
-                Row.Children.Add(Buttons);
             }
-            Card.MouseLeftButtonUp += (s, e) =>
+            var BtnEdit = new MyIconButton() { Logo = ModBase.Logo.IconButtonEdit, ToolTip = "编辑账号" };
+            var BtnDelete = new MyIconButton() { Logo = ModBase.Logo.IconButtonDelete, ToolTip = "删除账号", Theme = MyIconButton.Themes.Red };
+            BtnEdit.Click += (s, e) => OpenAccountSetupPage();
+            BtnDelete.Click += (s, e) =>
+            {
+                // 账号是不可恢复数据，删除前走项目自带确认弹窗，避免误点
+                if (ModMain.MyMsgBox($"确定要删除账号「{Entry.Name}」吗？" + Environment.NewLine + "删除后需要重新登录才能恢复。", "删除账号", "删除", "取消", IsWarn: true) != 1)
+                    return;
+                ModAccountList.Delete(Entry);
+                RefreshPage(false, true);
+            };
+            Item.Buttons = new[] { BtnEdit, BtnDelete };
+            Item.Click += (s, e) =>
             {
                 if (IsCurrent)
-                {
                     SwitchAccountMode(AccountPanelMode.Compact);
-                }
                 else
-                {
-                    // 先切形态再换账号，SwitchTo 触发的 RefreshPage 才会直接画成完成态
-                    AccountMode = AccountPanelMode.Compact;
-                    _LoginPageTypeOverride = -1;
-                    ModAccountList.SwitchTo(Entry);
-                }
+                    SwitchToAccount(Entry);
             };
-            return Card;
+            // 选中行底板：与下载页版本列表一致，浅蓝圆角底
+            return new Border()
+            {
+                CornerRadius = new CornerRadius(6),
+                Background = IsCurrent ? GetBrush("ColorBrush7") : Brushes.Transparent,
+                Margin = new Thickness(0, 0, 0, 4),
+                Child = Item
+            };
+        }
+
+        /// <summary>切换账号：只改设置，形态切换交给 SwitchAccountMode（负责淡出淡入与刷新）。</summary>
+        private void SwitchToAccount(AccountEntry Entry)
+        {
+            try
+            {
+                ModAccountList.SetCurrent(Entry);
+                SwitchAccountMode(AccountPanelMode.Compact);
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn(ex, "切换账号失败：" + (Entry?.Name ?? ""));
+            }
         }
 
         private FrameworkElement CreateNewAccountButton()
@@ -761,99 +759,44 @@ namespace PCL
             {
                 ToolTip = "新建账号",
                 Logo = LogoNewAccount,
-                Width = 44,
-                Height = 32,
+                LogoScale = 1.06d,
+                Width = 24,
+                Height = 24,
                 HorizontalAlignment = HorizontalAlignment.Center,
-                Margin = new Thickness(0, 6, 0, 0)
+                Margin = new Thickness(0, 2, 0, 0)
             };
             SetupSquareButton(Btn);
             Btn.Click += (s, e) => OpenNewTypeDialog();
-            return Btn;
+            var Card = new MyCard()
+            {
+                HorizontalAlignment = HorizontalAlignment.Center,
+                Margin = new Thickness(8, 8, 10, 2),
+                CornerRadius = new CornerRadius(5)
+            };
+            var Host = new StackPanel() { Orientation = Orientation.Horizontal, Margin = new Thickness(10, 3, 9, 3) };
+            Host.Children.Add(Btn);
+            Card.Children.Add(Host);
+            return Card;
         }
 
-        // 新建档案：选择验证类型（社区版是一个浮在主窗口上方的独立弹窗）
+        // 新建档案：选择验证类型，调用项目自带的 Select 弹窗（与社区版的 SelectDialog 同一套交互）
         private void OpenNewTypeDialog()
         {
             try
             {
-                var Win = new Window()
+                var Options = new List<IMyRadio>()
                 {
-                    Owner = ModMain.FrmMain,
-                    WindowStyle = WindowStyle.None,
-                    AllowsTransparency = true,
-                    Background = Brushes.Transparent,
-                    ResizeMode = ResizeMode.NoResize,
-                    SizeToContent = SizeToContent.WidthAndHeight,
-                    WindowStartupLocation = WindowStartupLocation.CenterOwner,
-                    ShowInTaskbar = false,
-                    Title = "新建档案"
+                    new MyListItem() { Title = "正版验证", Height = 36d },
+                    new MyListItem() { Title = "第三方验证", Height = 36d },
+                    new MyListItem() { Title = "离线验证", Height = 36d }
                 };
-                var Card = new Border()
-                {
-                    Background = GetBrush("ColorBrushWhite"),
-                    CornerRadius = new CornerRadius(6),
-                    Padding = new Thickness(24, 18, 24, 16),
-                    Margin = new Thickness(18),
-                    MinWidth = 300,
-                    Effect = new DropShadowEffect() { BlurRadius = 18, ShadowDepth = 4, Direction = 270, Opacity = 0.22 }
-                };
-                var Panel = new StackPanel();
-                Panel.Children.Add(new TextBlock()
-                {
-                    Text = "新建档案 - 选择验证类型",
-                    FontSize = 16.5,
-                    Foreground = GetBrush("ColorBrush2")
-                });
-                Panel.Children.Add(new Rectangle()
-                {
-                    Height = 1.5,
-                    Margin = new Thickness(0, 8, 0, 0),
-                    Fill = GetBrush("ColorBrush2"),
-                    Opacity = 0.35
-                });
-                var List = new StackPanel() { Margin = new Thickness(0, 8, 0, 0) };
-                Panel.Children.Add(List);
-
-                var BtnNext = new MyButton() { Text = "继续", Height = 30, MinWidth = 76, Margin = new Thickness(0, 0, 8, 0), IsEnabled = false };
-                var BtnCancel = new MyButton() { Text = "取消", Height = 30, MinWidth = 76 };
-                var Buttons = new StackPanel()
-                {
-                    Orientation = Orientation.Horizontal,
-                    HorizontalAlignment = HorizontalAlignment.Right,
-                    Margin = new Thickness(0, 14, 0, 0)
-                };
-                Buttons.Children.Add(BtnNext);
-                Buttons.Children.Add(BtnCancel);
-                Panel.Children.Add(Buttons);
-                Card.Child = Panel;
-                Win.Content = Card;
-
-                _NewTypeChoice = 0;
-                CreateNewTypeRow(List, BtnNext, "正版验证", ModBase.Logo.IconButtonShield, 1);
-                CreateNewTypeRow(List, BtnNext, "第三方验证", ModBase.Logo.IconButtonCard, 4);
-                CreateNewTypeRow(List, BtnNext, "离线验证", ModBase.Logo.IconButtonOffline, 2);
-
-                bool Accepted = false;
-                BtnCancel.Click += (s, e) => Win.Close();
-                BtnNext.Click += (s, e) =>
-                {
-                    if (_NewTypeChoice <= 0)
-                        return;
-                    Accepted = true;
-                    Win.Close();
-                };
-                Win.KeyDown += (s, e) =>
-                {
-                    if (e.Key == Key.Escape)
-                        Win.Close();
-                };
-                Win.ShowDialog();
-                if (!Accepted)
+                int? Choice = ModMain.MyMsgBoxSelect(Options, "新建档案", "继续", "取消");
+                if (Choice is null)
                     return;
-                // 只影响本次显示，不写回「LoginPageType」设置
-                _LoginPageTypeOverride = _NewTypeChoice;
-                AccountMode = AccountPanelMode.Login;
-                RefreshPage(true, true);
+                // 只影响本次显示，不写回 LoginType 设置
+                int[] PageTypes = { 1, 4, 2 };
+                _LoginPageTypeOverride = PageTypes[Choice.Value];
+                SwitchAccountMode(AccountPanelMode.Login, true);
             }
             catch (Exception ex)
             {
@@ -861,92 +804,56 @@ namespace PCL
             }
         }
 
-        private void CreateNewTypeRow(StackPanel Host, MyButton BtnNext, string Title, string Logo, int PageType)
-        {
-            var Icon = new System.Windows.Shapes.Path()
-            {
-                Data = (Geometry)new GeometryConverter().ConvertFromString(Logo),
-                Width = 20,
-                Height = 20,
-                Stretch = Stretch.Uniform,
-                VerticalAlignment = VerticalAlignment.Center,
-                Fill = GetBrush("ColorBrush1")
-            };
-            var Text = new TextBlock()
-            {
-                Text = Title,
-                FontSize = 14,
-                Margin = new Thickness(14, 0, 0, 0),
-                VerticalAlignment = VerticalAlignment.Center,
-                Foreground = GetBrush("ColorBrush1")
-            };
-            var Row = new Grid();
-            Row.ColumnDefinitions.Add(new ColumnDefinition() { Width = GridLength.Auto });
-            Row.ColumnDefinitions.Add(new ColumnDefinition() { Width = new GridLength(1, GridUnitType.Star) });
-            Grid.SetColumn(Icon, 0);
-            Grid.SetColumn(Text, 1);
-            Row.Children.Add(Icon);
-            Row.Children.Add(Text);
-            var Card = new Border()
-            {
-                Height = 40,
-                CornerRadius = new CornerRadius(6),
-                Padding = new Thickness(8, 0, 8, 0),
-                Margin = new Thickness(0, 0, 0, 2),
-                Background = Brushes.Transparent,
-                Child = Row,
-                Cursor = Cursors.Hand
-            };
-            Card.MouseLeftButtonUp += (s, e) =>
-            {
-                _NewTypeChoice = PageType;
-                foreach (var Child in Host.Children)
-                {
-                    if (Child is not Border Other || Other.Child is not Grid OtherRow)
-                        continue;
-                    var OtherText = OtherRow.Children.OfType<TextBlock>().FirstOrDefault();
-                    var OtherIcon = OtherRow.Children.OfType<System.Windows.Shapes.Path>().FirstOrDefault();
-                    int OtherType = NewTypeRowTag(OtherText?.Text ?? "");
-                    bool IsSelected = OtherType == _NewTypeChoice;
-                    Other.Background = IsSelected ? GetBrush("ColorBrush6") : Brushes.Transparent;
-                    if (OtherIcon is not null)
-                        OtherIcon.Fill = IsSelected ? GetBrush("ColorBrush2") : GetBrush("ColorBrush1");
-                    if (OtherText is not null)
-                        OtherText.Foreground = IsSelected ? GetBrush("ColorBrush2") : GetBrush("ColorBrush1");
-                }
-                BtnNext.IsEnabled = true;
-            };
-            Host.Children.Add(Card);
-        }
-
-        private static int NewTypeRowTag(string Title)
-        {
-            switch (Title)
-            {
-                case "正版验证":
-                    return 1;
-                case "第三方验证":
-                    return 4;
-                case "离线验证":
-                    return 2;
-                default:
-                    return 0;
-            }
-        }
-
         /// <summary>正常刷新时才把登录类型写回设置；新建档案的临时选择不落盘，取消后仍是原账号。</summary>
         private void ApplyLoginType(ModLaunch.McLoginType Type)
         {
+            // 启动页的「正版 / 离线」单选只能表达 Ms 与 Legacy 两种登录方式。
+            // 账号区显示的是第三方（统一通行证 / Authlib）账号时，若还按单选状态写回 LoginType，
+            // 就会出现「界面显示第三方账号、启动却用离线账号」且选中高亮错位；此处以账号本身为准。
+            if (AccountMode != AccountPanelMode.Login &&
+                Settings.Get<ModLaunch.McLoginType>("LoginType") is ModLaunch.McLoginType.Auth or ModLaunch.McLoginType.Nide)
+                return;
             if (_LoginPageTypeOverride < 0)
                 Settings.Set("LoginType", Type);
         }
 
+        private readonly int AccountAnimUuid = ModBase.GetUuid();
+
         private void SwitchAccountMode(AccountPanelMode Mode, bool KeepInput = false)
         {
+            bool ModeChanged = AccountMode != Mode;
             AccountMode = Mode;
             if (Mode != AccountPanelMode.Login)
                 _LoginPageTypeOverride = -1;
-            RefreshPage(KeepInput, true);
+            if (!ModeChanged || !this.IsLoaded || ModAnimation.AniControlEnabled != 0)
+            {
+                RefreshPage(KeepInput, true);
+                return;
+            }
+            // 与社区版 PageLaunchLeft 的页面切换一致：旧内容淡出 → 换页 → 新内容淡入
+            // AaOpacity 的值是「变化量」，且参数在创建时就求值，所以淡出写 -1、淡入写 +1，
+            // 不能写 1 - Opacity（那样会在动画开始前就被算成 0）
+            ModAnimation.AniStop("Account Mode " + AccountAnimUuid);
+            ModAnimation.AniStart(new ModAnimation.AniData[]
+            {
+                ModAnimation.AaOpacity(this.PanCenter, -this.PanCenter.Opacity, 100, Ease: new ModAnimation.AniEaseOutFluent()),
+                ModAnimation.AaCode(() =>
+                {
+                    this.PanCenter.Opacity = 0d;
+                    RefreshPage(KeepInput, false);
+                }, 100),
+                ModAnimation.AaOpacity(this.PanCenter, 1d, 100, 120, new ModAnimation.AniEaseInFluent())
+            }, "Account Mode " + AccountAnimUuid);
+        }
+
+        /// <summary>完成态的图标卡片默认隐藏，鼠标在账号区时淡入（与社区版 PageLoginProfileSkin 一致）。</summary>
+        private void ShowCompactButtons(bool Show)
+        {
+            if (this.PanCompactCard is null)
+                return;
+            if (!Show && this.PanAccountCompact.Visibility != Visibility.Visible)
+                return;
+            ModAnimation.AniStart(ModAnimation.AaOpacity(this.PanCompactCard, (Show ? 1d : 0d) - this.PanCompactCard.Opacity, 120, Ease: new ModAnimation.AniEaseOutFluent()), "Compact Buttons " + AccountAnimUuid);
         }
 
         /// <summary>该登录页自己是否带「登录」按钮（目前只有正版登录页有）。</summary>
