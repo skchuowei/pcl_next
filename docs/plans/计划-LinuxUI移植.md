@@ -95,7 +95,7 @@
 | **R2** | 窗口壳：WPF 自绘标题栏 / 无边框 / `MyResizer` 缩放在 Avalonia 下用另一套实现 | 装饰绘制细节、缩放热区 | 标题栏高度、按钮尺寸、图标位置必须与 Windows 一致 |
 | **R3** | WebP 解码：`System.Drawing` + `Imazen.WebP` → Skia | 色彩管理、边缘插值 | 图像尺寸、卡片内图片的显示区域不变 |
 | **R4** | 动画曲线：WPF 自定义 Ani 引擎 → Avalonia `Transitions` / `Easing` | 曲线形状（近似代替） | 时长数值照抄（如 100/200/300/700ms） |
-| **R5** | `MyCard` 折叠（`CanSwap` / `IsSwapped` 箭头 + 高度动画）尚未接入 | 折叠过程 | 折叠前后两种静态布局必须都能还原 |
+| **R5** | `MyCard` 折叠**已接入**（2026-11-11）：`CanSwap`/`IsSwapped` → 折叠高 40、内容隐藏、右上 10×6 箭头（展开 180° / 折叠 0°，250ms）、悬停 `ColorBrush2`、点击标题区切换（`MyCard.vb` L284–L316）；**高度过渡动画仍未接入**（WPF 150ms / 分段匀速，现为瞬时） | 折叠过程的高度过渡 | 折叠前后两种静态布局、折叠高 40、箭头位置 `Margin 0,17,16,0` 必须一致 |
 | **R6** | `MyComboBox` / `MyTextBox` 模板细节（弹出层、滚动条、IME、选中样式）尚未逐像素核对 | 弹出层绘制 | 收起态边框、圆角、内边距、字号必须一致 |
 | **R7** | Windows 系统集成（注册表、托盘、跳转列表、通知、资源管理器定位） | 全部（换 XDG / DBus / 无等价物时不实现） | 页面内的文案与按钮布局不变；不做的集成须在页面里显式说明 |
 | **R8** | 音频：**不做**（用户裁决，登记项关闭） | 不适用 | 无需保留任何音频 UI：Windows 端 `ModMusic.vb` 无调用点（全库仅 1 处命中 = 自身声明），界面上不存在播放条/音量控件，不做不产生布局差异 |
@@ -119,6 +119,7 @@
 | **R26** | 版本选择页行为边界：Linux 侧无实例列表服务，`PageSelectLeft.PanList` 保持空、`PageSelectRight` 固定呈现空态卡片（`PageSelectRight.xaml.vb` L98–L109：`LabEmptyTitle`「无可用版本」、说明两行、下载按钮）；列表条目、「添加文件夹」注入项、加载卡片状态机未接入 | 仅数据与状态机；空态布局必须完整 | 左列 `MinWidth 250 / MaxWidth 300`、空态卡片 `Margin 40`、标题 19 号、分隔线高 2、按钮 `MinWidth 140 / Padding 13,0` 不得改 |
 | **R27** | `MySlider` 数值提示：WPF 的 `Popup`（`GetHintText` 动态文案、拖动/键盘时弹出、700ms 后收起）未移植；拖动时的 1.3 滑块缩放与 40ms 颜色切换并入 R10 近似 | 仅提示气泡与动画 | 轨道 1px/2px、滑块 10×10、宽度算法（两端 0.5 补偿）与配色分支不得改；接入设置页后再按 `RefreshPopup` 补 |
 | **R28** | `MyExtraTextButton` 近似：WPF 圆角绑定 `ActualHeight×0.4`（52 → 20.8）改为固定 21；`Show` 进出场（0→1 淡入 80ms + 0.15→0.85 缩放）未移植；按下 800ms→0.85、60ms→0.80 的分段压缩为 100ms→0.8，回弹 300ms `BackEaseOut` 保留 | 仅动画与绑定表达式 | 高 52、内层下移 10、文案 16 号 `ColorBrush8`、图标 `Margin 2,12,0,12`、悬停 `ColorBrush4` / 禁用 `ColorBrushGray4` 不得改 |
+| **R29** | 设置·启动页静态态：Linux 侧尚无设置服务，`SettingService.Key/Value` 绑定、`ValidateExcept` / `ValidateInteger` 校验、运行期联动（窗口尺寸框显隐、皮肤类型分支 `UpdateSkinType`、内存条比例 `PanRamDisplay`、Java 列表刷新）均未接入；页面按 `Settings.vb` 默认值呈现（`LaunchArgumentIndieV2=4`、`Visible=5`、`Priority=1`、`WindowType=1`、`RamType=0`、`RamCustom=15`、`AdvanceGC=4`、`GraphicCard=True`、JVM 默认串） | 仅数据绑定与联动 | 五张卡片的行列高（28/9）、`Margin 25,40,25,25`、`MinWidth 140 / Padding 13,0`、JVM 框高 100、`Panel` 内控件顺序与文案不得改 |
 
 ---
 
@@ -314,7 +315,7 @@
 | 文件 | 优先级 | 特有检查点 | 状态 |
 |---|---|---|---|
 | `Pages/PageSetup/PageSetupLink.xaml` | P1（试点先做） | 两张卡片的行高 28/15/35、列宽 Auto/1*/60、按钮 `MinWidth 140` + `Padding 13,5` + 间距 20 | ✅（R5 折叠、R6 弹出层） |
-| `Pages/PageSetup/PageSetupLaunch.xaml` | P1 | 启动选项下拉与输入框网格、注册表相关项按 R7 处理 | ⬜ |
+| `Pages/PageSetup/PageSetupLaunch.xaml` | P1 | 启动选项下拉与输入框网格、注册表相关项按 R7 处理 | ✅（13.12，R29） |
 | `Pages/PageSetup/PageSetupSystem.xaml` | P1 | 最大的一页（17 KB）：多卡片、多网格、滑块/开关 | ⬜ |
 | `Pages/PageSetup/PageSetupUI.xaml` | P1 | 最大的一页（36 KB）：主题、背景、字体预览 | ⬜（R9 缩放） |
 
@@ -756,6 +757,34 @@ dotnet build PCL.Desktop.Linux/PCL.Desktop.Linux.csproj -c Release -r linux-x64
 **验证**：`dotnet build PCL.Desktop.Linux/PCL.Desktop.Linux.csproj -c Release -r linux-x64` → **0 警告 / 0 错误**
 （产物 `bin-net10/Dev/2.100.0.4-0.87/linux-x64/`）。三个控件尚未被页面使用，需随设置页统一验收目视（V11）。
 
+### 13.12 设置栈「启动」页（LU6.1，2026-11-11，只做编译验证、不弹窗）
+
+**对照来源**：`pcl-next/Pages/PageSetup/PageSetupLaunch.xaml`（全文 300 行）；
+默认值取自 `pcl-next/Pages/PageSetup/Settings.vb`（`LaunchArgumentIndieV2=4`、`LaunchArgumentVisible=5`、
+`LaunchArgumentPriority=1`、`LaunchArgumentWindowType=1`、`LaunchRamType=0`、`LaunchRamCustom=15`、
+`LaunchAdvanceGC=4`、`LaunchAdvanceGraphicCard=True`、`LaunchAdvanceJvm` 默认串）；
+子页切换与默认页取自 `PageSetupLeft.xaml.vb` L20–L30 / L44–L55 / L93–L122；
+`MyCard` 折叠行为取自 `Controls/MyCard.vb` L86–L103 / L284–L316。
+
+**Linux 实现**：`Views/PageSetupLaunchView.axaml(.cs)`；
+`Controls/MyControls.cs`（`MyCard` 补 `CanSwap`/`IsSwapped`、`MyTextBox` 补 `HintText` → `Watermark`）；
+`Theme/PclControls.axaml`（MyCard 折叠箭头与内容隐藏样式）；
+`Views/PageSetupLeftView.axaml.cs`（新增 `PageChanged` 事件）；
+`MainWindow.axaml.cs`（`ShowSetupPage`：设置栈子页 0 启动 / 1 联机已接，2 个性化 / 3 其他待补）。
+
+| 卡片 / 区域 | Windows 取值 | Linux 实现 | 结论 |
+|---|---|---|---|
+| 启动选项卡 | 内容 `Margin 25,40,25,25`；行高 `28/9` 交替；名称列 Auto（原 SharedSizeGroup，单 Grid 内 Auto 等价）；下拉/输入框跨 2 列 | 同；5 个下拉项与全部 ToolTip 逐字保留；`SelectedIndex` 按默认值 4/4/1/1 | 一致（R29） |
+| 窗口大小 | 下拉 + 宽 60 输入 ×2 + ` × `（18 号）；自定义宽高初始 `Collapsed` | 同（`IsVisible=False`） | 一致（R29） |
+| 内存分配卡 | `Margin 25,40,25,15`；自动/自定义 `MyRadioBox`（宽 110、间距 20）、滑块 `MaxValue 49 / Value 15 / IsEnabled False`、优化开关高 22；内存条三列 `4.7*/2.5*/0.7*`、分隔行高 4、`4.7 GB / 7.9 GB / 2.5 GB` | 同；渐变 `ColorObject3→ColorObject2`、`ColorBrush3×0.5`、`ColorBrush6×0.7` | 一致（R29） |
+| 离线皮肤卡 | `CanSwap=True IsSwapped=True`（折叠高 40）；5 个皮肤单选、正版名/按钮组初始隐藏 | 同（折叠由 MyCard 实现；内容仍完整保留，展开可见） | R5 / R29 |
+| 高级选项卡 | `IsSwapped=True`；JVM 框高 100、可换行、`MaxLength 4000`；GC 第 4 项；4 个开关（高性能显卡默认勾选）；蓝色提示条 | 同 | R5 / R29 |
+| 「版本独立设置」 | `MyExtraTextButton` 居中、`Margin 0,-5,0,15`、LogoScale 0.9、箭头路径原文 | 同 | R28 |
+
+**验证**：`dotnet build PCL.Desktop.Linux/PCL.Desktop.Linux.csproj -c Release -r linux-x64` → **0 警告 / 0 错误**
+（产物 `bin-net10/Dev/2.100.0.4-0.92/linux-x64/`）。
+**未验证项**：卡片折叠/展开的点击与箭头旋转、下拉弹出层、长 JVM 文本滚动、内存条比例、胶囊按钮悬停 —— 需统一验收目视（V12）。
+
 ## 14. 待统一验收清单（UI 全部成型后一次性执行）
 
 | 编号 | 待验收项 | 为什么必须靠运行判断 | 当前已知线索 |
@@ -771,3 +800,4 @@ dotnet build PCL.Desktop.Linux/PCL.Desktop.Linux.csproj -c Release -r linux-x64
 | **V9** | 标题栏外观与交互（R17 / R18 / R20） | 渐变由 HSL 运行期算出、状态色靠伪类，静态看不出来 | 需目视：三段渐变方向与明暗、`PCL Next` 文字位置（18px 左缩进）、5 个 Tab 常/悬停/按下/选中三态配色与单选互斥、关闭/最小化、点击其他栈后宿主置空且不报错 |
 | **V10** | 启动栈 / 版本选择栈（13.10） | 空态居中、按钮三态、页面进入动画、右页滚动、`ScrollViewerFullMargin` 滚动条 2,1,1,1 边距均需运行观察 | 需目视：首页为「启动」且标题栏「启动」选中、启动左页 300 宽（按钮 54 / 35 高）、「版本选择」点开进入 250–300 宽左列 + 居中空态卡片、「下载游戏」可点、右页提示条与日志卡、`PanLaunching` 保持隐藏 |
 | **V11** | 设置页前置控件（13.11） | 圆点/圆环尺寸、滑块宽度算法、拖动与键盘步进、胶囊按钮配色均需运行观察 | 需目视：`MyRadioBox` 18 圆环 + 9 圆点（选中 `ColorBrush2`、悬停 `ColorBrush3`）、`MySlider` 底轨 1px/前轨 2px/滑块 10、拖动与 ←/→ 生效、`MyExtraTextButton` 52 高 + 内层下移 10 + 悬停 `ColorBrush4` |
+| **V12** | 设置·启动页（13.12） | 折叠交互、下拉弹出层、长文本滚动、内存条比例、卡片阴影均需运行观察 | 需目视：标题栏进「设置」后左导航选中「启动」且右页出现五张卡片；「离线皮肤」「高级选项」初始为 40 高折叠条、点击标题区展开/收起且箭头旋转；启动选项 5 行 28 高、内存条三段比例、JVM 框 100 高、底部胶囊按钮居中 |

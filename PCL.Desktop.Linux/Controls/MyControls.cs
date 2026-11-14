@@ -18,17 +18,82 @@ namespace PCL.Desktop.Linux.Controls;
 /// 卡片容器，1:1 对齐 `pcl-next/Controls/MyCard.vb`：
 /// 外圈阴影（Margin -3、半径 3、静止不透明度 0.07 / 悬停 0.4）、白色卡片底 #F5FFFFFF、圆角 5、
 /// 标题字号 13 加粗、位置 (15,12)、颜色 ColorBrush1 → 悬停 ColorBrush2。
-/// 折叠（CanSwap / IsSwapped）与高度动画属交互层，暂未接入（登记项 R5）。
+/// 折叠（CanSwap / IsSwapped）：折叠高 40（`MyCard.vb` L284）、内容隐藏、右上角 10×6 箭头
+/// （`Margin 0,17,16,0`，展开 180° / 折叠 0°，250ms）；高度动画未接入（R5）。
 /// </summary>
 public class MyCard : ContentControl
 {
     public static readonly StyledProperty<string?> TitleProperty =
         AvaloniaProperty.Register<MyCard, string?>(nameof(Title));
 
+    public static readonly StyledProperty<bool> CanSwapProperty =
+        AvaloniaProperty.Register<MyCard, bool>(nameof(CanSwap));
+
+    public static readonly StyledProperty<bool> IsSwappedProperty =
+        AvaloniaProperty.Register<MyCard, bool>(nameof(IsSwapped));
+
     public string? Title
     {
         get => GetValue(TitleProperty);
         set => SetValue(TitleProperty, value);
+    }
+
+    public bool CanSwap
+    {
+        get => GetValue(CanSwapProperty);
+        set => SetValue(CanSwapProperty, value);
+    }
+
+    public bool IsSwapped
+    {
+        get => GetValue(IsSwappedProperty);
+        set => SetValue(IsSwappedProperty, value);
+    }
+
+    protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
+    {
+        base.OnPropertyChanged(change);
+        if (change.Property == CanSwapProperty || change.Property == IsSwappedProperty) SyncSwap();
+    }
+
+    private void SyncSwap()
+    {
+        PseudoClasses.Set(":can-swap", CanSwap);
+        PseudoClasses.Set(":swapped", CanSwap && IsSwapped);
+        if (CanSwap) Height = IsSwapped ? 40 : double.NaN;
+    }
+
+    protected override void OnPointerReleased(PointerReleasedEventArgs e)
+    {
+        base.OnPointerReleased(e);
+        if (!CanSwap || !IsEnabled) return;
+        if (e.InitialPressMouseButton != MouseButton.Left) return;
+        // 原逻辑只在标题区域（折叠高 40 / 展开时 34）响应点击（MyCard.vb L285–L316）
+        if (e.GetPosition(this).Y > (IsSwapped ? 40 : 34)) return;
+        IsSwapped = !IsSwapped;
+    }
+}
+
+/// <summary>
+/// 输入框，对齐 `pcl-next/Application.xaml` 的 MyTextBox 样式：
+/// 1px 边框 ColorBrushBg0、背景 #55FFFFFF、圆角 3、字号 13、文字颜色 ColorBrush1。
+/// `HintText` 为 WPF 自定义占位文案属性，此处映射到 Avalonia 原生 `Watermark`。
+/// </summary>
+public class MyTextBox : TextBox
+{
+    public static readonly StyledProperty<string?> HintTextProperty =
+        AvaloniaProperty.Register<MyTextBox, string?>(nameof(HintText));
+
+    public string? HintText
+    {
+        get => GetValue(HintTextProperty);
+        set => SetValue(HintTextProperty, value);
+    }
+
+    protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
+    {
+        base.OnPropertyChanged(change);
+        if (change.Property == HintTextProperty) Watermark = HintText;
     }
 }
 
@@ -76,14 +141,6 @@ public class MyButton : Button
             Classes.Set("red", ColorType == MyButtonColor.Red);
         }
     }
-}
-
-/// <summary>
-/// 输入框，对齐 `pcl-next/Application.xaml` 的 MyTextBox 样式：
-/// 1px 边框 ColorBrushBg0、背景 #55FFFFFF、圆角 3、字号 13、文字颜色 ColorBrush1。
-/// </summary>
-public class MyTextBox : TextBox
-{
 }
 
 /// <summary>

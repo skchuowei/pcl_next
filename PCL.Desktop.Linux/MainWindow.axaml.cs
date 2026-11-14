@@ -35,7 +35,8 @@ public partial class MainWindow : Window
     private readonly PageLaunchRightView _launchRight;
     private readonly PageSelectLeftView _selectLeft;
     private readonly PageSelectRightView _selectRight;
-    private MyPageLeft? _setupLeftPage;
+    private PageSetupLeftView? _setupLeftPage;
+    private PageSetupLaunchView? _setupLaunchPage;
     private CancellationTokenSource? _leftWidthAnimation;
 
     public MainWindow()
@@ -124,9 +125,14 @@ public partial class MainWindow : Window
                 PageRight.Content = _linkPage;
                 break;
             case 3:
-                _setupLeftPage ??= new PageSetupLeftView();
+                if (_setupLeftPage is null)
+                {
+                    _setupLeftPage = new PageSetupLeftView();
+                    _setupLeftPage.PageChanged += (_, id) => ShowSetupPage(id);
+                }
                 PageLeft.Content = _setupLeftPage;
-                PageRight.Content = null;
+                // 设置栈默认子页 = 启动（`PageSetupLeft.xaml.vb` L20–L30 / L44–L55）
+                ShowSetupPage(_setupLeftPage.PageId);
                 // 页面刚挂上，等布局跑完再取宽度并播放逐个进入动画（对应 Windows 端 `TriggerShowAnimation`）
                 Dispatcher.UIThread.Post(() =>
                 {
@@ -146,6 +152,20 @@ public partial class MainWindow : Window
         }
 
         UpdateLeftBackgroundWidth();
+    }
+
+    /// <summary>
+    /// 设置栈子页切换（对应 `PageSetupLeft.xaml.vb` L93–L122 `PageChange`）：
+    /// 0 启动（已移植）/ 1 联机（已移植）/ 2 个性化、3 其他待补（宿主置空，R20）。
+    /// </summary>
+    private void ShowSetupPage(int pageId)
+    {
+        PageRight.Content = pageId switch
+        {
+            0 => _setupLaunchPage ??= new PageSetupLaunchView(),
+            1 => _linkPage,
+            _ => null
+        };
     }
 
     /// <summary>

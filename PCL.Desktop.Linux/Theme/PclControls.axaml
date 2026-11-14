@@ -297,6 +297,27 @@
                             <ContentPresenter Name="PART_Content"
                                               Content="{TemplateBinding Content}"
                                               ContentTemplate="{TemplateBinding ContentTemplate}" />
+                            <!-- 折叠箭头（MyCard.vb L88–L94）：10×6、Margin 0,17,16,0、
+                                 展开 180°（向上）/ 折叠 0°（向下），250ms -->
+                            <Path Name="PART_Swap"
+                                  Width="10" Height="6"
+                                  Margin="0,17,16,0"
+                                  HorizontalAlignment="Right" VerticalAlignment="Top"
+                                  Stretch="Uniform"
+                                  Fill="{DynamicResource ColorBrush1}"
+                                  Data="M2,4 l-2,2 10,10 10,-10 -2,-2 -8,8 -8,-8 z"
+                                  RenderTransformOrigin="0.5,0.5"
+                                  IsVisible="False" IsHitTestVisible="False">
+                                <Path.RenderTransform>
+                                    <RotateTransform Angle="180" />
+                                </Path.RenderTransform>
+                                <Path.Transitions>
+                                    <Transitions>
+                                        <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.25" />
+                                        <BrushTransition Property="Fill" Duration="0:0:0.09" />
+                                    </Transitions>
+                                </Path.Transitions>
+                            </Path>
                         </Grid>
                     </Grid>
                 </ControlTemplate>
@@ -309,6 +330,19 @@
     </Style>
     <Style Selector="c|MyCard:pointerover /template/ TextBlock#PART_Title">
         <Setter Property="Foreground" Value="{DynamicResource ColorBrush2}" />
+    </Style>
+    <Style Selector="c|MyCard:pointerover /template/ Path#PART_Swap">
+        <Setter Property="Fill" Value="{DynamicResource ColorBrush2}" />
+    </Style>
+    <!-- 折叠：箭头出现，内容隐藏，箭头转正（MyCard.vb L86–L103） -->
+    <Style Selector="c|MyCard:can-swap /template/ Path#PART_Swap">
+        <Setter Property="IsVisible" Value="True" />
+    </Style>
+    <Style Selector="c|MyCard:swapped /template/ Path#PART_Swap">
+        <Setter Property="RenderTransform" Value="rotate(0deg)" />
+    </Style>
+    <Style Selector="c|MyCard:swapped /template/ ContentPresenter#PART_Content">
+        <Setter Property="IsVisible" Value="False" />
     </Style>
 
     <!-- ===== MyButton ===== -->
