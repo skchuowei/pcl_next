@@ -45,15 +45,23 @@
       **不能执行 git 命令**，提交数算不出来。所以由 scripts\Get-BuildSmallVersion.ps1
       把运行期算好的值落盘，求值期只读文件。
 
-      刷新时机（三处，见脚本 .PARAMETER CacheFile）：
+      刷新时机（四处）：
         · scripts\Build.ps1 构建前       —— 本地验证构建
         · CI workflow 构建前             —— 保证发布构建的目录名精确
         · post-commit 钩子               —— 提交后立即正确，IDE 里直接编译也准
+        · 每次构建成功结束（PclBuildSeqBump）—— 本机编译次数 +1，下一次编译换新编号（2026-11-14）
       缓存缺失（如新克隆仓库）时 PclBuildSmall 为空，目录名退化为纯版本名；
       下一次任一路径刷新后自动补上，不会长期缺段。
     -->
     <PclBuildCacheFile>$(MSBuildThisFileDirectory)pcl-next/obj/pcl-build.small</PclBuildCacheFile>
     <PclBuildSmall Condition="'$(PclBuildSmall)' == '' AND Exists('$(PclBuildCacheFile)')">$([System.IO.File]::ReadAllText('$(PclBuildCacheFile)').Trim())</PclBuildSmall>
+    <!--
+      2026-11-14：构建号改为「(提交数 + 本机累计编译次数) × 0.01」，每次编译 +0.01
+      （脚本 obj\pcl-build.seq 计数，构建结束时由 pcl-next.csproj 的 PclBuildSeqBump 递增）。
+      发布构建必须让同一 commit 的 x64 / arm64 共用同一个编号，并让发布号回到纯提交语义，
+      因此检测到 PublishProfile 时自动关闭递增（命令行也可显式 -p:PclNoBump=true）。
+    -->
+    <PclNoBump Condition="'$(PclNoBump)' == '' AND '$(PublishProfile)' != ''">true</PclNoBump>
 
     <!--
       产物目录里使用的版本段：版本名 + 构建号，形如 2.100.0.3-0.20。

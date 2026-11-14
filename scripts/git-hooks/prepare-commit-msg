@@ -5,8 +5,9 @@
 # 在新历史里不可达。锚点不可达时改用 scripts/build-number.base 的继承基数
 # （Windows 65 / Linux 71 / Android 60），与 scripts/Get-BuildSmallVersion.ps1
 # 的「root+base」退化分支同源：
-#   当前编号   = base + max(0, rev-list --count HEAD - 1)
-#   本次提交编号 = base + rev-list --count HEAD   （HEAD 是提交前的计数）
+#   当前编号   = base + max(0, rev-list --count HEAD - 1) + 本机编译次数
+#   本次提交编号 = base + rev-list --count HEAD            + 本机编译次数（HEAD 是提交前的计数）
+# 2026-11-14 起编号再叠加 pcl-next/obj/pcl-build.seq 的本机累计编译次数（每次编译 +0.01）。
 # 锚点可达（旧仓库 / 完整克隆）时保持原语义，不叠加基数。
 # 本次提交自身的序号与编译期脚本在提交后算出的值一致。
 #
@@ -51,8 +52,21 @@ else
     COUNT=$((BASE + ROOTCOUNT))
 fi
 
+# 本机累计编译次数（2026-11-14 用户裁决「每次编译都要加 0.01」）：
+#   编号 = 提交数 + 编译次数，与 scripts/Get-BuildSmallVersion.ps1 完全同源。
+# 计数存在 pcl-next/obj/pcl-build.seq（每次构建成功结束后 +1），读不到按 0 处理。
+TOP=$(git rev-parse --show-toplevel 2>/dev/null)
+SEQ=0
+if [ -n "$TOP" ] && [ -f "$TOP/pcl-next/obj/pcl-build.seq" ]; then
+    RAWSEQ=$(tr -d '[:space:]' < "$TOP/pcl-next/obj/pcl-build.seq")
+    case "$RAWSEQ" in
+        ''|*[!0-9]*) SEQ=0 ;;
+        *) SEQ=$RAWSEQ ;;
+    esac
+fi
+COUNT=$((COUNT + SEQ))
+
 MAJOR=$((COUNT / 100))
 MINOR=$((COUNT % 100))
 SMALL=$(printf '%d.%02d' "$MAJOR" "$MINOR")
-
 printf '\nBuild: %s\n' "$SMALL" >> "$MSGFILE"

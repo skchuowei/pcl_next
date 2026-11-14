@@ -140,7 +140,8 @@ bin-net10\<开发代号>\<版本名>-<构建号>\<运行环境>\
 - `<开发代号>`：与 `pcl-next.vbproj` 的 `PclChannel` 大小写一致，取 `Dev` / `Slush` / `Alpha` / `Beta` / `Rc` / `Snapshot`。
 - `<版本名>-<构建号>`：`ModBase.VersionBaseName` + 构建小版本（§5.2.1），如 `2.100.0.3-0.20`。
   **构建号必须出现在目录名里**：同一个版本名会被连续提交反复编译，只按版本名分目录会互相覆盖，
-  事后无法判断某个目录里到底是哪次提交编的。构建号单调递增（自固定锚点以来提交数 × 0.01），
+  事后无法判断某个目录里到底是哪次提交编的。构建号单调递增（(自固定锚点以来提交数 + 本机累计编译次数) × 0.01，
+  2026-11-14 起每次编译 +0.01），
   所以「后编的目录名一定比先编的大」，一眼就能分辨新旧。
   构建号由 `pcl-next\obj\pcl-build.small` 提供（MSBuild 求值期读文件，不跑 git），
   刷新时机见 §0.3.2。
@@ -265,6 +266,14 @@ MSBuild 的属性求值发生在所有 Target 之前，那个阶段只能调用�
 | 本地验证构建 | `scripts\Build.ps1` 开头 | 构建前先落盘，目录名当次即准 |
 | CI 构建 / 发布 | workflow 的 `Refresh build number cache` 步骤 | 保证 CI 目录名与制品名同源 |
 | `git commit` 成功后 | `post-commit` 钩子 | 提交后立即正确，IDE 里直接编译也准 |
+| 每次构建成功结束 | `pcl-next.csproj` 的 `PclBuildSeqBump` 目标 | `obj\pcl-build.seq` +1，**下一次编译换新号**（2026-11-14） |
+
+- **口径（2026-11-14 起）**：构建号 = (提交数 + 本机累计编译次数) × 0.01，
+  每次编译 +0.01。计数只在构建**成功结束**时 +1（一次构建只加一次），
+  本次构建的目录名 / `AssemblyInformationalVersion` / 制品名仍由同一份缓存决定，
+  不会脱钩。发布构建必须 `-p:PclNoBump=true`（双 RID 同号 + 回到纯提交语义）。
+  跨机器核对产物看 `BuildCommitFull` / `BuildContentId` / `BuildUuid`，不要拿 `M.mm` 跨机器比。
+  唯一真源见《分支与发布规范》§5.2.1；专项计划见 `docs/plans/计划-构建号每次编译递增.md`。
 
 - 钩子安装：`scripts\Install-GitHooks.ps1`（同时装 `prepare-commit-msg` 与 `post-commit`）。
 - 缓存缺失时（新克隆仓库、还没跑过任何脚本）目录名退化为纯版本名，第一次 `Build.ps1` / `post-commit`
@@ -475,9 +484,10 @@ ReleaseArtifacts/<开发代号>/<版本名>/<运行环境>/
    - 提交信息**末尾必须有一行** `Build: <M.mm>`，用于事后判断某个 exe 是否包含这次推送；
    - 该值由 `scripts/Install-GitHooks.ps1` 安装的 `prepare-commit-msg` 钩子自动追加，
      装了钩子就不用管；未装钩子时必须手工执行 `scripts/Get-BuildSmallVersion.ps1` 补写；
-   - 值由 `scripts\build-number.base` 的继承编号（Windows 65 / Linux 71 / Android 60）叠加基线提交数推导，
+   - 值由 `scripts\build-number.base` 的继承编号（Windows 65 / Linux 71 / Android 60）叠加基线提交数，
+     再叠加本机累计编译次数（`pcl-next\obj\pcl-build.seq`）推导，2026-11-14 起**每次编译 +0.01**；
      **禁止手工编造或复用旧值**；原固定锚点 `v2.100.0.1-dev.1` 在 2026-11-08 三仓库架构下已不可达（§0.3.2）。
-     编号严格单调——后提交的产物一定大于先提交的，打新发布标签不归零；
+     编号严格单调——后编译的产物一定大于先编译的，打新发布标签不归零；
    - 构建产物会自动把同一编号写进 `AssemblyInformationalVersion`、启动日志、关于页，
      并另存一份 `PCL-Next-<版本名>-<代号>-<构建号>.exe`，
      发布制品必须来自干净工作树（否则带 `.dirty` 后缀，视为不可发布）。

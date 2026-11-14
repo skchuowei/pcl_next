@@ -209,7 +209,7 @@
   </Target>
   <!--
     构建小版本（《分支与发布规范》§5.2.1）：
-    编译前根据 git 状态推导「自本周期起点以来的提交数 × 0.01」，生成 obj\PclBuildInfo.g.cs，
+    编译前根据 git 状态推导「(自本周期起点以来的提交数 + 本机累计编译次数) × 0.01」，生成 obj\PclBuildInfo.g.cs，
     内含 AssemblyInformationalVersion 与 PclBuildInfoGenerated 数据类，
     使任何一份产物都能反查到构建时的提交（exe 属性 → 详细信息 → 产品版本）。
 
@@ -248,5 +248,23 @@
   </Target>
   <Target Name="PclVersionedArtifactPublish" AfterTargets="Publish" Condition="'$(PublishDir)' != ''">
     <Exec Command="powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\scripts\Copy-VersionedArtifact.ps1&quot; -ExePath &quot;$(PublishDir)$(AssemblyName).exe&quot; -Channel &quot;$(PclChannel)&quot;&#xD;&#xA;" IgnoreExitCode="true" StandardOutputImportance="low" StandardErrorImportance="low" />
+  </Target>
+  <!--
+    构建号「每次编译 +0.01」（2026-11-14 用户裁决，规则见《分支与发布规范》§5.2.1）：
+    构建**成功结束后**把本机累计编译次数加 1 并写回 obj\pcl-build.seq / pcl-build.small，
+    下一次编译换用下一个编号，同一提交下反复编译不再共用同一个 M.mm。
+
+    为什么放在「结束」而不是「开始」：
+    目录名（OutputPath）在 MSBuild **属性求值期**就定下了，那之前无法执行 git / 脚本；
+    若在编译中途改缓存，会出现「目录是 1.22、exe 里写着 1.23」的脱钩。
+    结束时递增，本次构建的三个落点（目录名、AssemblyInformationalVersion、制品名）
+    仍由同一份缓存决定，下一次构建才换号，三者永远同源。
+
+    发布构建必须传 -p:PclNoBump=true：同一 commit 的 x64 / arm64 两个制品要共用同一个编号，
+    且发布号要回到纯提交语义（与 tag 对齐）；Directory.Build.props 检测到 PublishProfile 时
+    也会自动置 PclNoBump=true。
+  -->
+  <Target Name="PclBuildSeqBump" AfterTargets="PclVersionedArtifact" Condition="'$(PclNoBump)' != 'true'">
+    <Exec Command="powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\scripts\Get-BuildSmallVersion.ps1&quot; -RepoRoot &quot;$(MSBuildProjectDirectory)\..&quot; -BumpSeq" IgnoreExitCode="true" StandardOutputImportance="low" StandardErrorImportance="low" />
   </Target>
 </Project>

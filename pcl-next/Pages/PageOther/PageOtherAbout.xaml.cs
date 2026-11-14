@@ -33,7 +33,7 @@ namespace PCL
 
             this.ItemAboutPcl.Info = this.ItemAboutPcl.Info.Replace("%VERSION%", ModBase.VersionDisplay).Replace("%VERSIONCODE%", ModBase.VersionCode.ToString()).Replace("%BRANCH%", ((int)ModBase.BuildType).ToString());
             // 构建版本：用于判断这份 exe 是否包含某次提交（规则见《分支与发布规范》§5.2.1）
-            string buildInfo = $"{ModBuildInfo.BuildSmall} · #{ModBuildInfo.BuildCommit} · 第 {ModBuildInfo.BuildCommitCount} 个提交 · 内容 {ModBuildInfo.BuildContentId}";
+            string buildInfo = $"{ModBuildInfo.BuildSmall} · #{ModBuildInfo.BuildCommit} · 第 {ModBuildInfo.BuildCommitCount} 个提交 · 本机第 {ModBuildInfo.BuildSeq} 次编译 · 内容 {ModBuildInfo.BuildContentId}";
             if (ModBuildInfo.BuildIsDirty)
                 buildInfo += " · 含未提交改动";
             this.ItemAboutBuild.Info = buildInfo;

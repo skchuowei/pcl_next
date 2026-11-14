@@ -2,12 +2,13 @@
 namespace PCL
 {
     /// <summary>
-/// 构建小版本：把「这份产物编译自哪个提交」写进程序，用于事后判断某个 exe 是否包含某次推送。
+/// 构建小版本：把「这份产物编译自哪个提交、本机第几次编译」写进程序，用于事后判断某个 exe 是否包含某次推送。
 /// <para>
-/// 规则见《分支与发布规范》§5.2.1：构建小版本 = 自<strong>固定锚点</strong>以来的提交数 × 0.01，
-/// 写成 M.mm（满 100 进 1）。锚点是首个 dev 发布（v2.100.0.1-dev.1）的提交，永不移动，
-/// 因此编号随提交单调递增——<strong>后提交的产物编号一定大于先提交的</strong>，
-/// 打新的发布标签也不会归零。数据由 <c>scripts\Get-BuildSmallVersion.ps1</c> 在编译前生成，
+/// 规则见《分支与发布规范》§5.2.1：构建小版本 = (自<strong>固定锚点</strong>以来的提交数 +
+/// 本机累计编译次数) × 0.01，写成 M.mm（满 100 进 1）。锚点是首个 dev 发布
+/// （v2.100.0.1-dev.1）的提交，永不移动；编译次数每次构建成功结束 +1（2026-11-14 用户裁决）。
+/// 因此同一提交下反复编译也各有编号，<strong>后编译的产物编号一定大于先编译的</strong>。
+/// 数据由 <c>scripts\Get-BuildSmallVersion.ps1</c> 在编译前生成，
 /// 见 <see cref="PclBuildInfoGenerated"/>。
 /// </para>
 /// <para>
@@ -17,14 +18,17 @@ namespace PCL
     public static class ModBuildInfo
     {
 
-        /// <summary>构建小版本，形如 2.27（锚点以来第 227 个提交）。无 git 时为 0.00。</summary>
+        /// <summary>构建小版本，形如 2.27（提交数 + 本机编译次数）。无 git 时为 0.00。</summary>
         public static string BuildSmall { get; private set; } = PCL.PclBuildInfoGenerated.BuildSmall;
 
         /// <summary>
-    /// 构建小版本的数值形式（等于锚点以来的提交数）。
+    /// 构建小版本的数值形式（= 提交数 + 本机累计编译次数）。
     /// 比较新旧必须用它：M.mm 是显示形式，字符串比较会把 <c>10.00</c> 判成小于 <c>2.00</c>。
     /// </summary>
         public static int BuildSmallNumber { get; private set; } = PCL.PclBuildInfoGenerated.BuildSmallNumber;
+
+        /// <summary>本机累计编译次数（2026-11-14 起参与编号：每次编译 +0.01）。</summary>
+        public static int BuildSeq { get; private set; } = PCL.PclBuildInfoGenerated.BuildSeq;
 
         /// <summary>构建时的提交短哈希（7 位）。无 git 时为 nogit。</summary>
         public static string BuildCommit { get; private set; } = PCL.PclBuildInfoGenerated.BuildCommit;

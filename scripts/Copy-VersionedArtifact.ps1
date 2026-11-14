@@ -53,13 +53,25 @@ if ($clrRva -ne 0) {
 $version = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($ExePath).FileVersion
 if ([string]::IsNullOrWhiteSpace($version)) { $version = '0.0.0.0' }
 
-# 构建号：与编译期写进 AssemblyInformationalVersion 的是同一个来源，不会漂
-$info = (& "$PSScriptRoot\Get-BuildSmallVersion.ps1" -Json) | ConvertFrom-Json
-$buildSmall = $info.BuildSmall
+# 构建号：优先读产物自身 ProductVersion（= AssemblyInformationalVersion，形如
+# 1.22.gaa500fa.c6295e4652f84.dirty），取开头的 M.mm —— 这样制品名与 exe 里的标识
+# **必然一致**；2026-11-14 起构建号每次编译 +0.01，缓存会在构建结束时预置下一次的编号，
+# 若在这里读缓存，Publish 阶段的副本就会拿到「下一个号」而与 exe 里的号脱钩。
+# 读不到 ProductVersion（老产物 / 非本工程 exe）时退回脚本取值，保持旧行为。
+$prodVersion = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($ExePath).ProductVersion
+$buildSmall = ''
+$dirtyTag = ''
+if ($prodVersion -match '^(\d+\.\d{2})\.') { $buildSmall = $Matches[1] }
+if ($prodVersion -and $prodVersion.EndsWith('.dirty')) { $dirtyTag = '-dirty' }
+if ([string]::IsNullOrWhiteSpace($buildSmall)) {
+    # 退回脚本取值（老产物 / 非本工程产出的 exe）
+    $info = (& "$PSScriptRoot\Get-BuildSmallVersion.ps1" -Json) | ConvertFrom-Json
+    $buildSmall = $info.BuildSmall
+    if ($info.Dirty) { $dirtyTag = '-dirty' }
+}
+if ([string]::IsNullOrWhiteSpace($buildSmall)) { $buildSmall = '0.00' }
 
 $code = $Channel.ToLowerInvariant()
-$dirtyTag = ''
-if ($info.Dirty) { $dirtyTag = '-dirty' }
 
 $name = "PCL-Next-$version-$code-$buildSmall$dirtyTag.exe"
 $dest = Join-Path (Split-Path -Parent $ExePath) $name
