@@ -40,7 +40,7 @@ namespace PCL
     /// </summary>
         public static ModLaunch.McLoginServer GetLoginData()
         {
-            string Server = (ModMinecraft.McInstanceSelected == null ? Settings.Get<string>("CacheAuthServerServer") : Settings.Get<string>("VersionServerAuthServer", Instance: ModMinecraft.McInstanceSelected)) + "/authserver";
+            string Server = ModMinecraft.McAuthServerGet() + "/authserver";
             return new ModLaunch.McLoginServer(ModLaunch.McLoginType.Auth) { Token = "Auth", BaseUrl = Server, UserName = Settings.Get<string>("CacheAuthUsername"), Password = Settings.Get<string>("CacheAuthPass"), Description = "Authlib-Injector", Type = ModLaunch.McLoginType.Auth };
         }
 

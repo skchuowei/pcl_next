@@ -107,19 +107,38 @@ namespace PCL
         /// </summary>
         private static string GetServerDisplay(string InstanceKey, string CacheKey)
         {
+            string Result = "";
             try
             {
                 var Instance = ModMinecraft.McInstanceSelected;
                 if (Instance is not null)
-                    return Settings.Get<string>(InstanceKey, Instance) ?? "";
+                    Result = Settings.Get<string>(InstanceKey, Instance) ?? "";
             }
             catch (Exception ex)
             {
                 Logger.Warn(ex, "读取版本服务器设置失败：" + InstanceKey);
             }
+            // 版本独立设置为空时继续读全局缓存，不能直接返回空串，
+            // 否则新建版本没填过服务器，列表里就永远看不到实际使用的验证服务器。
+            if (!string.IsNullOrEmpty(Result))
+                return Result;
             try
             {
-                return Settings.Get<string>(CacheKey) ?? "";
+                Result = Settings.Get<string>(CacheKey) ?? "";
+                // Authlib 未显式保存服务器名时展示默认验证服务器的主机名，
+                // 避免列表里只显示「第三方（Authlib）」而看不出实际连的是哪个服务器
+                if (string.IsNullOrEmpty(Result) && CacheKey == "CacheAuthServerName")
+                {
+                    try
+                    {
+                        return new Uri(ModMinecraft.McAuthServerGet()).Host;
+                    }
+                    catch
+                    {
+                        return "";
+                    }
+                }
+                return Result;
             }
             catch (Exception ex)
             {
@@ -259,6 +278,90 @@ namespace PCL
             {
                 Logger.Warn(ex, "修正当前账号状态失败");
             }
+        }
+
+        /// <summary>重命名离线账号（原地替换，保持列表顺序）。返回空字符串表示成功，否则为错误提示。</summary>
+        public static string Rename(AccountEntry Entry, string NewName)
+        {
+            if (Entry is null)
+                return "账号不存在";
+            if (Entry.Type != ModLaunch.McLoginType.Legacy)
+                return "只有离线账号支持修改玩家名";
+            NewName = (NewName ?? "").Replace("¨", "").Trim();
+            if (string.IsNullOrEmpty(NewName))
+                return "玩家名不能为空";
+            if (NewName == Entry.Name)
+                return "";
+            var Names = SplitList("LoginLegacyName");
+            int Index = Names.FindIndex(p => p.Trim() == Entry.Name.Trim());
+            if (Index < 0)
+                return "账号已不存在，请刷新后重试";
+            if (Names.Where((p, i) => i != Index).Any(p => p.Trim() == NewName))
+                return "已存在同名账号";
+            Names[Index] = NewName;
+            Settings.Set("LoginLegacyName", string.Join("¨", Names));
+            ModMain.FrmLoginLegacy?.Reload(false);
+            ModMain.FrmLaunchLeft?.RefreshPage(false, true);
+            return "";
+        }
+
+        /// <summary>修改 Authlib / 统一通行证的登录密码（原地替换，保持账号与密码列表不错位）。</summary>
+        public static string SetPassword(AccountEntry Entry, string NewPassword)
+        {
+            if (Entry is null)
+                return "账号不存在";
+            if (Entry.Type != ModLaunch.McLoginType.Auth && Entry.Type != ModLaunch.McLoginType.Nide)
+                return "该账号类型不支持修改密码";
+            NewPassword = (NewPassword ?? "").Replace("¨", "");
+            if (string.IsNullOrEmpty(NewPassword))
+                return "密码不能为空";
+            string NameKey = Entry.Type == ModLaunch.McLoginType.Auth ? "LoginAuthEmail" : "LoginNideEmail";
+            string PassKey = Entry.Type == ModLaunch.McLoginType.Auth ? "LoginAuthPass" : "LoginNidePass";
+            var Names = SplitList(NameKey);
+            var Passes = SplitList(PassKey);
+            int Index = Names.FindIndex(p => p.Trim() == Entry.Name.Trim());
+            if (Index < 0)
+                return "账号已不存在，请刷新后重试";
+            while (Passes.Count <= Index)
+                Passes.Add("");
+            Passes[Index] = NewPassword;
+            while (Passes.Count > Names.Count)
+                Passes.RemoveAt(Passes.Count - 1);
+            Settings.Set(PassKey, string.Join("¨", Passes));
+            if (Entry.Type == ModLaunch.McLoginType.Auth)
+                ModMain.FrmLoginAuth?.Reload(false);
+            else
+                ModMain.FrmLoginNide?.Reload(false);
+            ModMain.FrmLaunchLeft?.RefreshPage(false, true);
+            return "";
+        }
+
+        /// <summary>
+        /// 保存 Authlib 验证服务器：清掉上一个服务器的登录与皮肤缓存，
+        /// 否则切换服务器后还会继续用旧 UUID 取皮肤/校验令牌。
+        /// </summary>
+        public static string SetAuthServer(string Server)
+        {
+            Server = (Server ?? "").Trim().TrimEnd('/');
+            if (!Uri.TryCreate(Server, UriKind.Absolute, out var Parsed) ||
+                (Parsed.Scheme != "http" && Parsed.Scheme != "https"))
+                return "请输入完整的 http/https 服务器地址";
+            string OldServer = (Settings.Get<string>("CacheAuthServerServer") ?? "").Trim().TrimEnd('/');
+            Settings.Set("CacheAuthServerServer", Server);
+            Settings.Set("CacheAuthServerName", Parsed.Host);
+            if (string.IsNullOrEmpty(Settings.Get<string>("CacheAuthServerRegister")))
+                Settings.Set("CacheAuthServerRegister", Parsed.GetLeftPart(UriPartial.Authority) + "/auth/register");
+            if (OldServer != Server)
+            {
+                Settings.Set("CacheAuthAccess", "");
+                Settings.Set("CacheAuthClient", "");
+                Settings.Set("CacheAuthUuid", "");
+                Settings.Set("CacheAuthName", "");
+                Settings.Set("CacheAuthPass", "");
+            }
+            ModMain.FrmLoginAuth?.Reload(false);
+            ModMain.FrmLaunchLeft?.RefreshPage(false, true);
+            return "";
         }
 
         /// <summary>删除账号（仅移除本地登录记录，不注销远程账号）。</summary>

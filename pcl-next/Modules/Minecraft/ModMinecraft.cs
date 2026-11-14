@@ -1894,6 +1894,40 @@ namespace PCL
         }
 
         /// <summary>
+        /// 当前生效的 Authlib-Injector 验证服务器地址。
+        /// 与社区版一致，未配置时回退到 LittleSkin，避免账号已保存但服务器为空时
+        /// 拼出 "/authserver" 这种非法相对地址（登录与皮肤请求都会因此直接失败）。
+        /// </summary>
+        public static string McAuthServerGet()
+        {
+            string Server = "";
+            try
+            {
+                Server = McInstanceSelected is null
+                    ? Settings.Get<string>("CacheAuthServerServer")
+                    : Settings.Get<string>("VersionServerAuthServer", Instance: McInstanceSelected);
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn(ex, "读取第三方验证服务器失败，回退到缓存设置");
+            }
+            if (string.IsNullOrEmpty(Server))
+            {
+                try
+                {
+                    Server = Settings.Get<string>("CacheAuthServerServer");
+                }
+                catch
+                {
+                    Server = "";
+                }
+            }
+            if (string.IsNullOrWhiteSpace(Server))
+                Server = "https://littleskin.cn/api/yggdrasil";
+            return Server.Trim().TrimEnd('/');
+        }
+
+        /// <summary>
     /// 获取 Uuid 对应的皮肤文件地址，失败将抛出异常。
     /// </summary>
         public static string McSkinGetAddress(string UUID, string Type)
@@ -1923,7 +1957,7 @@ namespace PCL
                     }
                 case "Auth":
                     {
-                        Url = (McInstanceSelected is null ? Settings.Get<string>("CacheAuthServerServer") : Settings.Get<string>("VersionServerAuthServer", Instance: McInstanceSelected)) + "/sessionserver/session/minecraft/profile/";
+                        Url = McAuthServerGet() + "/sessionserver/session/minecraft/profile/";
                         break;
                     }
 

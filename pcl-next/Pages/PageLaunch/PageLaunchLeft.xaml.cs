@@ -55,6 +55,10 @@ namespace PCL
             this.BtnLoginConfirm.Click += (p1, p2) => ConfirmLogin();
             this.PanLaunchingInfo.SizeChanged += (p1, p2) => PanLaunchingInfo_SizeChangedW((object)p1, (SizeChangedEventArgs)p2);
             this.PanLaunchingInfo.SizeChanged += (p1, p2) => PanLaunchingInfo_SizeChangedH((object)p1, (SizeChangedEventArgs)p2);
+            // 皮肤下载是异步的：启动页与设置页都不再使用 FrmLogin*Skin 的预览控件，
+            // 必须监听加载器完成事件，否则头像会一直停在「下载中」时用的默认 Steve/Alex。
+            foreach (var Loader in SkinLoaders)
+                Loader.OnStateChangedUi += SkinLoader_StateChanged;
             this.Loaded += (_, __) => PageLaunchLeft_Loaded();
         }
         public void PageLaunchLeft_Loaded()
@@ -645,6 +649,7 @@ namespace PCL
         // 完成态
         private void RenderCompact(AccountEntry Current)
         {
+            EnsureAccountSkin(Current);
             this.LabCompactName.Text = string.IsNullOrEmpty(Current?.Name) ? "未登录" : Current.Name;
             this.LabCompactInfo.Text = Current is null ? "" : Current.InfoText;
             string Head = Current is null ? "" : GetAccountHead(Current, Current, 128);
@@ -664,6 +669,8 @@ namespace PCL
         // 选择态
         private void RenderSelect(List<AccountEntry> Accounts, AccountEntry Current)
         {
+            // 先触发当前账号的皮肤加载，头像生成时会优先读取加载器输出
+            EnsureAccountSkin(Current);
             this.PanAccountList.Children.Clear();
             foreach (var Entry in Accounts)
             {
@@ -793,6 +800,10 @@ namespace PCL
                 int? Choice = ModMain.MyMsgBoxSelect(Options, "新建档案", "继续", "取消");
                 if (Choice is null)
                     return;
+                // 第三方验证必须先确定 Authlib-Injector 服务器，否则会拼出 "/authserver"，
+                // 登录和皮肤请求都会因为非法 URI 直接失败（与社区版新建档案的流程一致）
+                if (Choice.Value == 1 && !PromptAuthServer())
+                    return;
                 // 只影响本次显示，不写回 LoginType 设置
                 int[] PageTypes = { 1, 4, 2 };
                 _LoginPageTypeOverride = PageTypes[Choice.Value];
@@ -801,6 +812,40 @@ namespace PCL
             catch (Exception ex)
             {
                 Logger.Warn(ex, "打开新建档案对话框失败");
+            }
+        }
+
+        /// <summary>设置页「添加账号」入口：先切回启动页，再打开项目自带的新建档案弹窗。</summary>
+        public void OpenNewAccountDialog()
+        {
+            // 从设置页跳回启动页时，PageChange 已经完成但本控件可能还没触发 Loaded；
+            // 这里不能因为 IsLoaded == false 就直接 return，否则「添加账号」只会跳页、不弹窗。
+            if (AccountMode != AccountPanelMode.Select)
+                SwitchAccountMode(AccountPanelMode.Select);
+            OpenNewTypeDialog();
+        }
+
+        /// <summary>
+        /// 让用户确认 Authlib-Injector 验证服务器。返回 False 表示用户取消；
+        /// 地址非法时用项目自带输入弹窗重试，不会把非法地址写进设置。
+        /// </summary>
+        public static bool PromptAuthServer()
+        {
+            string Current = ModMinecraft.McAuthServerGet();
+            while (true)
+            {
+                string Input = ModMain.MyMsgBoxInput(
+                    "第三方验证服务器",
+                    "请输入 Authlib-Injector 验证服务器地址，例如 LittleSkin 的 https://littleskin.cn/api/yggdrasil。",
+                    Current,
+                    HintText: "https://littleskin.cn/api/yggdrasil");
+                if (Input is null)
+                    return false;
+                string Error = ModAccountList.SetAuthServer(Input);
+                if (string.IsNullOrEmpty(Error))
+                    return true;
+                ModMain.Hint(Error, ModMain.HintType.Red);
+                Current = Input;
             }
         }
 
@@ -979,7 +1024,7 @@ namespace PCL
         /// 当前账号皮肤已加载时优先用真实皮肤，否则退回内置的 Steve / Alex 默认皮肤；
         /// 头像由皮肤纹理的头部区域（基准层 8,8 + 帽子层 40,8）裁出，不做网络请求。
         /// </summary>
-        private static string GetAccountHead(AccountEntry Entry, AccountEntry Current, int Size)
+        public static string GetAccountHead(AccountEntry Entry, AccountEntry Current, int Size)
         {
             try
             {
@@ -991,6 +1036,10 @@ namespace PCL
                         Texture = SkinMs.Output;
                     else if (Entry.Type == ModLaunch.McLoginType.Legacy && SkinLegacy.State == ModBase.LoadState.Finished)
                         Texture = SkinLegacy.Output;
+                    else if (Entry.Type == ModLaunch.McLoginType.Nide && SkinNide.State == ModBase.LoadState.Finished)
+                        Texture = SkinNide.Output;
+                    else if (Entry.Type == ModLaunch.McLoginType.Auth && SkinAuth.State == ModBase.LoadState.Finished)
+                        Texture = SkinAuth.Output;
                 }
                 // 皮肤文件缺失时退回内置默认皮肤，保证每行都有头像
                 if (string.IsNullOrEmpty(Texture) || (!Texture.StartsWithF(ModBase.PathImage) && !FileUtils.Exists(Texture)))
@@ -1028,6 +1077,77 @@ namespace PCL
             {
                 Logger.Warn(ex, "生成账号头像失败：" + (Entry?.Name ?? ""));
                 return "";
+            }
+        }
+
+        private static readonly Dictionary<string, string> SkinInputSignatures = new Dictionary<string, string>();
+
+        /// <summary>
+        /// 启动当前账号对应的皮肤加载器。启动页完成态/选择态与设置页「我的账号」共用，
+        /// 否则第三方账号虽然拿到了 UUID，也永远不会去请求皮肤，只能一直显示默认头像。
+        /// 加载器完成后会把 Input 清空以强制下次重绘，因此这里不能每次都无条件 Start()，
+        /// 否则 Finished→刷新→Start 会变成死循环；只在输入真正变化或上次失败时启动。
+        /// </summary>
+        public static void EnsureAccountSkin(AccountEntry Entry)
+        {
+            if (Entry is null || string.IsNullOrEmpty(Entry.Name))
+                return;
+            try
+            {
+                switch (Entry.Type)
+                {
+                    case ModLaunch.McLoginType.Ms:
+                        EnsureSkin(SkinMs, Settings.Get<string>("CacheMsV2Name") + "|" + Settings.Get<string>("CacheMsV2Uuid"));
+                        break;
+                    case ModLaunch.McLoginType.Legacy:
+                        {
+                            var Input = SkinLegacyInput();
+                            EnsureSkin(SkinLegacy, Input.Item1 + "|" + Input.Item2);
+                            break;
+                        }
+                    case ModLaunch.McLoginType.Nide:
+                        EnsureSkin(SkinNide, Settings.Get<string>("CacheNideName") + "|" + Settings.Get<string>("CacheNideUuid"));
+                        break;
+                    case ModLaunch.McLoginType.Auth:
+                        EnsureSkin(SkinAuth, Settings.Get<string>("CacheAuthName") + "|" + Settings.Get<string>("CacheAuthUuid"));
+                        break;
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn(ex, "启动账号皮肤加载失败：" + Entry.Name);
+            }
+        }
+
+        private static void EnsureSkin(ModLoader.LoaderTask<(string, string), string> Loader, string Signature)
+        {
+            bool Changed = !SkinInputSignatures.TryGetValue(Loader.Name, out var Old) || Old != Signature;
+            if (!Changed && (Loader.State == ModBase.LoadState.Loading || Loader.State == ModBase.LoadState.Finished))
+                return;
+            SkinInputSignatures[Loader.Name] = Signature;
+            Loader.Start(IsForceRestart: Changed);
+        }
+
+        private void SkinLoader_StateChanged(ModLoader.LoaderBase Loader, ModBase.LoadState NewState, ModBase.LoadState OldState)
+        {
+            if (NewState != ModBase.LoadState.Finished || !this.IsLoaded)
+                return;
+            try
+            {
+                var Current = ModAccountList.GetCurrent();
+                if (Current is null || string.IsNullOrEmpty(Current.Name))
+                    return;
+                bool IsCurrentLoader =
+                    Current.Type == ModLaunch.McLoginType.Ms && Loader == SkinMs ||
+                    Current.Type == ModLaunch.McLoginType.Legacy && Loader == SkinLegacy ||
+                    Current.Type == ModLaunch.McLoginType.Nide && Loader == SkinNide ||
+                    Current.Type == ModLaunch.McLoginType.Auth && Loader == SkinAuth;
+                if (IsCurrentLoader)
+                    RefreshAccountPanel();
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn(ex, "刷新账号头像失败");
             }
         }
 

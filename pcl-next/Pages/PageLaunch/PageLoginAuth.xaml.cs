@@ -56,7 +56,7 @@ namespace PCL
     /// </summary>
         public static ModLaunch.McLoginServer GetLoginData()
         {
-            string Server = (ModMinecraft.McInstanceSelected == null ? Settings.Get<string>("CacheAuthServerServer") : Settings.Get<string>("VersionServerAuthServer", Instance: ModMinecraft.McInstanceSelected)) + "/authserver";
+            string Server = ModMinecraft.McAuthServerGet() + "/authserver";
             if (ModMain.FrmLoginAuth is null)
             {
                 // 完成态下登录页可能不存在，回退到已保存的当前账号，避免启动时被判成「账号不能为空」

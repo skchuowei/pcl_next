@@ -737,12 +737,18 @@ namespace PCL
         private bool IsMouseDown = false;
         private void Button_MouseDown(object sender, MouseButtonEventArgs e)
         {
-            if (this.IsMouseDirectlyOver && !(Type == CheckType.None))
+            if (!this.IsMouseDirectlyOver || Type == CheckType.None)
+                return;
+            // 右侧图标按钮所在区域不能当成整行点击：以前这里会把 ButtonStack 直接
+            // 设成 IsHitTestVisible = false，导致图标永远收不到 MouseUp，编辑/复制/删除
+            // 全部退化成「点击账号行」。现在只按横向位置区分，图标区域交给按钮自己处理。
+            if (ButtonStack is not null && Buttons is not null)
             {
-                IsMouseDown = true;
-                if (ButtonStack is not null)
-                    ButtonStack.IsHitTestVisible = false;
+                double ButtonAreaWidth = Buttons.Count() * 25d + 10d;
+                if (e.GetPosition(this).X >= this.ActualWidth - ButtonAreaWidth)
+                    return;
             }
+            IsMouseDown = true;
         }
         private void Button_MouseLeave(object sender, object e)
         {
