@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using Avalonia;
 using Avalonia.Animation;
@@ -35,6 +36,9 @@ public partial class MainWindow : Window
     private readonly PageLaunchRightView _launchRight;
     private readonly PageSelectLeftView _selectLeft;
     private readonly PageSelectRightView _selectRight;
+    private readonly PageDownloadLeftView _downloadLeft;
+    private readonly PageDownloadInstallView _downloadInstall;
+    private readonly Dictionary<int, PageResourceView> _downloadResourcePages = new();
     private PageSetupLeftView? _setupLeftPage;
     private PageSetupLaunchView? _setupLaunchPage;
     private PageSetupUIView? _setupUiPage;
@@ -78,11 +82,14 @@ public partial class MainWindow : Window
         _launchRight = new PageLaunchRightView();
         _selectLeft = new PageSelectLeftView();
         _selectRight = new PageSelectRightView();
+        _downloadLeft = new PageDownloadLeftView();
+        _downloadInstall = new PageDownloadInstallView();
         _linkPage = new PageSetupLinkView();
 
         _launchLeft.VersionSelectRequested += (_, _) => ShowStack(StackVersionSelect);
         _launchLeft.DownloadRequested += (_, _) => ShowStack(1);
         _selectRight.DownloadRequested += (_, _) => ShowStack(1);
+        _downloadLeft.PageChanged += (_, id) => ShowDownloadPage(id);
 
         // 栈切换（vb L1438–L1471）
         BtnTitleSelect0.Check += (_, on) => { if (on) ShowStack(0); };
@@ -107,7 +114,7 @@ public partial class MainWindow : Window
 
     /// <summary>
     /// 切换页面栈（vb L1438–L1471）。
-    /// 0 启动 / 2 联机 / 3 设置 已有页面；1 下载 / 4 更多 尚未移植（宿主置空，R20）；
+    /// 0 启动 / 1 下载 / 2 联机 / 3 设置 已有页面；4 更多 尚未移植（宿主置空，R20）；
     /// 5 = 版本选择次级栈（`PageType.InstanceSelect`，标题栏保持「启动」选中，与原逻辑一致）。
     /// </summary>
     private void ShowStack(int index)
@@ -121,6 +128,12 @@ public partial class MainWindow : Window
                 PageRight.Content = _launchRight;
                 // 页面刚挂上，等布局跑完再播放进入动画（对应 Windows 端 `TriggerShowAnimation`）
                 Dispatcher.UIThread.Post(() => _launchLeft.TriggerShowAnimation(), DispatcherPriority.Loaded);
+                break;
+            case 1:
+                PageLeft.Content = _downloadLeft;
+                PageRight.Content = _downloadInstall;
+                // 页面刚挂上，等布局跑完再播放进入动画（对应 Windows 端 `TriggerShowAnimation`）
+                Dispatcher.UIThread.Post(() => _downloadLeft.TriggerShowAnimation(), DispatcherPriority.Loaded);
                 break;
             case 2:
                 PageLeft.Content = null;
@@ -154,6 +167,40 @@ public partial class MainWindow : Window
         }
 
         UpdateLeftBackgroundWidth();
+    }
+
+    /// <summary>
+    /// 下载栈子页切换（对应 `PageDownloadLeft.xaml.vb` L59–L70 `PageChange`）：
+    /// 0 原版游戏；2 Mod / 3 整合包 / 4 数据包 / 5 资源包 / 6 光影包共用 `PageResourceView`（R40）。
+    /// </summary>
+    private void ShowDownloadPage(int pageId)
+    {
+        if (pageId == 0)
+        {
+            PageRight.Content = _downloadInstall;
+            return;
+        }
+
+        if (!_downloadResourcePages.TryGetValue(pageId, out var page))
+        {
+            ResourcePageKind? kind = pageId switch
+            {
+                2 => ResourcePageKind.Mod,
+                3 => ResourcePageKind.ModPack,
+                4 => ResourcePageKind.DataPack,
+                5 => ResourcePageKind.ResourcePack,
+                6 => ResourcePageKind.Shader,
+                _ => null
+            };
+            if (kind is null)
+            {
+                PageRight.Content = null;
+                return;
+            }
+            page = new PageResourceView(kind.Value);
+            _downloadResourcePages[pageId] = page;
+        }
+        PageRight.Content = page;
     }
 
     /// <summary>

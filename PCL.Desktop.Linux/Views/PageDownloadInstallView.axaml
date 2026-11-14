@@ -1,0 +1,510 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="using:PCL.Desktop.Linux.Controls"
+             x:Class="PCL.Desktop.Linux.Views.PageDownloadInstallView">
+
+    <!--
+      1:1 对照基准：pcl-next/Pages/PageDownload/PageDownloadInstall.xaml（全文 359 行）
+      外层：MyPageRight PanScroll="PanBack" → Grid
+        · PanAllBack：MyScrollViewer(Auto/Disabled) → Grid Margin 25,10,25,25
+          - PanMinecraft（版本列表容器，卡片由运行期注入，静态为空）
+          - PanSelect（安装配置子页，默认 Collapsed，结构按原 XAML 保留：名称卡 + 5 条提示 +
+            Minecraft / Forge / NeoForge / Fabric / Fabric API / OptiFine / OptiFabric / LiteLoader 八张 40 高折叠卡）
+          - BtnStart（「开始下载」胶囊按钮，仅在选择页显示）
+        · PanLoad：居中卡片，8 个 MyLoading（仅 LoadMinecraft 可见并带进度，其余 Collapsed）
+
+      静态状态：Linux 侧尚无下载服务，页面按 `PageLoaderInit` 的加载态呈现 ——
+      PanLoad 可见、PanAllBack 隐藏（`MyPageRight.vb` L87–L89）；版本列表与安装配置均由运行期数据驱动。
+
+      差异登记：
+      · R36 —— 下载服务未接入：版本列表（Minecraft 各版本卡片）与安装配置流程不生成；
+        刷新按钮、开始下载、返回选择页均为空操作；页面停留在「正在加载」
+      · R37 —— `MyImage` 位图源（pack://application:,,,/images/Blocks/*.png）在 Linux 项目内不存在，
+        以 18×18（LiteLoader 20、Minecraft 32）透明占位保留布局；接入图片资源后需还原
+      · R38 —— `MyCard.SwapLogoRight`（折叠箭头旋转基准 270°）在 Linux MyCard 无对应属性，
+        箭头统一按 180°/0° 呈现；`MyLoading.HasAnimation` 同样未实现（加载环初始动画差异）
+      · R39 —— `MyTextBox` 的 `HasBackground="False"` / `ShowValidateResult="False"` 与
+        `ValidateFolderName` 校验未接入；`MyCard.UseAnimation` 未实现（首帧无淡入）
+      · R27 —— MySlider 无数值提示 Popup；本页无滑块，仅作全局登记
+    -->
+
+    <Grid>
+        <Grid Name="PanAllBack" IsVisible="False">
+            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                          Name="PanBack">
+                <Grid Margin="25,10,25,25" Name="PanInner">
+                    <StackPanel Name="PanMinecraft" Margin="0,0,0,-10" />
+                    <StackPanel x:Name="PanSelect" IsVisible="False" Opacity="0" IsHitTestVisible="False"
+                                Margin="0,0,0,45">
+                        <c:MyCard x:Name="CardSelectName" Margin="0,15,0,15" MinHeight="62">
+                            <Grid>
+                                <c:MyIconButton HorizontalAlignment="Left" Opacity="0.6"
+                                                x:Name="BtnBack" Margin="13,0,0,0" Height="26" Width="26"
+                                                LogoScale="0.87"
+                                                VerticalAlignment="Center"
+                                                Logo="M1097 584 250 584 562 896C591 925 591 972 562 1001 533 1030 487 1030 458 1001L21 565C6 550-0 531 0 511L0 511 0 511C-0 492 6 472 21 457L458 21C487-7 533-7 562 21 591 50 591 97 562 126L250 438 1097 438C1137 438 1170 471 1170 511 1170 551 1137 584 1097 584L1097 584Z" />
+                                <!-- R37：ImgLogo 32×32 图片占位 -->
+                                <Border x:Name="ImgLogo" Margin="52,15,0,0" VerticalAlignment="Top"
+                                        HorizontalAlignment="Left" Height="32" Width="32"
+                                        Background="Transparent" />
+                                <c:MyTextBox Margin="93,16,16,0" Padding="-1,0" MinHeight="30" FontSize="15"
+                                             VerticalAlignment="Top" x:Name="TextSelectName"
+                                             MaxLength="70" />
+                                <TextBlock x:Name="LabSelectName" IsVisible="False" Height="21"
+                                           Margin="56,47,42,11" Padding="0,4,0,0" VerticalAlignment="Top"
+                                           FontSize="12.5" TextTrimming="CharacterEllipsis"
+                                           Foreground="{DynamicResource ColorBrushGray3}" />
+                                <c:MyIconButton x:Name="BtnOriginalNameRestore" IsVisible="False"
+                                                Height="30" Width="30" HorizontalAlignment="Right"
+                                                VerticalAlignment="Top" Margin="0,16,6,0" LogoScale="0.55"
+                                                ToolTip.Tip="撤销更改"
+                                                Logo="M9.83,3.17 A1.18,1.18 0 0 1 9.83,4.83 L6.85,7.82 H14.5 A6.68,6.68 0 0 1 14.5,21.18 H11 A1.18,1.18 0 0 1 11,18.82 H14.5 A4.32,4.32 0 0 0 14.5,10.18 H6.85 L9.83,13.17 A1.18,1.18 0 0 1 8.17,14.83 L3.17,9.83 A1.18,1.18 0 0 1 3.17,8.17 L8.17,3.17 A1.18,1.18 0 0 1 9.83,3.17 Z" />
+                            </Grid>
+                        </c:MyCard>
+                        <c:MyHint x:Name="HintSelectName" HintTheme="Red" IsVisible="False" />
+                        <c:MyHint Text="如果不安装 Fabric API，大多数 Mod 都会无法使用！" Margin="0,10,0,0"
+                                  x:Name="HintFabricAPI" HintTheme="Red" />
+                        <c:MyHint Text="必须安装 OptiFabric 才能正常使用 OptiFine！" Margin="0,10,0,0"
+                                  x:Name="HintOptiFabric" HintTheme="Red" />
+                        <c:MyHint Text="安装结束后，请在 Mod 下载中搜索 OptiFabric Origins 并下载，否则 OptiFine 会无法使用！"
+                                  Margin="0,10,0,0" x:Name="HintOptiFabricOld" HintTheme="Yellow" />
+                        <c:MyHint Text="OptiFine 与一部分 Mod 的兼容性不佳，请谨慎安装。" Margin="0,10,0,0"
+                                  x:Name="HintModOptiFine" HintTheme="Yellow" />
+
+                        <c:MyCard Title="Minecraft" Height="40" Margin="0,12,0,0" x:Name="CardMinecraft"
+                                  IsVisible="False">
+                            <Grid>
+                                <Grid x:Name="PanMinecraftInfo" Height="18" Margin="132,11,35,0"
+                                      VerticalAlignment="Top">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <!-- R37：ImgMinecraft 18×18 图片占位 -->
+                                    <Border x:Name="ImgMinecraft" Height="18" Width="18" Margin="0,0,7,0"
+                                            Background="Transparent" />
+                                    <TextBlock x:Name="LabMinecraftVersion" Grid.Column="1"
+                                               VerticalAlignment="Center"
+                                               TextTrimming="CharacterEllipsis" />
+                                </Grid>
+                                <Grid x:Name="PanMinecraftCompare" Height="18" Margin="132,11,80,0"
+                                      VerticalAlignment="Top" IsVisible="False" IsHitTestVisible="False">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="180" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="1*" />
+                                    </Grid.ColumnDefinitions>
+                                    <DockPanel>
+                                        <!-- R37：ImgMinecraftOld 18×18 图片占位 -->
+                                        <Border DockPanel.Dock="Left" Width="18" Height="18"
+                                                Background="Transparent" />
+                                        <TextBlock x:Name="LabMinecraftOld" Margin="7,0,0,0"
+                                                   VerticalAlignment="Center" />
+                                    </DockPanel>
+                                    <Path Grid.Column="1" Data="M3,3 L7,7 3,11 M9,3 L13,7 9,11"
+                                          Margin="10,0,18,0" Height="14"
+                                          HorizontalAlignment="Center" VerticalAlignment="Center"
+                                          Stroke="{DynamicResource ColorBrushGray2}" StrokeThickness="1.4"
+                                          StrokeLineCap="Round" StrokeJoin="Round" />
+                                    <DockPanel Grid.Column="2">
+                                        <!-- R37：ImgMinecraftNew 18×18 图片占位 -->
+                                        <Border DockPanel.Dock="Left" Width="18" Height="18"
+                                                Background="Transparent" />
+                                        <TextBlock x:Name="LabMinecraftNew" Margin="7,0,0,0"
+                                                   VerticalAlignment="Center" />
+                                    </DockPanel>
+                                </Grid>
+                                <Grid Height="40" VerticalAlignment="Top" Background="Transparent"
+                                      Cursor="Hand">
+                                    <Path HorizontalAlignment="Right" Margin="0,0,16,0" Stretch="Uniform"
+                                          Height="6" Width="10" Fill="{DynamicResource ColorBrush1}"
+                                          RenderTransformOrigin="0.5,0.5"
+                                          Data="M2,4 l-2,2 10,10 10,-10 -2,-2 -8,8 -8,-8 z">
+                                        <Path.RenderTransform>
+                                            <RotateTransform Angle="270" />
+                                        </Path.RenderTransform>
+                                    </Path>
+                                </Grid>
+                                <c:MyIconButton x:Name="BtnMinecraftRestore" IsVisible="False"
+                                                Height="30" Width="30" HorizontalAlignment="Right"
+                                                VerticalAlignment="Top" Margin="0,5,32,0" LogoScale="0.55"
+                                                ToolTip.Tip="撤销更改"
+                                                Logo="M9.83,3.17 A1.18,1.18 0 0 1 9.83,4.83 L6.85,7.82 H14.5 A6.68,6.68 0 0 1 14.5,21.18 H11 A1.18,1.18 0 0 1 11,18.82 H14.5 A4.32,4.32 0 0 0 14.5,10.18 H6.85 L9.83,13.17 A1.18,1.18 0 0 1 8.17,14.83 L3.17,9.83 A1.18,1.18 0 0 1 3.17,8.17 L8.17,3.17 A1.18,1.18 0 0 1 9.83,3.17 Z" />
+                            </Grid>
+                        </c:MyCard>
+
+                        <c:MyCard Title="Forge" Height="40" Margin="0,12,0,0" x:Name="CardForge"
+                                  IsSwapped="True" CanSwap="True">
+                            <Grid>
+                                <StackPanel Margin="20,40,18,15" VerticalAlignment="Top" Name="PanForge" />
+                                <Grid x:Name="PanForgeInfo" Height="18" Margin="132,11,15,0"
+                                      VerticalAlignment="Top">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="1*" />
+                                    </Grid.ColumnDefinitions>
+                                    <Border x:Name="ImgForge" Margin="0,0,7,0" Height="18" Width="18"
+                                            Background="Transparent" />
+                                    <TextBlock x:Name="LabForge" VerticalAlignment="Center"
+                                               TextTrimming="CharacterEllipsis" Grid.Column="1" />
+                                </Grid>
+                                <Grid x:Name="PanForgeCompare" Height="18" Margin="132,11,80,0"
+                                      VerticalAlignment="Top" IsVisible="False" IsHitTestVisible="False">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="180" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="1*" />
+                                    </Grid.ColumnDefinitions>
+                                    <DockPanel>
+                                        <Border DockPanel.Dock="Left" Width="18" Height="18"
+                                                Background="Transparent" />
+                                        <TextBlock x:Name="LabForgeOld" Margin="7,0,0,0"
+                                                   VerticalAlignment="Center" />
+                                    </DockPanel>
+                                    <Path Grid.Column="1" Data="M3,3 L7,7 3,11 M9,3 L13,7 9,11"
+                                          Margin="10,0,18,0" Height="14"
+                                          HorizontalAlignment="Center" VerticalAlignment="Center"
+                                          Stroke="{DynamicResource ColorBrushGray2}" StrokeThickness="1.4"
+                                          StrokeLineCap="Round" StrokeJoin="Round" />
+                                    <DockPanel Grid.Column="2">
+                                        <Border DockPanel.Dock="Left" Width="18" Height="18"
+                                                Background="Transparent" />
+                                        <TextBlock Margin="7,0,0,0" VerticalAlignment="Center" />
+                                    </DockPanel>
+                                </Grid>
+                                <c:MyIconButton x:Name="BtnForgeClear" Height="30" Width="30"
+                                                HorizontalAlignment="Right" VerticalAlignment="Top"
+                                                Margin="0,5,32,0" LogoScale="0.5" ToolTip.Tip="取消安装"
+                                                Logo="F1 M2,0 L0,2 8,10 0,18 2,20 10,12 18,20 20,18 12,10 20,2 18,0 10,8 2,0Z" />
+                                <c:MyIconButton x:Name="BtnForgeRestore" IsVisible="False" Height="30"
+                                                Width="30" HorizontalAlignment="Right" VerticalAlignment="Top"
+                                                Margin="0,5,32,0" LogoScale="0.55" ToolTip.Tip="撤销更改"
+                                                Logo="M9.83,3.17 A1.18,1.18 0 0 1 9.83,4.83 L6.85,7.82 H14.5 A6.68,6.68 0 0 1 14.5,21.18 H11 A1.18,1.18 0 0 1 11,18.82 H14.5 A4.32,4.32 0 0 0 14.5,10.18 H6.85 L9.83,13.17 A1.18,1.18 0 0 1 8.17,14.83 L3.17,9.83 A1.18,1.18 0 0 1 3.17,8.17 L8.17,3.17 A1.18,1.18 0 0 1 9.83,3.17 Z" />
+                            </Grid>
+                        </c:MyCard>
+
+                        <c:MyCard Title="NeoForge" Height="40" Margin="0,12,0,0" x:Name="CardNeoForge"
+                                  IsSwapped="True" CanSwap="True">
+                            <Grid>
+                                <StackPanel Margin="20,40,18,15" VerticalAlignment="Top" Name="PanNeoForge" />
+                                <Grid x:Name="PanNeoForgeInfo" Height="18" Margin="132,11,15,0"
+                                      VerticalAlignment="Top">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="1*" />
+                                    </Grid.ColumnDefinitions>
+                                    <Border x:Name="ImgNeoForge" Margin="0,0,7,0" Height="18" Width="18"
+                                            Background="Transparent" />
+                                    <TextBlock x:Name="LabNeoForge" VerticalAlignment="Center"
+                                               TextTrimming="CharacterEllipsis" Grid.Column="1" />
+                                </Grid>
+                                <Grid x:Name="PanNeoForgeCompare" Height="18" Margin="132,11,80,0"
+                                      VerticalAlignment="Top" IsVisible="False" IsHitTestVisible="False">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="180" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="1*" />
+                                    </Grid.ColumnDefinitions>
+                                    <DockPanel>
+                                        <Border DockPanel.Dock="Left" Width="18" Height="18"
+                                                Background="Transparent" />
+                                        <TextBlock x:Name="LabNeoForgeOld" Margin="7,0,0,0"
+                                                   VerticalAlignment="Center" />
+                                    </DockPanel>
+                                    <Path Grid.Column="1" Data="M3,3 L7,7 3,11 M9,3 L13,7 9,11"
+                                          Margin="10,0,18,0" Height="14"
+                                          HorizontalAlignment="Center" VerticalAlignment="Center"
+                                          Stroke="{DynamicResource ColorBrushGray2}" StrokeThickness="1.4"
+                                          StrokeLineCap="Round" StrokeJoin="Round" />
+                                    <DockPanel Grid.Column="2">
+                                        <Border DockPanel.Dock="Left" Width="18" Height="18"
+                                                Background="Transparent" />
+                                        <TextBlock Margin="7,0,0,0" VerticalAlignment="Center" />
+                                    </DockPanel>
+                                </Grid>
+                                <c:MyIconButton x:Name="BtnNeoForgeClear" Height="30" Width="30"
+                                                HorizontalAlignment="Right" VerticalAlignment="Top"
+                                                Margin="0,5,32,0" LogoScale="0.5" ToolTip.Tip="取消安装"
+                                                Logo="F1 M2,0 L0,2 8,10 0,18 2,20 10,12 18,20 20,18 12,10 20,2 18,0 10,8 2,0Z" />
+                                <c:MyIconButton x:Name="BtnNeoForgeRestore" IsVisible="False" Height="30"
+                                                Width="30" HorizontalAlignment="Right" VerticalAlignment="Top"
+                                                Margin="0,5,32,0" LogoScale="0.55" ToolTip.Tip="撤销更改"
+                                                Logo="M9.83,3.17 A1.18,1.18 0 0 1 9.83,4.83 L6.85,7.82 H14.5 A6.68,6.68 0 0 1 14.5,21.18 H11 A1.18,1.18 0 0 1 11,18.82 H14.5 A4.32,4.32 0 0 0 14.5,10.18 H6.85 L9.83,13.17 A1.18,1.18 0 0 1 8.17,14.83 L3.17,9.83 A1.18,1.18 0 0 1 3.17,8.17 L8.17,3.17 A1.18,1.18 0 0 1 9.83,3.17 Z" />
+                            </Grid>
+                        </c:MyCard>
+
+                        <c:MyCard Title="Fabric" Height="40" Margin="0,12,0,0" x:Name="CardFabric"
+                                  IsSwapped="True" CanSwap="True">
+                            <Grid>
+                                <StackPanel Margin="20,40,18,15" VerticalAlignment="Top" Name="PanFabric" />
+                                <Grid x:Name="PanFabricInfo" Height="18" Margin="132,11,15,0"
+                                      VerticalAlignment="Top">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="1*" />
+                                    </Grid.ColumnDefinitions>
+                                    <Border x:Name="ImgFabric" Margin="0,0,7,0" Height="18" Width="18"
+                                            Background="Transparent" />
+                                    <TextBlock x:Name="LabFabric" VerticalAlignment="Center"
+                                               TextTrimming="CharacterEllipsis" Grid.Column="1" />
+                                </Grid>
+                                <Grid x:Name="PanFabricCompare" Height="18" Margin="132,11,80,0"
+                                      VerticalAlignment="Top" IsVisible="False" IsHitTestVisible="False">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="180" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="1*" />
+                                    </Grid.ColumnDefinitions>
+                                    <DockPanel>
+                                        <Border DockPanel.Dock="Left" Width="18" Height="18"
+                                                Background="Transparent" />
+                                        <TextBlock x:Name="LabFabricOld" Margin="7,0,0,0"
+                                                   VerticalAlignment="Center" />
+                                    </DockPanel>
+                                    <Path Grid.Column="1" Data="M3,3 L7,7 3,11 M9,3 L13,7 9,11"
+                                          Margin="10,0,18,0" Height="14"
+                                          HorizontalAlignment="Center" VerticalAlignment="Center"
+                                          Stroke="{DynamicResource ColorBrushGray2}" StrokeThickness="1.4"
+                                          StrokeLineCap="Round" StrokeJoin="Round" />
+                                    <DockPanel Grid.Column="2">
+                                        <Border DockPanel.Dock="Left" Width="18" Height="18"
+                                                Background="Transparent" />
+                                        <TextBlock Margin="7,0,0,0" VerticalAlignment="Center" />
+                                    </DockPanel>
+                                </Grid>
+                                <c:MyIconButton x:Name="BtnFabricClear" Height="30" Width="30"
+                                                HorizontalAlignment="Right" VerticalAlignment="Top"
+                                                Margin="0,5,32,0" LogoScale="0.5" ToolTip.Tip="取消安装"
+                                                Logo="F1 M2,0 L0,2 8,10 0,18 2,20 10,12 18,20 20,18 12,10 20,2 18,0 10,8 2,0Z" />
+                                <c:MyIconButton x:Name="BtnFabricRestore" IsVisible="False" Height="30"
+                                                Width="30" HorizontalAlignment="Right" VerticalAlignment="Top"
+                                                Margin="0,5,32,0" LogoScale="0.55" ToolTip.Tip="撤销更改"
+                                                Logo="M9.83,3.17 A1.18,1.18 0 0 1 9.83,4.83 L6.85,7.82 H14.5 A6.68,6.68 0 0 1 14.5,21.18 H11 A1.18,1.18 0 0 1 11,18.82 H14.5 A4.32,4.32 0 0 0 14.5,10.18 H6.85 L9.83,13.17 A1.18,1.18 0 0 1 8.17,14.83 L3.17,9.83 A1.18,1.18 0 0 1 3.17,8.17 L8.17,3.17 A1.18,1.18 0 0 1 9.83,3.17 Z" />
+                            </Grid>
+                        </c:MyCard>
+
+                        <c:MyCard Title="Fabric API" Height="40" Margin="0,12,0,0" x:Name="CardFabricApi"
+                                  IsSwapped="True" CanSwap="True">
+                            <Grid>
+                                <StackPanel Margin="20,40,18,15" VerticalAlignment="Top" Name="PanFabricApi" />
+                                <Grid x:Name="PanFabricApiInfo" Height="18" Margin="132,11,15,0"
+                                      VerticalAlignment="Top">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="1*" />
+                                    </Grid.ColumnDefinitions>
+                                    <Border x:Name="ImgFabricApi" Margin="0,0,7,0" Height="18" Width="18"
+                                            Background="Transparent" />
+                                    <TextBlock x:Name="LabFabricApi" VerticalAlignment="Center"
+                                               TextTrimming="CharacterEllipsis" Grid.Column="1" />
+                                </Grid>
+                                <Grid x:Name="PanFabricApiCompare" Height="18" Margin="132,11,80,0"
+                                      VerticalAlignment="Top" IsVisible="False" IsHitTestVisible="False">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="180" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="1*" />
+                                    </Grid.ColumnDefinitions>
+                                    <DockPanel>
+                                        <Border DockPanel.Dock="Left" Width="18" Height="18"
+                                                Background="Transparent" />
+                                        <TextBlock x:Name="LabFabricApiOld" Margin="7,0,0,0"
+                                                   VerticalAlignment="Center" />
+                                    </DockPanel>
+                                    <Path Grid.Column="1" Data="M3,3 L7,7 3,11 M9,3 L13,7 9,11"
+                                          Margin="10,0,18,0" Height="14"
+                                          HorizontalAlignment="Center" VerticalAlignment="Center"
+                                          Stroke="{DynamicResource ColorBrushGray2}" StrokeThickness="1.4"
+                                          StrokeLineCap="Round" StrokeJoin="Round" />
+                                    <DockPanel Grid.Column="2">
+                                        <Border DockPanel.Dock="Left" Width="18" Height="18"
+                                                Background="Transparent" />
+                                        <TextBlock Margin="7,0,0,0" VerticalAlignment="Center" />
+                                    </DockPanel>
+                                </Grid>
+                                <c:MyIconButton x:Name="BtnFabricApiClear" Height="30" Width="30"
+                                                HorizontalAlignment="Right" VerticalAlignment="Top"
+                                                Margin="0,5,32,0" LogoScale="0.5" ToolTip.Tip="取消安装"
+                                                Logo="F1 M2,0 L0,2 8,10 0,18 2,20 10,12 18,20 20,18 12,10 20,2 18,0 10,8 2,0Z" />
+                                <c:MyIconButton x:Name="BtnFabricApiRestore" IsVisible="False" Height="30"
+                                                Width="30" HorizontalAlignment="Right" VerticalAlignment="Top"
+                                                Margin="0,5,32,0" LogoScale="0.55" ToolTip.Tip="撤销更改"
+                                                Logo="M9.83,3.17 A1.18,1.18 0 0 1 9.83,4.83 L6.85,7.82 H14.5 A6.68,6.68 0 0 1 14.5,21.18 H11 A1.18,1.18 0 0 1 11,18.82 H14.5 A4.32,4.32 0 0 0 14.5,10.18 H6.85 L9.83,13.17 A1.18,1.18 0 0 1 8.17,14.83 L3.17,9.83 A1.18,1.18 0 0 1 3.17,8.17 L8.17,3.17 A1.18,1.18 0 0 1 9.83,3.17 Z" />
+                            </Grid>
+                        </c:MyCard>
+
+                        <c:MyCard Title="OptiFine" Height="40" Margin="0,12,0,0" x:Name="CardOptiFine"
+                                  IsSwapped="True" CanSwap="True">
+                            <Grid>
+                                <StackPanel Margin="20,40,18,15" VerticalAlignment="Top">
+                                    <StackPanel Name="PanOptiFine" />
+                                </StackPanel>
+                                <Grid x:Name="PanOptiFineInfo" Height="18" Margin="132,11,15,0"
+                                      VerticalAlignment="Top">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="1*" />
+                                    </Grid.ColumnDefinitions>
+                                    <Border x:Name="ImgOptiFine" Margin="0,0,7,0" Height="18" Width="18"
+                                            Background="Transparent" />
+                                    <TextBlock x:Name="LabOptiFine" VerticalAlignment="Center"
+                                               TextTrimming="CharacterEllipsis" Grid.Column="1" />
+                                </Grid>
+                                <Grid x:Name="PanOptiFineCompare" Height="18" Margin="132,11,80,0"
+                                      VerticalAlignment="Top" IsVisible="False" IsHitTestVisible="False">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="180" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="1*" />
+                                    </Grid.ColumnDefinitions>
+                                    <DockPanel>
+                                        <Border DockPanel.Dock="Left" Width="18" Height="18"
+                                                Background="Transparent" />
+                                        <TextBlock x:Name="LabOptiFineOld" Margin="7,0,0,0"
+                                                   VerticalAlignment="Center" />
+                                    </DockPanel>
+                                    <Path Grid.Column="1" Data="M3,3 L7,7 3,11 M9,3 L13,7 9,11"
+                                          Margin="10,0,18,0" Height="14"
+                                          HorizontalAlignment="Center" VerticalAlignment="Center"
+                                          Stroke="{DynamicResource ColorBrushGray2}" StrokeThickness="1.4"
+                                          StrokeLineCap="Round" StrokeJoin="Round" />
+                                    <DockPanel Grid.Column="2">
+                                        <Border DockPanel.Dock="Left" Width="18" Height="18"
+                                                Background="Transparent" />
+                                        <TextBlock Margin="7,0,0,0" VerticalAlignment="Center" />
+                                    </DockPanel>
+                                </Grid>
+                                <c:MyIconButton x:Name="BtnOptiFineClear" Height="30" Width="30"
+                                                HorizontalAlignment="Right" VerticalAlignment="Top"
+                                                Margin="0,5,32,0" LogoScale="0.5" ToolTip.Tip="取消安装"
+                                                Logo="F1 M2,0 L0,2 8,10 0,18 2,20 10,12 18,20 20,18 12,10 20,2 18,0 10,8 2,0Z" />
+                                <c:MyIconButton x:Name="BtnOptiFineRestore" IsVisible="False" Height="30"
+                                                Width="30" HorizontalAlignment="Right" VerticalAlignment="Top"
+                                                Margin="0,5,32,0" LogoScale="0.55" ToolTip.Tip="撤销更改"
+                                                Logo="M9.83,3.17 A1.18,1.18 0 0 1 9.83,4.83 L6.85,7.82 H14.5 A6.68,6.68 0 0 1 14.5,21.18 H11 A1.18,1.18 0 0 1 11,18.82 H14.5 A4.32,4.32 0 0 0 14.5,10.18 H6.85 L9.83,13.17 A1.18,1.18 0 0 1 8.17,14.83 L3.17,9.83 A1.18,1.18 0 0 1 3.17,8.17 L8.17,3.17 A1.18,1.18 0 0 1 9.83,3.17 Z" />
+                            </Grid>
+                        </c:MyCard>
+
+                        <c:MyCard Title="OptiFabric" Height="40" Margin="0,12,0,0" x:Name="CardOptiFabric"
+                                  IsSwapped="True" CanSwap="True">
+                            <Grid>
+                                <StackPanel Margin="20,40,18,15" VerticalAlignment="Top" Name="PanOptiFabric" />
+                                <Grid x:Name="PanOptiFabricInfo" Height="18" Margin="132,11,15,0"
+                                      VerticalAlignment="Top">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="1*" />
+                                    </Grid.ColumnDefinitions>
+                                    <Border x:Name="ImgOptiFabric" Margin="0,0,7,0" Height="18" Width="18"
+                                            Background="Transparent" />
+                                    <TextBlock x:Name="LabOptiFabric" VerticalAlignment="Center"
+                                               TextTrimming="CharacterEllipsis" Grid.Column="1" />
+                                </Grid>
+                                <Grid x:Name="PanOptiFabricCompare" Height="18" Margin="132,11,80,0"
+                                      VerticalAlignment="Top" IsVisible="False" IsHitTestVisible="False">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="180" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="1*" />
+                                    </Grid.ColumnDefinitions>
+                                    <DockPanel>
+                                        <Border DockPanel.Dock="Left" Width="18" Height="18"
+                                                Background="Transparent" />
+                                        <TextBlock x:Name="LabOptiFabricOld" Margin="7,0,0,0"
+                                                   VerticalAlignment="Center" />
+                                    </DockPanel>
+                                    <Path Grid.Column="1" Data="M3,3 L7,7 3,11 M9,3 L13,7 9,11"
+                                          Margin="10,0,18,0" Height="14"
+                                          HorizontalAlignment="Center" VerticalAlignment="Center"
+                                          Stroke="{DynamicResource ColorBrushGray2}" StrokeThickness="1.4"
+                                          StrokeLineCap="Round" StrokeJoin="Round" />
+                                    <DockPanel Grid.Column="2">
+                                        <Border DockPanel.Dock="Left" Width="18" Height="18"
+                                                Background="Transparent" />
+                                        <TextBlock Margin="7,0,0,0" VerticalAlignment="Center" />
+                                    </DockPanel>
+                                </Grid>
+                                <c:MyIconButton x:Name="BtnOptiFabricClear" Height="30" Width="30"
+                                                HorizontalAlignment="Right" VerticalAlignment="Top"
+                                                Margin="0,5,32,0" LogoScale="0.5" ToolTip.Tip="取消安装"
+                                                Logo="F1 M2,0 L0,2 8,10 0,18 2,20 10,12 18,20 20,18 12,10 20,2 18,0 10,8 2,0Z" />
+                                <c:MyIconButton x:Name="BtnOptiFabricRestore" IsVisible="False" Height="30"
+                                                Width="30" HorizontalAlignment="Right" VerticalAlignment="Top"
+                                                Margin="0,5,32,0" LogoScale="0.55" ToolTip.Tip="撤销更改"
+                                                Logo="M9.83,3.17 A1.18,1.18 0 0 1 9.83,4.83 L6.85,7.82 H14.5 A6.68,6.68 0 0 1 14.5,21.18 H11 A1.18,1.18 0 0 1 11,18.82 H14.5 A4.32,4.32 0 0 0 14.5,10.18 H6.85 L9.83,13.17 A1.18,1.18 0 0 1 8.17,14.83 L3.17,9.83 A1.18,1.18 0 0 1 3.17,8.17 L8.17,3.17 A1.18,1.18 0 0 1 9.83,3.17 Z" />
+                            </Grid>
+                        </c:MyCard>
+
+                        <c:MyCard Title="LiteLoader" Height="40" Margin="0,12,0,0" x:Name="CardLiteLoader"
+                                  IsSwapped="True" CanSwap="True">
+                            <Grid>
+                                <StackPanel Margin="20,40,18,15" VerticalAlignment="Top" Name="PanLiteLoader" />
+                                <Grid x:Name="PanLiteLoaderInfo" Height="18" Margin="132,11,15,0"
+                                      VerticalAlignment="Top">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="1*" />
+                                    </Grid.ColumnDefinitions>
+                                    <Border x:Name="ImgLiteLoader" Margin="-1,0,6,0" Height="20" Width="20"
+                                            Background="Transparent" />
+                                    <TextBlock x:Name="LabLiteLoader" VerticalAlignment="Center"
+                                               TextTrimming="CharacterEllipsis" Grid.Column="1" />
+                                </Grid>
+                                <Grid x:Name="PanLiteLoaderCompare" Height="18" Margin="132,11,80,0"
+                                      VerticalAlignment="Top" IsVisible="False" IsHitTestVisible="False">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="180" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="1*" />
+                                    </Grid.ColumnDefinitions>
+                                    <DockPanel>
+                                        <Border DockPanel.Dock="Left" Width="18" Height="18"
+                                                Background="Transparent" />
+                                        <TextBlock x:Name="LabLiteLoaderOld" Margin="7,0,0,0"
+                                                   VerticalAlignment="Center" />
+                                    </DockPanel>
+                                    <Path Grid.Column="1" Data="M3,3 L7,7 3,11 M9,3 L13,7 9,11"
+                                          Margin="10,0,18,0" Height="14"
+                                          HorizontalAlignment="Center" VerticalAlignment="Center"
+                                          Stroke="{DynamicResource ColorBrushGray2}" StrokeThickness="1.4"
+                                          StrokeLineCap="Round" StrokeJoin="Round" />
+                                    <DockPanel Grid.Column="2">
+                                        <Border DockPanel.Dock="Left" Width="18" Height="18"
+                                                Background="Transparent" />
+                                        <TextBlock Margin="7,0,0,0" VerticalAlignment="Center" />
+                                    </DockPanel>
+                                </Grid>
+                                <c:MyIconButton x:Name="BtnLiteLoaderClear" Height="30" Width="30"
+                                                HorizontalAlignment="Right" VerticalAlignment="Top"
+                                                Margin="0,5,32,0" LogoScale="0.5" ToolTip.Tip="取消安装"
+                                                Logo="F1 M2,0 L0,2 8,10 0,18 2,20 10,12 18,20 20,18 12,10 20,2 18,0 10,8 2,0Z" />
+                                <c:MyIconButton x:Name="BtnLiteLoaderRestore" IsVisible="False" Height="30"
+                                                Width="30" HorizontalAlignment="Right" VerticalAlignment="Top"
+                                                Margin="0,5,32,0" LogoScale="0.55" ToolTip.Tip="撤销更改"
+                                                Logo="M9.83,3.17 A1.18,1.18 0 0 1 9.83,4.83 L6.85,7.82 H14.5 A6.68,6.68 0 0 1 14.5,21.18 H11 A1.18,1.18 0 0 1 11,18.82 H14.5 A4.32,4.32 0 0 0 14.5,10.18 H6.85 L9.83,13.17 A1.18,1.18 0 0 1 8.17,14.83 L3.17,9.83 A1.18,1.18 0 0 1 3.17,8.17 L8.17,3.17 A1.18,1.18 0 0 1 9.83,3.17 Z" />
+                            </Grid>
+                        </c:MyCard>
+                    </StackPanel>
+                </Grid>
+            </ScrollViewer>
+            <c:MyExtraTextButton x:Name="BtnStart" Text="开始下载" IsVisible="False"
+                                 HorizontalAlignment="Center" VerticalAlignment="Bottom"
+                                 LogoScale="0.95"
+                                 Logo="M955 610h-59c-15 0-29 13-29 29v196c0 15-13 29-29 29h-649c-15 0-29-13-29-29v-196c0-15-13-29-29-29h-59c-15 0-29 13-29 29V905c0 43 35 78 78 78h787c43 0 78-35 78-78V640c0-15-13-29-29-29zM492 740c11 11 29 11 41 0l265-265c11-11 11-29 0-41l-41-41c-11-11-29-11-41 0l-110 110c-11 11-33 3-33-13V68C571 53 555 39 541 39h-59c-15 0-29 13-29 29v417c0 17-21 25-33 13l-110-110c-11-11-29-11-41 0L226 433c-11 11-11 29 0 41L492 740z" />
+        </Grid>
+        <c:MyCard HorizontalAlignment="Center" VerticalAlignment="Center" Margin="40,0"
+                  x:Name="PanLoad">
+            <Grid>
+                <c:MyLoading Text="正在加载" Margin="20,20,20,17" x:Name="LoadMinecraft"
+                             HorizontalAlignment="Center" VerticalAlignment="Center" ShowProgress="True" />
+                <c:MyLoading IsVisible="False" x:Name="LoadOptiFine" />
+                <c:MyLoading IsVisible="False" x:Name="LoadForge" />
+                <c:MyLoading IsVisible="False" x:Name="LoadNeoForge" />
+                <c:MyLoading IsVisible="False" x:Name="LoadLiteLoader" />
+                <c:MyLoading IsVisible="False" x:Name="LoadFabric" />
+                <c:MyLoading IsVisible="False" x:Name="LoadFabricApi" />
+                <c:MyLoading IsVisible="False" x:Name="LoadOptiFabric" />
+            </Grid>
+        </c:MyCard>
+    </Grid>
+</UserControl>

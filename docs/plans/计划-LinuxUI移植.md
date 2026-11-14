@@ -110,7 +110,7 @@
 | **R17** | 标题栏渐变与主页面背景**已在 Linux 侧按同一 HSL 算法、同一取整算**（`Theme/PclTheme.cs`：`FromHSL2` / `FromHSL` / `Hue` 逐行移植自 `ModBase.vb` L360–L409），主题参数已由 `const` 改为**皮肤参数字段 + `Refresh(theme)` 早退语义**（同 `ModSecret.vb` L69–L110），默认值 `ColorHue=210`、`ColorSat=85`、`ColorLightAdjust=0`、`ColorHueTopbarDelta=0`（`ModSecret.vb` L66）。**核实结论（§13.8）：Windows 端本 fork 不存在「皮肤编号 → 参数」的映射表，四个参数全程无赋值点，故参数恒为默认值、配色恒为 PCL 蓝**；`UiBackgroundColorful` 开关与设置页联动待设置页接入 | 参数恒定本身与 Windows 端一致，不算降级 | 算法与取整不得改成近似值；不得自行发明映射表；取得映射数据后在 `PclTheme.Refresh` 单点接入 |
 | **R18** | 标题栏 logo 只接入 `UiLogoType=1`（默认档：文字 `PCL Next`、17 号白字、`Margin 18,0,0,0`）；其余三档（`0` 形状 / `2` 自定义文本 / `3` 图片）与 `UiLogoLeft`、`UiLogoText`、`ImgTitle` 背景图未接入 | 未接入档不影响默认外观 | 默认档的位置/字号/色值不得改；接入时按 vb L820–L869 的分支补齐 |
 | **R19** | 窗口壳的行为近似：① 开场/关闭动画缓动由 `AniEaseOutBack` 改 `BackEaseOut`（时长 600/500ms 照抄）；② `IsMouseDirectlyOver` 无等价物，标题栏拖拽改为「向上找 `MyIconButton`/`MyRadioButton` 祖先」；③ Avalonia 11 无 `CanMinimize` 属性，最小化走 `WindowState.Minimized`；④ `Topmost` 启动瞬间、`UiOpacity` 窗口不透明度、窗口尺寸/位置记忆（`Settings`）未接入 | 只允许实现手段差异 | 标题栏高度 48、按钮 28×28 与边距 12/44、缩放热区 8/13px 不得改 |
-| **R20** | **【临时状态，2026-11-11 收窄】**页面栈与外壳其余部件：启动栈（0）、联机栈（2）、设置栈左导航（3）、版本选择次级栈（5）已有页面；**初始选中已恢复 Windows 默认「启动」**（vb L1438–L1471、`FormMain.xaml` L121 `BtnTitleSelect0 Checked=True`）；设置栈右页、下载栈（1）、更多栈（4）仍为宿主置空；`ImgBack` 背景图（`UiBackgroundOpacity` / `Blur` / `Suit`）、`PanTitleInner`（次级页面标题栏）、`PanHint`、`BtnExtra*` 未接入；设置左导航的重置按钮点击为空操作（设置子页未移植） | **临时状态不算允许差异**：页面补齐后必须继续回收，不得以「Linux 少几个栈」沉淀成既定行为 | 已回收项（初始选中、启动栈、版本选择栈）不得回退；「联机」页与外壳几何不得因此改动；每移植完一个栈就必须回收对应降级项并在本节留痕 |
+| **R20** | **【临时状态，2026-11-14 收窄】**页面栈与外壳其余部件：启动栈（0）、下载栈（1）、联机栈（2）、设置栈左导航（3）+ 四个子页、版本选择次级栈（5）已有页面；**初始选中已恢复 Windows 默认「启动」**（vb L1438–L1471、`FormMain.xaml` L121 `BtnTitleSelect0 Checked=True`）；仅剩更多栈（4）为宿主置空；`ImgBack` 背景图（`UiBackgroundOpacity` / `Blur` / `Suit`）、`PanTitleInner`（次级页面标题栏）、`PanHint`、`BtnExtra*` 未接入；左导航重置按钮点击为空操作 | **临时状态不算允许差异**：页面补齐后必须继续回收，不得以「Linux 少几个栈」沉淀成既定行为 | 已回收项（初始选中、启动栈、版本选择栈、下载栈、设置栈）不得回退；「联机」页与外壳几何不得因此改动；每移植完一个栈就必须回收对应降级项并在本节留痕 |
 | **R21** | 左竖条（`RectLeftBackground`）宽度动画的触发时机：Windows 由 `PanMainLeft.SizeChanged` 驱动；Linux 改为「切换栈并完成布局后取 `PanMainLeft.Bounds.Width` 驱动一次」。因左列为 `Auto`、内容固定，窗口缩放不改变该宽度，实际表现一致 | 仅触发时机 | 目标宽度值、180ms 时长、阴影淡出条件不得改；若后续左页宽度随内容变化，必须补回尺寸监听 |
 | **R22** | 右页宿主 `MyPageRight` 尚未移植：Windows 端右页继承 `MyPageRight`，由 `PanScroll` 提供滚动条横向滑入（350ms / 90ms）、内容逐个进入（0→1 淡入 100ms、-16→0 位移 250+350ms）与退出动画；Linux 右页为普通 `UserControl` + 原生 `ScrollViewer`，无这些动画 | 仅动画；不改变任何静态布局 | 右页内容的 `Margin`、卡片间距、字号、滚动条宽度不得改；移植 `MyPageRight` 时逐项补齐并在 §13 留痕 |
 | **R23** | `MyTextBox` 属性差异：WPF 自定义属性 `HasBackground="False"`（启动日志）在 Avalonia 无等价物，改 `Background=Transparent`；WPF `TextBox.VerticalScrollBarVisibility/HorizontalScrollBarVisibility=Disabled` 在 Avalonia 是 `ScrollViewer` 附加属性，本轮未设（只读日志框内容为空，不出现滚动条） | 仅属性表达方式 | 内边距 `Padding 0,4`、`Margin 15,34,15,13`、`BorderThickness 0`、字号 13 不得改 |
@@ -126,6 +126,13 @@
 | **R33** | 设置·其他页静态态：Linux 侧尚无设置服务，`SettingService.Key` 绑定与 `Reload` / `Reset` 未接入，页面按 `Settings.vb` 默认值呈现（`ToolDownloadSource/Version=1`、`ToolDownloadThread=63`、`ToolDownloadSpeed=42`、`ToolDownloadMod=2`、`ToolDownloadTranslateV2=1`、`ToolModLocalNameStyle=0`、`ToolUpdateRelease/Snapshot=False`、`ToolHelpChinese=True`、`SystemSystemUpdate/Activity=0`、`SystemSystemCache=""`、`SystemDebugAnim=9`）；`ChannelIsOfficial=False`（Dev）→ `PanDonate` 可见、`ItemSystemUpdateDownload` 文案为带土豆码后缀的版本 | 仅数据绑定 | 四张卡片的行列高（28/7/27、28/7、22/8/22、28/9/5）、`Margin 25,37,25,15 / 25,37,25,12 / 25,40,25,17 / 25,40,25,20`、按钮 `MinWidth 140 / Padding 13,0 / 间距 20`、调试卡 `IsSwapped=True` 不得改 |
 | **R34** | 设置·其他页交互未接入：「检查更新」`UpdateCheckByButton`、「导出设置 / 导入设置」（原为「该功能尚在开发中」提示）、「复制识别码」`PageOtherAbout.CopyIdentify`、「输入土豆码」`InputPotatoCode` 均为空操作；`SliderDownloadThread` ≥100 的警告弹窗、`ComboSystemActivity` 选末项与 `ComboSystemUpdate` 选末项的确认回滚、`CheckDebugMode` 切换提示均未实现 | 仅交互动作 | 控件顺序、`ComboSystemUpdate` 四项文案、公告三项 ToolTip、`PanDonate` 双按钮布局不得改 |
 | **R35** | 设置·其他页输入框校验未接入：`TextSystemCache` 的 `ValidateRules`（`ValidateNullable` + `ValidateFolderPath UseMinecraftCharCheck=False`）在 Linux 无对应校验管线，仅保留 `HintText="默认"` 与 ToolTip；输入内容不落盘 | 仅校验与持久化 | `Grid.Row=4 / ColumnSpan=2 / Column=1`、`HintText`、ToolTip 三行文案不得改 |
+| **R36** | 下载栈左导航刷新按钮未接入：`PageDownloadLeft.xaml.vb` L95–L152 `Refresh_Click`（清空资源缓存、重启 8 个加载器、回到对应子页）未实现，按钮只保留形态与 ToolTip；`RestrictMcDownload` 为 False（`ModDownloadPolicy` 默认允许 MC 下载）→ 「原版游戏」与「社区资源」小标题保持可见 | 仅刷新动作 | 条目高 36、`MinPaddingRight 35`、Logo 缩放（0.8/0.97/0.98/0.96/0.81/1.04）、「社区资源」字号 12 / `Margin 13,20,5,4` 不得改 |
+| **R37** | 下载栈「原版游戏」页静态态：Linux 侧尚无下载服务，`PageLoaderInit` 的加载态固定呈现（PanLoad 可见、PanAllBack 隐藏，`MyPageRight.vb` L87–L89）；版本列表 `PanMinecraft` 的卡片由 `LoadMinecraft_OnFinish` 运行期生成，静态为空；`PanSelect` 安装配置子页（名称卡 + 5 条提示 + 8 张 40 高折叠卡）按原 XAML 保留但默认隐藏；「开始下载」`BtnStart` 仅在选择页显示，静态隐藏 | 仅数据驱动部分 | `PanInner Margin 25,10,25,25`、`PanSelect Margin 0,0,0,45`、八张卡 `Height 40 / Margin 0,12,0,0`、`PanLoad Margin 40,0` 不得改 |
+| **R38** | 下载栈图片资源缺失：`MyImage` 的 `pack://application:,,,/images/Blocks/*.png`（Anvil / NeoForge / Fabric / GrassPath / OptiFabric / Egg、Minecraft 32×32 与 18×18）在 Linux 项目内不存在，以同尺寸透明占位保留布局；`MyCard.SwapLogoRight`（折叠箭头旋转基准 270°）与 `MyLoading.HasAnimation` 在 Linux 控件无对应属性 | 仅位图与装饰 | 占位尺寸（18 / 20 / 32）与 `Margin 132,11,15,0`、标题卡 `Height 40` 不得改 |
+| **R39** | 下载栈输入框与卡片动画差异：`TextSelectName` 的 `HasBackground="False"` / `ShowValidateResult="False"` / `ValidateFolderName` 校验未接入（保留 `Padding -1,0 / MinHeight 30 / MaxLength 70`）；`MyCard.UseAnimation`、`MyPanel` 选中页切换动画（PanSelect 40→0 位移 + 淡入 160ms）未移植 | 仅校验与动画 | 名称卡 `MinHeight 62`、文本框 `Margin 93,16,16,0`、返回按钮 26×26 `Margin 13,0,0,0` 不得改 |
+| **R40** | 资源搜索页静态态：Linux 侧无资源搜索服务，`PanProjects` 为空、分页固定第 1 页且首/前按钮禁用；搜索 / 重置条件 / 安装已有整合包 / 翻页均为空操作；`HintSource`（CurseForge 未启用）与 `HintError`（Modrinth 连接失败）按「加载成功」态保持隐藏；五个包装页（Mod / 整合包 / 数据包 / 资源包 / 光影包）共用 `PageResourceView`，仅种类与下拉项不同 | 仅数据与动作 | 搜索卡 `Margin 25,40,25,15`、条件 Grid 6 列（Auto/1.3*/1.2*/50/Auto/1*）与 3 行（28/9/28）、按钮 `MinWidth 140 / Padding 13,0 / 间距 20`、分页卡 `Height 23 / Margin 10,7` 不得改 |
+| **R41** | 资源搜索页版本下拉差异：WPF `IsEditable="True"`（可自行输入版本号）在 Avalonia ComboBox 无等价属性，退化为普通下拉；`IsTextSearchEnabled="False"` 与 `ComboSearchLoader` 的「仅 Mod + 具体版本输入时显示」联动未实现（静态保持隐藏，与原默认态一致） | 仅输入能力 | 版本下拉 13 项文案与顺序、`ComboSearchLoader Margin 10,0,0,0` 不得改 |
+| **R42** | 资源条目与详情页未移植：列表项 `MyResourceItem.xaml`（64 高、5 列 7 行、Logo 50×50 圆角 6、标题/下载量/时间/来源四栏）与详情页 `PageDownloadCompDetail.xaml`（介绍卡 + 筛选胶囊 + 结果列表 + 加载卡）未建 Linux 视图；搜索服务接入时一并补齐 | 仅缺失子视图 | 搜索页布局不得因此简化；补齐时按原 XAML 逐项对照并在 §13 留痕 |
 
 ---
 
@@ -838,6 +845,32 @@ dotnet build PCL.Desktop.Linux/PCL.Desktop.Linux.csproj -c Release -r linux-x64
 （产物 `bin-net10/Dev/2.100.0.4-0.94/linux-x64/`）。
 **未验证项**：五个下拉弹出层、调试卡折叠/展开、线程数滑块拖动与数值提示、卡片滚动 —— 需统一验收目视（V14）。
 
+### 13.15 下载栈（LU7，2026-11-14，只做编译验证、不弹窗）
+
+**对照来源**：
+`pcl-next/Pages/PageDownload/PageDownloadLeft.xaml`（58 行）+ `.xaml.vb`（L4–L28 页面切换、L95–L152 刷新、L155–L158 返回）；
+`PageDownloadInstall.xaml`（359 行）+ `.xaml.vb`（L3–L42 加载器初始化、L52–L106 选择页切换、L446–L546 版本列表生成）；
+`Resource/PageResource.xaml`（96 行）+ `.xaml.vb`（L80–L122 加载与筛选、L143–L164 来源降级）及五个包装页
+`PageDownloadMod/Pack/DataPack/ResourcePack/Shader.xaml`。
+
+**Linux 实现**：`Views/PageDownloadLeftView.axaml(.cs)`、`Views/PageDownloadInstallView.axaml(.cs)`、
+`Views/PageResourceView.axaml(.cs)`（五个包装页共用，`ResourcePageKind` 区分种类）；
+`MainWindow.axaml.cs`（`ShowStack(1)` 接入左导航 + 原版游戏页；`ShowDownloadPage` 按 0/2/3/4/5/6 切换子页）。
+
+| 区域 | Windows 取值 | Linux 实现 | 结论 |
+|---|---|---|---|
+| 下载左导航 | StackPanel `Margin 0,12,0,0`；原版游戏（0，选中）+「社区资源」小标题 + Mod(2)/整合包(3)/数据包(4)/资源包(5)/光影包(6)；条目高 36、`MinPaddingRight 35`、右侧刷新按钮 | 同；`ScrollViewer Classes=fullmargin`、`AnimatedControl="PanItem"`；复选框互斥选中并回传 `Index`；刷新按钮空操作 | 一致（R36 / R20） |
+| 原版游戏页 · 加载态 | PanLoad 居中卡片（8 个 MyLoading，仅 Minecraft 带进度）+ PanAllBack 隐藏 | 同；`LoadMinecraft` 显示「正在加载」+ 进度，其余 7 个隐藏 | 一致（R37） |
+| 原版游戏页 · 版本列表 | `PanInner Margin 25,10,25,25`；`PanMinecraft` 运行期注入版本卡（宽卡片、标题、各 Mod 加载器折叠卡） | 容器与 `Margin 0,0,0,-10` 保留，卡片静态为空 | 一致（R37） |
+| 原版游戏页 · 安装配置 | `PanSelect` 默认 Collapsed；名称卡 `MinHeight 62` + 5 条提示 + 8 张 40 高折叠卡（Minecraft 40、Forge/NeoForge/Fabric/FabricAPI/OptiFine/OptiFabric/LiteLoader 折叠）+「开始下载」 | 同结构全部保留（含 `Margin 132,11,15,0` 信息行、`Margin 20,40,18,15` 内容区、取消/撤销按钮 30×30）；位图以同尺寸透明占位 | 一致（R37 / R38 / R39） |
+| 资源搜索页 · 搜索卡 | `Margin 25,40,25,15`；6 列 × 3 行；名称 / 来源（3 项）/ 版本（13 项）/ 加载器（隐藏）/ 类型；按钮行三枚 `MinWidth 140` | 同；种类标题「搜索 Mod / 整合包 / 数据包 / 资源包 / 光影包」与类型下拉按原五页逐项生成；「安装已有整合包」仅整合包可见 | 一致（R40 / R41） |
+| 资源搜索页 · 结果区 | 两条提示条（默认隐藏）+ 结果卡（运行期填充）+ 分页卡（首页/前页禁用、页码 1、后页） | 同；结果为空、分页禁用、提示条隐藏 | 一致（R40） |
+| 资源种类 · 下拉项 | Mod 27 项（全部带 15px 缩进）/ 整合包 19 项 / 数据包 17 项 / 资源包 33 项（3 组禁用标题）/ 光影包 21 项（4 组禁用标题） | 逐项照抄（Content / Tag / 缩进 / 禁用 / ToolTip「由 FTB 官方发布」「作为资源包加载，可以直接在原版游戏里使用。」） | 一致（R40） |
+
+**验证**：`dotnet build PCL.Desktop.Linux/PCL.Desktop.Linux.csproj -c Release -r linux-x64` → **0 警告 / 0 错误**
+（产物 `bin-net10/Dev/2.100.0.4-0.95/linux-x64/`）。
+**未验证项**：左导航 7 项排布与刷新按钮悬停、加载卡片的进度动画、六个下拉弹出层、五个资源子页的切换与长下拉（21–33 项）滚动 —— 需统一验收目视（V15）。
+
 ## 14. 待统一验收清单（UI 全部成型后一次性执行）
 
 | 编号 | 待验收项 | 为什么必须靠运行判断 | 当前已知线索 |
@@ -856,3 +889,4 @@ dotnet build PCL.Desktop.Linux/PCL.Desktop.Linux.csproj -c Release -r linux-x64
 | **V12** | 设置·启动页（13.12） | 折叠交互、下拉弹出层、长文本滚动、内存条比例、卡片阴影均需运行观察 | 需目视：标题栏进「设置」后左导航选中「启动」且右页出现五张卡片；「离线皮肤」「高级选项」初始为 40 高折叠条、点击标题区展开/收起且箭头旋转；启动选项 5 行 28 高、内存条三段比例、JVM 框 100 高、底部胶囊按钮居中 |
 | **V13** | 设置·个性化页（13.13） | 主题区 15 项排布、解锁遮罩层叠、下拉弹出层、复选框禁用态、整页滚动均需运行观察 | 需目视：左导航点「个性化」后右页出现六张卡片；基础卡标题下不透明度滑条满格（600/600）、龙猫蓝选中、其余主题灰色且玄素黑双层叠字；标题栏卡「默认」选中；主页卡「空白」选中且无提示条/按钮；功能隐藏卡 22 行复选框仅「联机」两项禁用；背景图片/音乐卡仅标题、无隐藏控件露出 |
 | **V14** | 设置·其他页（13.14） | 五个下拉弹出层、调试卡折叠、滑块拖动、按钮排布均需运行观察 | 需目视：左导航点「其他」后右页出现「下载 / 社区资源 / 辅助功能 / 启动器」四张卡片 + 40 高「调试选项」折叠条；下载卡两条滑块分别停在 63/255 与 42/42；缓存框显示灰色「默认」占位；启动器卡两排按钮（3 + 2）左对齐、间距 20；展开调试卡后动画滑条停在 9/30；`PanDonate` 在 Dev 渠道可见 |
+| **V15** | 下载栈（13.15） | 左导航选中态、加载卡片、六个下拉弹出层、五个资源子页切换均需运行观察 | 需目视：标题栏进「下载」后左导航 7 项（原版游戏选中、社区资源小标题灰字）、右页居中「正在加载」卡片带进度环；点「Mod」等五项后右页出现同名搜索卡（标题「搜索 Mod」等）、类型下拉分别为 27/19/17/33/21 项；资源页结果区为空、分页卡居中且首页/前页灰显；点回「原版游戏」恢复加载卡片 |
