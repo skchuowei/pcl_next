@@ -37,8 +37,15 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- 唯一的工程引用：CLI 不得直接引用 pcl-next / PCLCS / MeloongCore -->
+    <!--
+      两个工程引用：
+        PCL.Download —— 下载/资源引擎（CLI 的一等能力面）
+        PCL.Core     —— 与 GUI 共用的业务内核（2026-11-14「GUI+CLI 开壳」起，
+                        部署期策略等宿主无关逻辑只在 Core 里有一份实现）
+      两者都声明了 PclIsGuiFree，CLI 的引用闭包仍不得出现 WPF 或 GUI 宿主程序集。
+    -->
     <ProjectReference Include="..\PCL.Download\PCL.Download.csproj" />
+    <ProjectReference Include="..\PCL.Core\PCL.Core.csproj" />
   </ItemGroup>
 
 </Project>

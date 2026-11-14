@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <!--
     pcl-next：基于 PCL2 的第三方分支，目标运行时 .NET 10（net10.0-windows）。
     同目录下原有的 net48 工程（Plain Craft Launcher 2.vbproj）已于本分支弃用并删除，
@@ -167,6 +167,7 @@
   <ItemGroup>
     <ProjectReference Include="..\MeloongCore\Shared\MeloongCore.csproj" />
     <ProjectReference Include="..\MeloongCore\Wpf\MeloongCore.Wpf.csproj" />
+    <ProjectReference Include="..\PCL.Core\PCL.Core.csproj" />
     <ProjectReference Include="..\PCLCS\PCLCS.csproj" />
     <ProjectReference Include="..\PCL.Download\PCL.Download.csproj" />
   </ItemGroup>

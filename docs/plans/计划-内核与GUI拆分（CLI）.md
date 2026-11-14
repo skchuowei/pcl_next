@@ -270,3 +270,75 @@ PCL_ALLOW_MC_DOWNLOAD=False pclcli install --version-json <x> --dir /tmp/i   # �
 3. **Windows 独占**：`DownloadEngine` 要求本地路径含 `:\\`，故 `pclcli` 只能在 Windows 跑（TFM 为 `net10.0` 不限制，但运行期受限）。CI 为 `windows-latest`，无影响。
 4. **`MeloongCore` / `PCLCS` 的 `OutDir` 仍指向各自 `bin\`**（AGENTS §0.3 点名要求改）。本次未动：它们属 GUI 侧且有发布流程依赖，改动风险大于收益，建议并入 T2 拆壳时统一处理。
 5. **`SlowSource_IsRotatedToFastSource` 偶发失败**：与本次改动无关（下载引擎慢源轮换依赖真实时钟），单跑稳定通过，建议后续加时间注入。
+
+---
+
+## 10. T2「GUI+CLI 开壳」执行记录（2026-11-14，第一刀）
+
+> 用户指令：「继续 GUI+CLI 开壳」。本条记录 T2 的第一个可编译、可验证增量。
+> 第一刀不搬业务代码，先把**两个前端必须共用的那一小块内核**独立成工程，
+> 并顺手消掉一处真实存在的合规双实现。
+
+### 10.1 目标与范围（第一刀）
+
+1. 新建无 GUI 内核工程 `PCL.Core`（`net10.0`，声明 `PclIsGuiFree=true`），
+   产物落三段树 `bin-net10\<代号>\<版本>-<构建号>\<RID>\core\`。
+2. GUI 壳 `pcl-next` 与 CLI 壳 `PCL.Cli` **同时**引用它，证明「一核两壳」的依赖方向成立。
+3. 第一个搬迁模块选**部署期下载策略**：此前 GUI `ModDownloadPolicy.cs` 与
+   CLI `CliPolicy.cs` 各写了一份「env → ini → 默认」的实现，属于合规红线（计划 §5.4）
+   最不该出现双实现的地方。现收敛为 `PCL.Core/PclDownloadPolicy.Resolve()` 唯一实现，
+   两端只保留「宿主差异」（GUI 缓存一次、CLI 向上查一级 ini + `--policy-file`）。
+
+### 10.2 交付物
+
+| 文件 | 变化 |
+|---|---|
+| `PCL.Core/PCL.Core.csproj` | 新增。net10.0 库，零第三方包、零工程引用，`PclIsGuiFree=true`，`OutputPath=$(PclTreeRoot)core\` |
+| `PCL.Core/PclDownloadPolicy.cs` | 新增。策略解析唯一实现：`Resolve(explicitIniPath, baseDirectory, searchParentDirectory)` 返回不可变结果（`AllowMcDownload` / `SourceKind` / `IniPath` / `Warning` / `SourceDisplay`），不写日志 |
+| `pcl-next/Modules/Base/ModDownloadPolicy.cs` | 由 207 行实现降为宿主转发层（约 75 行）：保留首次访问缓存、GUI 不向上查 ini、日志用 `MeloongCore.Logger`；对外 API（`AllowMcDownload` / `RestrictMcDownload` / `PolicySource` / `PolicyFilePath` / 三个常量）不变，12 处调用点零改动 |
+| `PCL.Cli/CliPolicy.cs` | 由 127 行实现降为适配层：委托 Core 解析，只保留 `env:` / `ini:` / `default` 来源字符串与「向上查一级」的产物布局约定；新增 `Warning` 属性 |
+| `pcl-next/pcl-next.csproj` / `PCL.Cli/PCL.Cli.csproj` | 各增一条 `ProjectReference` 指向 `PCL.Core` |
+| `pcl-next.sln` | 注册 `PCL.Core`（Debug/Release/Snapshot 三配置） |
+| `AGENTS.md` §0.1 | 三段树合法子层补 `core\`，避免被当成散装产物清理 |
+
+### 10.3 验证证据（本机 2026-11-14）
+
+| 项 | 命令 | 结果 |
+|---|---|---|
+| Core 单编 | `dotnet build PCL.Core\PCL.Core.csproj -c Release -r win-x64` | **0 错误 / 0 警告**，产物 `bin-net10\Dev\2.100.0.7-1.14\win-x64\core\PCL.Core.dll` |
+| CLI 单编 | `dotnet build PCL.Cli\PCL.Cli.csproj -c Release -r win-x64` | **0 错误 / 0 警告**，产物在 `...\win-x64\cli\pclcli.dll` |
+| GUI 全编 | `dotnet build pcl-next\pcl-next.csproj -c Release -r win-x64 --self-contained` | **0 错误**。⚠ 只能在**临时 worktree**（HEAD 干净树 + 本轮改动）里验证：主工作区当时被并行会话未提交的 `PageSetupSystem.xaml`（`<StackPanel>` 未闭合，MC3000）挡住，与本轮无关；已验证后 worktree 已删除，主工作区文件未被触碰 |
+| CLI 离线自检 | `pclcli selftest --suite offline` | 6 项全过（arch / hash / file-check-rule / policy / version-json / resource-registry） |
+| 策略禁用回归 | `PCL_ALLOW_MC_DOWNLOAD=False pclcli selftest --suite offline` | `policy` 项按预期失败、退出码 **6**，证明迁移后「禁用即拦截」语义未变 |
+
+补充：`dotnet build pcl-next.sln -r win-x64` 会被 SDK 直接拒绝（NETSDK1134），
+solution 级构建不接受单一 RID；验证必须逐工程执行，这与 AGENTS §0.1 的 RID 硬要求一致。
+
+### 10.4 第二刀候选（按收益排序，未执行）
+
+1. **日志与路径**：`PclLogger` 目前依赖 `ModMain`（日志目录、UI 线程），先抽出
+   `PCL.Core/PclLogSink`（接口 + 默认文件实现），GUI 注入 UI 回调，CLI 注入 stderr/文件。
+   这是把「内核能独立跑起来」的关键前置。
+2. **版本/渠道**：`ModBuildChannel` / `ModBase.VersionBaseName` 仍是 GUI 工程内的常量，
+   且被 `scripts/Set-VersionInfo.ps1` 直接改写（发布流程依赖）。搬迁必须同步改脚本，
+   否则发布脚本会写空。建议单独一刀，不与本刀混合。
+3. **资源搜索**：`ResourceProviderSearch` 依赖 `ModLoader.LoaderTask`（GUI 侧任务框架），
+   需先把 `LoaderTask` 的 DTO 化（计划 2026-11-08 口径 A）再搬。
+4. **CLI 命令扩展**：内核具备日志/路径后，CLI 可新增 `instance list`、`java list`、
+   `launch --dry-run`（只做决策输出，不真的启动），逐步逼近 T2 §1 的「全能力前端」。
+
+### 10.5 明确不做（第一刀）
+
+- 不动 `ModNet` / `ModDownload` / `ModMinecraft` / `ModLaunch` 等业务模块（仍留在 GUI 壳内）。
+- 不改 `pcl-next.exe --headless` 启动链，不引入 WPF 依赖到 Core。
+- 不动 `scripts/Set-VersionInfo.ps1` 与版本常量真源。
+- 不改 CLI 的 stdout JSON 协议与退出码表。
+
+### 10.6 回滚方案
+
+- 删除 `PCL.Core/` 目录，回退 `pcl-next/pcl-next.csproj` / `PCL.Cli/PCL.Cli.csproj` 的两条
+  `ProjectReference`、`pcl-next.sln` 的注册项，并把 `ModDownloadPolicy.cs` / `CliPolicy.cs`
+  恢复为各自 207 / 127 行实现（HEAD 版本可直接 `git checkout --` 取回）。
+- 回滚后两端行为与 2026-11-13 完全一致，无数据迁移、无配置变更。
+- 按 AGENTS §六 出正式回退报告，禁止静默回退。
+

@@ -168,7 +168,7 @@ bin-net10/<开发代号>/<版本名>-<构建号>/<运行环境>/cli/     ← PCL
 例：bin-net10/Dev/2.100.0.3-0.20/win-x64/cli/pclcli.exe
 ```
 
-- `cli\` 是**三段树内的合法子层**，不得当成散装产物清理。
+- `cli\` 与 `core\` 是**三段树内的合法子层**（分别放 `PCL.Cli` / `PCL.Core` 的产物），不得当成散装产物清理。
 - **禁止**不带 `-r <RID>` 编译：旧规则允许 `any` 占位，2026-11-08 起一律由
   `PclRidGuard` 报错终止；带 `-r` 时 `<运行环境>` 段才是真实 RID。连 `dotnet test` 也必须带 `-r`。
 - 上述两处树由 `PCL2\Directory.Build.props` 的 `PclTreeRoot` 统一推出，**不要在工程里手写绝对路径**。

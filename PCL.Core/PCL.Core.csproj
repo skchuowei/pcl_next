@@ -1,0 +1,48 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <OutputType>Library</OutputType>
+    <AssemblyName>PCL.Core</AssemblyName>
+    <RootNamespace>PCL.Core</RootNamespace>
+    <Configurations>Debug;Release;Snapshot</Configurations>
+    <Deterministic>true</Deterministic>
+    <LangVersion>13.0</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+
+    <!--
+      GUI 与 CLI 共用的业务内核（T2 拆壳的第一块地基，《计划-内核与GUI拆分（CLI）》§5.6）。
+
+      本工程是「无 GUI 内核」：只放不依赖 WPF / WinForms / pcl-next 宿主的逻辑，
+      由两个前端共同引用——GUI 壳 pcl-next 与 CLI 壳 PCL.Cli。
+      声明 PclIsGuiFree 后，Directory.Build.props 的架构护栏会在构建期检查引用闭包，
+      一旦有人误引 WPF 或宿主程序集，构建直接失败。
+    -->
+    <PclIsGuiFree>true</PclIsGuiFree>
+  </PropertyGroup>
+
+  <!--
+    产物落三段树内的 core\ 子层（AGENTS §0.1：cli\ / core\ 都是三段树内的合法子层）。
+    无条件赋值，避免外部 -p:OutputPath 成为第二处真相源。
+  -->
+  <PropertyGroup>
+    <OutputPath>$(PclTreeRoot)core\</OutputPath>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
+    <PclUseTreePath>true</PclUseTreePath>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <DefineConstants>$(DefineConstants);SNAPSHOT</DefineConstants>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Snapshot|AnyCPU'">
+    <Optimize>True</Optimize>
+  </PropertyGroup>
+
+  <!--
+    刻意保持「零第三方包、零工程引用」：Core 的第一个模块是部署期策略解析，
+    它只需要 BCL。后续搬迁模块时按需加引用，加之前先确认不引入 WPF 与 GUI 宿主。
+  -->
+
+</Project>
