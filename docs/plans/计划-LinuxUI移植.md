@@ -120,6 +120,9 @@
 | **R27** | `MySlider` 数值提示：WPF 的 `Popup`（`GetHintText` 动态文案、拖动/键盘时弹出、700ms 后收起）未移植；拖动时的 1.3 滑块缩放与 40ms 颜色切换并入 R10 近似 | 仅提示气泡与动画 | 轨道 1px/2px、滑块 10×10、宽度算法（两端 0.5 补偿）与配色分支不得改；接入设置页后再按 `RefreshPopup` 补 |
 | **R28** | `MyExtraTextButton` 近似：WPF 圆角绑定 `ActualHeight×0.4`（52 → 20.8）改为固定 21；`Show` 进出场（0→1 淡入 80ms + 0.15→0.85 缩放）未移植；按下 800ms→0.85、60ms→0.80 的分段压缩为 100ms→0.8，回弹 300ms `BackEaseOut` 保留 | 仅动画与绑定表达式 | 高 52、内层下移 10、文案 16 号 `ColorBrush8`、图标 `Margin 2,12,0,12`、悬停 `ColorBrush4` / 禁用 `ColorBrushGray4` 不得改 |
 | **R29** | 设置·启动页静态态：Linux 侧尚无设置服务，`SettingService.Key/Value` 绑定、`ValidateExcept` / `ValidateInteger` 校验、运行期联动（窗口尺寸框显隐、皮肤类型分支 `UpdateSkinType`、内存条比例 `PanRamDisplay`、Java 列表刷新）均未接入；页面按 `Settings.vb` 默认值呈现（`LaunchArgumentIndieV2=4`、`Visible=5`、`Priority=1`、`WindowType=1`、`RamType=0`、`RamCustom=15`、`AdvanceGC=4`、`GraphicCard=True`、JVM 默认串） | 仅数据绑定与联动 | 五张卡片的行列高（28/9）、`Margin 25,40,25,25`、`MinWidth 140 / Padding 13,0`、JVM 框高 100、`Panel` 内控件顺序与文案不得改 |
+| **R30** | 设置·个性化页主题解锁交互未接入：`LabLauncherTheme5Unlock` 连点解锁玄素黑（`PageSetupUI.xaml.vb` L354–L366）、`LabLauncherTheme8/9/11` 的右键跳转（赞助 / 反馈 / 解密游戏，L367–L385）、`RadioLauncherTheme14` 选中后显示色相/饱和度/亮度/色调渐变四条滑条（L388–L411）均未实现；解锁提示层（`Background=ColorBrushSemiTransparent` 的四个 TextBlock）与解锁 ToolTip 按原布局保留，滑条按原 XAML 保持隐藏 | 仅解锁状态机与右键菜单 | 主题 15 项的 6 列 × 3 行排布、`PanLauncherTheme Height 90`、各 `IsEnabled`（仅 0–4 可用）与 `Opacity`（玄素黑 0/1 双层）不得改；滑条 `MaxValue 360/180/100/40`、`ValueByKey 10/5/5/5` 不得改 |
+| **R31** | 设置·个性化页文件操作未接入：背景图片（打开文件夹 / 刷新 / 清空，`PageSetupUI.xaml.vb` L75–L154）、背景音乐（打开文件夹 / 刷新 / 清空，L226–L273）、标题栏图片（更改 / 清空，L157–L223）与「生成教学文件」「打开主页文件夹」均只保留按钮形态与 ToolTip；三组区域在无文件时保持原 XAML 的隐藏态（`PanBackground*`、`BtnBackgroundClear`、`PanMusicVolume/Detail`、`BtnMusicClear`），卡片标题不加「（N 张）/（N 首）」后缀 | 仅文件系统动作与数量后缀 | 隐藏态的卡片间距、`StackPanel Margin 25,40,25,20 / 25,42,25,20`、按钮 `MinWidth 140 / Padding 13,0 / 间距 20` 不得改；接入文件服务后按 `BackgroundRefreshUI` / `MusicRefreshUI` 补齐 |
+| **R32** | 设置·个性化页「功能隐藏」联动未接入：父子项联动（`HiddenSetupMain` / `HiddenSetupSub` / `HiddenOtherMain` / `HiddenOtherSub` / `HiddenOtherNet`，L513–L587）、警告提示（`HiddenHint`）、F12 强制显示（`HiddenForceShow`）与 `HiddenRefresh` 对标题栏 Tab / 设置左导航 / 更多子页的显隐影响均未实现；复选框仅为静态形态，`UiHidden*` 默认全部不勾，「联机」「设置 子页面-联机」两项按原 XAML 保持 `IsEnabled=False` | 仅联动规则 | `CardSwitch` 的 7 列（Auto/18/0.8*/0.9*/0.8*/0.8*/1.0*）与 6 行（4/30/30/30/30/Auto）、复选框高 22、文案与 ToolTip 逐字不得改 |
 
 ---
 
@@ -785,6 +788,30 @@ dotnet build PCL.Desktop.Linux/PCL.Desktop.Linux.csproj -c Release -r linux-x64
 （产物 `bin-net10/Dev/2.100.0.4-0.92/linux-x64/`）。
 **未验证项**：卡片折叠/展开的点击与箭头旋转、下拉弹出层、长 JVM 文本滚动、内存条比例、胶囊按钮悬停 —— 需统一验收目视（V12）。
 
+### 13.13 设置栈「个性化」页（LU6.2，2026-11-14，只做编译验证、不弹窗）
+
+**对照来源**：`pcl-next/Pages/PageSetup/PageSetupUI.xaml`（全文 346 行）+ `PageSetupUI.xaml.vb`
+（L3–L40 加载/刷新、L47–L49 标题栏分支、L309–L343 主页分支、L388–L411 自定义主题滑条、L513–L587 功能隐藏联动）；
+默认值取自 `pcl-next/Pages/PageSetup/Settings.vb` L139–L180；
+主题解锁为空实现（`Modules/ModSecret.vb` L136–L143：`ThemeCheckAll` 空体、`ThemeCheckOne` 恒 True、`ThemeUnlock` 恒 False），
+`ChannelIsOfficial` 在 Dev 渠道为 False（`ModBuildChannel.vb` L109–L113）→ 赞助遮罩 `PanLauncherHide` 保持隐藏。
+
+**Linux 实现**：`Views/PageSetupUIView.axaml(.cs)`；
+`MainWindow.axaml.cs`（`ShowSetupPage`：新增 `2 => PageSetupUIView`，个性化页接入设置栈子页切换）。
+
+| 卡片 / 区域 | Windows 取值 | Linux 实现 | 结论 |
+|---|---|---|---|
+| 基础卡 | 内容 `Margin 25,40,25,17`；不透明度行 Grid 五列（Auto[Name1]/1*/30/Auto/1*）、滑块跨 5 列；`PanLauncherTheme Height 90`、6 列 × 3 行、15 项主题；勾选框 `Margin -1,0,0,1` 高 22 | 同；不透明度 `Value 600 / MaxValue 600 / ValueByKey 10`；龙猫蓝 `Checked=True`；四条自定义滑条按原 XAML 隐藏；赞助遮罩按原布局保留并隐藏 | 一致（R30 / R27） |
+| 背景图片卡 | `Margin 25,40,25,20`；自适应 Grid 高 28 / 不透明度 22 / 模糊 22；13 项下拉；彩色背景勾选；三按钮 `Height 35`、第三个红色隐藏 | 同；`Value 1000 / 0`、下拉 `SelectedIndex=0`（自动）、彩色勾选；三栏与清空按钮隐藏 | 一致（R31 / R29） |
+| 背景音乐卡 | `Margin 25,42,25,20`；音量滑条 22 高、四个选项高 22、清空按钮红色隐藏 | 同；音量 `Value 500`；随机/自动勾选，启动/退出两项不勾 | 一致（R31） |
+| 标题栏卡 | `Margin 25,40,25,15`；四选一（1*/1*/1*/1*/0.2*）、`Margin -1,0,0,0`、高 22；居左勾选 / 文本框 / 图片按钮组均隐藏 | 同；「默认」`Checked=True`（`UiLogoType=1`） | 一致（R29） |
+| 主页卡 | `Margin 25,40,25,15`；四选一；蓝色提示 + 黄色可关闭提示；本地四按钮 `WrapPanel`、联网输入框、预设下拉均隐藏 | 同；「空白」`Checked=True`（`UiCustomType=0`）、两提示 `IsVisible=False`、预设下拉 21 项 | 一致（R29） |
+| 功能隐藏卡 | `Margin 25,38,15,15`；说明文字换行；7 列（Auto/18/0.8*/0.9*/0.8*/0.8*/1.0*）、6 行（4/30/30/30/30/Auto）；4 行 × 5–6 个复选框 | 同；全部不勾；「联机」「设置 子页面-联机」`IsEnabled=False`；ToolTip 逐字保留（含 `ToolTip.ShowOnDisabled`） | 一致（R32） |
+
+**验证**：`dotnet build PCL.Desktop.Linux/PCL.Desktop.Linux.csproj -c Release -r linux-x64` → **0 警告 / 0 错误**
+（产物 `bin-net10/Dev/2.100.0.4-0.93/linux-x64/`）。
+**未验证项**：主题区 15 项在 6 列 × 3 行内的实际排布与解锁遮罩层叠、下拉弹出层、复选框三态、卡片滚动 —— 需统一验收目视（V13）。
+
 ## 14. 待统一验收清单（UI 全部成型后一次性执行）
 
 | 编号 | 待验收项 | 为什么必须靠运行判断 | 当前已知线索 |
@@ -801,3 +828,4 @@ dotnet build PCL.Desktop.Linux/PCL.Desktop.Linux.csproj -c Release -r linux-x64
 | **V10** | 启动栈 / 版本选择栈（13.10） | 空态居中、按钮三态、页面进入动画、右页滚动、`ScrollViewerFullMargin` 滚动条 2,1,1,1 边距均需运行观察 | 需目视：首页为「启动」且标题栏「启动」选中、启动左页 300 宽（按钮 54 / 35 高）、「版本选择」点开进入 250–300 宽左列 + 居中空态卡片、「下载游戏」可点、右页提示条与日志卡、`PanLaunching` 保持隐藏 |
 | **V11** | 设置页前置控件（13.11） | 圆点/圆环尺寸、滑块宽度算法、拖动与键盘步进、胶囊按钮配色均需运行观察 | 需目视：`MyRadioBox` 18 圆环 + 9 圆点（选中 `ColorBrush2`、悬停 `ColorBrush3`）、`MySlider` 底轨 1px/前轨 2px/滑块 10、拖动与 ←/→ 生效、`MyExtraTextButton` 52 高 + 内层下移 10 + 悬停 `ColorBrush4` |
 | **V12** | 设置·启动页（13.12） | 折叠交互、下拉弹出层、长文本滚动、内存条比例、卡片阴影均需运行观察 | 需目视：标题栏进「设置」后左导航选中「启动」且右页出现五张卡片；「离线皮肤」「高级选项」初始为 40 高折叠条、点击标题区展开/收起且箭头旋转；启动选项 5 行 28 高、内存条三段比例、JVM 框 100 高、底部胶囊按钮居中 |
+| **V13** | 设置·个性化页（13.13） | 主题区 15 项排布、解锁遮罩层叠、下拉弹出层、复选框禁用态、整页滚动均需运行观察 | 需目视：左导航点「个性化」后右页出现六张卡片；基础卡标题下不透明度滑条满格（600/600）、龙猫蓝选中、其余主题灰色且玄素黑双层叠字；标题栏卡「默认」选中；主页卡「空白」选中且无提示条/按钮；功能隐藏卡 22 行复选框仅「联机」两项禁用；背景图片/音乐卡仅标题、无隐藏控件露出 |

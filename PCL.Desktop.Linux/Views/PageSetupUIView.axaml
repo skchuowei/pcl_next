@@ -1,0 +1,461 @@
+﻿<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="using:PCL.Desktop.Linux.Controls"
+             x:Class="PCL.Desktop.Linux.Views.PageSetupUIView">
+
+    <!--
+      1:1 对照基准：pcl-next/Pages/PageSetup/PageSetupUI.xaml（全文 346 行）
+      外层：MyPageRight PanScroll="PanBack" → MyScrollViewer(Auto/Disabled) → StackPanel Margin 25,10
+      六张卡片：基础 / 背景图片 / 背景音乐 / 标题栏 / 主页 / 功能隐藏（均 Margin 0,0,0,15，首卡 0,15）
+
+      静态初值取自 Settings.vb 的默认值（不是 XAML 设计值）：
+      · UiLauncherTransparent = 600 → 首卡不透明度滑条 Value 600（MaxValue 600 / ValueByKey 10）
+      · UiLauncherTheme = 0 → 龙猫蓝 RadioLauncherTheme0 选中；其余主题项保持 IsEnabled=False
+      · UiLauncherLogo = True → 「显示 PCL 图标」勾选
+      · UiBackgroundOpacity = 1000 / UiBackgroundBlur = 0 / UiBackgroundSuit = 0（自动）/
+        UiBackgroundColorful = True → 彩色背景勾选；无图片文件 → 三栏与「清空」按钮保持隐藏、标题不变
+      · 无音乐文件 → 音量/选项/清空按钮保持隐藏、标题不变
+      · UiLogoType = 1 → 「默认」选中；CheckLogoLeft / PanLogoText / PanLogoChange 隐藏
+      · UiCustomType = 0 → 主页四项为「空白」，PanCustom* 与两条 MyHint 全部隐藏
+      · UiMusicRandom / UiMusicAuto = True；UiMusicVolume = 500；UiHidden* 全部 False（复选框全不勾）
+      · ChannelIsOfficial = False（Dev 渠道）→ PanLauncherHide 赞助遮罩保持隐藏
+
+      差异登记：
+      · R29 —— SettingService 键值绑定未接入，本页为静态默认态；所有文案 / ToolTip 逐字保留
+      · R30 —— 主题解锁交互（LabLauncherTheme5Unlock 连点、8/9/11 的右键跳转、14 的自定义
+        色相/饱和度/亮度滑条显隐）未接入；滑条已按原布局放置但保持隐藏
+      · R31 —— 背景图片 / 背景音乐 / 标题栏图片的文件夹打开、刷新、清空（含确认框）未接入，
+        按钮仅保留形态与 ToolTip
+      · R32 —— 功能隐藏的联动规则（父项联动子项、F12 强制显示、左导航项显隐）未接入，
+        复选框仅保留静态形态；「联机」两项按原 XAML 保持 IsEnabled=False
+      · R27 —— MySlider 无数值提示 Popup（GetHintText 的百分比 / 度数文案未显示）
+    -->
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                  Name="PanBack">
+        <StackPanel Name="PanMain" Margin="25,10">
+
+            <c:MyCard Margin="0,15" Title="基础" Name="CardLauncher">
+                <Grid Margin="25,40,25,17">
+                    <StackPanel>
+                        <Grid Margin="0,0,0,6">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" SharedSizeGroup="Name1" />
+                                <ColumnDefinition Width="1*" />
+                                <ColumnDefinition Width="30" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="1*" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <TextBlock VerticalAlignment="Center" HorizontalAlignment="Left"
+                                       Text="不透明度" Margin="0,0,20,0" />
+                            <c:MySlider MaxValue="600" Value="600" ValueByKey="10"
+                                        Grid.ColumnSpan="5" Name="SliderLauncherTransparent" Grid.Column="1" />
+                            <TextBlock Grid.Row="1" VerticalAlignment="Center" Name="LabLauncherHue"
+                                       IsVisible="False" HorizontalAlignment="Left"
+                                       Text="色调" Margin="0,10,20,0" />
+                            <c:MySlider Grid.Row="1" Grid.Column="1" Name="SliderLauncherHue"
+                                        IsVisible="False" MaxValue="360" ValueByKey="10" Margin="0,10,0,0" />
+                            <TextBlock Grid.Row="2" VerticalAlignment="Center" Name="LabLauncherDelta"
+                                       IsVisible="False" HorizontalAlignment="Left"
+                                       Text="色调渐变" Margin="0,10,20,0" />
+                            <c:MySlider Grid.Row="2" Grid.Column="1" Name="SliderLauncherDelta"
+                                        IsVisible="False" MaxValue="180" ValueByKey="5" Margin="0,10,0,0" />
+                            <TextBlock Grid.Row="1" Grid.Column="3" VerticalAlignment="Center" Name="LabLauncherSat"
+                                       IsVisible="False" HorizontalAlignment="Left"
+                                       Text="饱和度" Margin="0,10,20,0" />
+                            <c:MySlider Grid.Row="1" Grid.Column="4" Name="SliderLauncherSat"
+                                        IsVisible="False" MaxValue="100" ValueByKey="5" Margin="0,10,0,0" />
+                            <TextBlock Grid.Row="2" Grid.Column="3" VerticalAlignment="Center" Name="LabLauncherLight"
+                                       IsVisible="False" HorizontalAlignment="Left"
+                                       Text="亮度" Margin="0,10,20,0" />
+                            <c:MySlider Grid.Row="2" Grid.Column="4" Name="SliderLauncherLight"
+                                        IsVisible="False" MaxValue="40" ValueByKey="5" Margin="0,10,0,0" />
+                        </Grid>
+                        <Grid Name="PanLauncherTheme" Height="90" Margin="0,0,0,7">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" SharedSizeGroup="Name1" />
+                                <ColumnDefinition />
+                                <ColumnDefinition />
+                                <ColumnDefinition />
+                                <ColumnDefinition />
+                                <ColumnDefinition />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition />
+                                <RowDefinition />
+                                <RowDefinition />
+                            </Grid.RowDefinitions>
+                            <TextBlock VerticalAlignment="Center" HorizontalAlignment="Left"
+                                       Text="主题" Margin="0,0,20,0" />
+                            <TextBlock VerticalAlignment="Center" HorizontalAlignment="Left"
+                                       Text="隐藏主题" Margin="0,0,20,0" Grid.Row="1" />
+                            <c:MyRadioBox Grid.Column="1" Grid.Row="0" Text="龙猫蓝" Name="RadioLauncherTheme0"
+                                          Checked="True" />
+                            <c:MyRadioBox Grid.Column="2" Grid.Row="0" Text="甜柠青" Name="RadioLauncherTheme1" />
+                            <c:MyRadioBox Grid.Column="3" Grid.Row="0" Text="小草绿" Name="RadioLauncherTheme2" />
+                            <c:MyRadioBox Grid.Column="4" Grid.Row="0" Text="菠萝黄" Name="RadioLauncherTheme3" />
+                            <c:MyRadioBox Grid.Column="5" Grid.Row="0" Text="橡木棕" Name="RadioLauncherTheme4" />
+                            <c:MyRadioBox Grid.Column="1" Grid.Row="1" Text="玄素黑" Name="RadioLauncherTheme5"
+                                          Opacity="0" ToolTip.Tip="灰色是个谎言" />
+                            <c:MyRadioBox Grid.Column="1" Grid.Row="1" Text="玄素黑" Name="RadioLauncherTheme5Gray"
+                                          IsEnabled="False" Opacity="1" />
+                            <TextBlock Grid.Column="1" Grid.Row="1" Name="LabLauncherTheme5Unlock"
+                                       Background="{DynamicResource ColorBrushSemiTransparent}"
+                                       ToolTip.Tip="灰色是个谎言" />
+                            <c:MyRadioBox Grid.Column="2" Grid.Row="1" Text="滑稽彩" Name="RadioLauncherTheme12"
+                                          IsEnabled="False"
+                                          ToolTip.Tip="滑稽树上滑稽果，滑稽树下你和我，滑稽之日搞事情，欢乐多又多"
+                                          ToolTip.ShowOnDisabled="True" />
+                            <c:MyRadioBox Grid.Column="3" Grid.Row="1" Text="铁杆粉" Name="RadioLauncherTheme6"
+                                          IsEnabled="False" ToolTip.Tip="99 次重逢的喜悦"
+                                          ToolTip.ShowOnDisabled="True" />
+                            <c:MyRadioBox Grid.Column="4" Grid.Row="1" Text="神秘紫" Name="RadioLauncherTheme7"
+                                          IsEnabled="False"
+                                          ToolTip.Tip="072 101 108 112 032 068 101 118 032 048 046 052 046 052"
+                                          ToolTip.ShowOnDisabled="True" />
+                            <c:MyRadioBox Grid.Column="5" Grid.Row="1" Text="欧皇彩" Name="RadioLauncherTheme13"
+                                          IsEnabled="False" ToolTip.Tip="这就是传说中的欧皇了吧"
+                                          ToolTip.ShowOnDisabled="True" />
+                            <c:MyRadioBox Grid.Column="1" Grid.Row="2" Text="秋仪金" Name="RadioLauncherTheme8"
+                                          IsEnabled="False" />
+                            <TextBlock Grid.Column="1" Grid.Row="2" Name="LabLauncherTheme8Copy"
+                                       Background="{DynamicResource ColorBrushSemiTransparent}" />
+                            <c:MyRadioBox Grid.Column="2" Grid.Row="2" Text="活跃橙" Name="RadioLauncherTheme9"
+                                          IsEnabled="False" />
+                            <TextBlock Grid.Column="2" Grid.Row="2" Name="LabLauncherTheme9Copy"
+                                       Background="{DynamicResource ColorBrushSemiTransparent}" />
+                            <c:MyRadioBox Grid.Column="3" Grid.Row="2" Text="跳票红" Name="RadioLauncherTheme10"
+                                          IsEnabled="False" ToolTip.Tip="进行一次正版登录，支持正版游戏！"
+                                          ToolTip.ShowOnDisabled="True" />
+                            <c:MyRadioBox Grid.Column="4" Grid.Row="2" Text="极客蓝" Name="RadioLauncherTheme11"
+                                          IsEnabled="False" ToolTip.Tip="右键打开解密游戏入口" />
+                            <TextBlock Grid.Column="4" Grid.Row="2" Name="LabLauncherTheme11Click"
+                                       Background="{DynamicResource ColorBrushSemiTransparent}" />
+                            <c:MyRadioBox Grid.Column="5" Grid.Row="2" Text="自定义" Name="RadioLauncherTheme14"
+                                          IsEnabled="False" ToolTip.Tip="需要解锁五个隐藏主题"
+                                          ToolTip.ShowOnDisabled="True" />
+                        </Grid>
+                        <c:MyCheckBox Text="打开启动器时显示 PCL 图标" Margin="-1,0,0,1" Height="22"
+                                      Checked="True" />
+                    </StackPanel>
+                    <Border Background="#DDDDDDDD" Margin="-8,23,-5,28" CornerRadius="4"
+                            Name="PanLauncherHide" IsVisible="False">
+                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <TextBlock Text="如果可以小小赞助一下 PCL，就能解锁主题颜色更换功能啦……&#xa;多亏了大家的支持，PCL 才能在免费、无任何广告的情况下维持数年的更新（磕头）！"
+                                       FontSize="13" Margin="0,0,0,0" />
+                            <c:MyButton Height="32" MinWidth="140" Text="支持 PCL 开发！" Padding="13,0"
+                                        HorizontalAlignment="Center" Margin="0,9,0,0" ColorType="Highlight" />
+                        </StackPanel>
+                    </Border>
+                </Grid>
+            </c:MyCard>
+
+            <c:MyCard Name="CardBackground" Margin="0,0,0,15" Title="背景图片">
+                <StackPanel Margin="25,40,25,20">
+                    <Grid Name="PanBackgroundSuit" Height="28" Margin="0,0,0,10" IsVisible="False">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" SharedSizeGroup="Name" />
+                            <ColumnDefinition />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock VerticalAlignment="Center" HorizontalAlignment="Left"
+                                   Text="自适应方式" Margin="0,0,25,0" />
+                        <c:MyComboBox Grid.Column="1" SelectedIndex="0">
+                            <c:MyComboBoxItem Content="自动"
+                                              ToolTip.Tip="当图片较小时选择平铺，较大时选择居中 (保持长宽比)" />
+                            <c:MyComboBoxItem Content="平铺" />
+                            <c:MyComboBoxItem Content="居中" />
+                            <c:MyComboBoxItem Content="拉伸"
+                                              ToolTip.Tip="拉伸图片使其恰好填满整个窗口，很可能会导致长宽比的改变" />
+                            <c:MyComboBoxItem Content="左上 (保持长宽比)" />
+                            <c:MyComboBoxItem Content="左中 (保持长宽比)" />
+                            <c:MyComboBoxItem Content="左下 (保持长宽比)" />
+                            <c:MyComboBoxItem Content="中上 (保持长宽比)" />
+                            <c:MyComboBoxItem Content="居中 (保持长宽比)" />
+                            <c:MyComboBoxItem Content="中下 (保持长宽比)" />
+                            <c:MyComboBoxItem Content="右上 (保持长宽比)" />
+                            <c:MyComboBoxItem Content="右中 (保持长宽比)" />
+                            <c:MyComboBoxItem Content="右下 (保持长宽比)" />
+                        </c:MyComboBox>
+                    </Grid>
+                    <Grid Name="PanBackgroundOpacity" Height="22" Margin="0,0,0,7" IsVisible="False">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" SharedSizeGroup="Name" />
+                            <ColumnDefinition />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock VerticalAlignment="Center" HorizontalAlignment="Left"
+                                   Text="不透明度" Margin="0,0,25,0" />
+                        <c:MySlider Name="SliderBackgroundOpacity" MaxValue="1000" Value="1000" ValueByKey="10"
+                                    Grid.Column="1" />
+                    </Grid>
+                    <Grid Name="PanBackgroundBlur" Height="22" Margin="0,0,0,10" IsVisible="False">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" SharedSizeGroup="Name" />
+                            <ColumnDefinition />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock VerticalAlignment="Center" HorizontalAlignment="Left"
+                                   Text="背景模糊" Margin="0,0,25,0" />
+                        <c:MySlider Name="SliderBackgroundBlur" MaxValue="40" Grid.Column="1"
+                                    ToolTip.Tip="高度的模糊会严重掉帧，请谨慎。&#13;不建议在制作整合包时开启模糊，以确保 PCL 在低性能电脑上可以流畅运行。" />
+                    </Grid>
+                    <c:MyCheckBox Text="叠加彩色背景" Margin="-1,0,0,8" Height="22" Checked="True" />
+                    <Grid Height="35" Margin="0,2,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" SharedSizeGroup="Button" />
+                            <ColumnDefinition Width="Auto" SharedSizeGroup="Button" />
+                            <ColumnDefinition Width="Auto" SharedSizeGroup="Button" />
+                        </Grid.ColumnDefinitions>
+                        <c:MyButton Name="BtnBackgroundOpen" MinWidth="140" Text="打开文件夹" Padding="13,0"
+                                    Margin="0,0,20,0"
+                                    ToolTip.Tip="将背景图片放到该文件夹，PCL 将会在每次打开时随机加载其中的一张图片" />
+                        <c:MyButton Name="BtnBackgroundRefresh" MinWidth="140" Text="刷新背景图片" Padding="13,0"
+                                    Margin="0,0,20,0" Grid.Column="1"
+                                    ToolTip.Tip="随机加载文件夹内的一张背景图片" />
+                        <c:MyButton Name="BtnBackgroundClear" MinWidth="140" Text="清空背景图片"
+                                    IsVisible="False" Padding="13,0" Margin="0,0,20,0" ColorType="Red"
+                                    Grid.Column="2" />
+                    </Grid>
+                </StackPanel>
+            </c:MyCard>
+
+            <c:MyCard Name="CardMusic" Margin="0,0,0,15" Title="背景音乐">
+                <StackPanel Margin="25,42,25,20">
+                    <Grid Name="PanMusicVolume" IsVisible="False" Height="22" Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" SharedSizeGroup="Name" />
+                            <ColumnDefinition />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock VerticalAlignment="Center" HorizontalAlignment="Left"
+                                   Text="音量" Margin="0,0,25,0" />
+                        <c:MySlider Name="SliderMusicVolume" MaxValue="1000" Value="500" ValueByKey="10"
+                                    Grid.Column="1" />
+                    </Grid>
+                    <StackPanel Name="PanMusicDetail" IsVisible="False" Margin="-1,0,0,3">
+                        <c:MyCheckBox Text="随机播放" Margin="0,0,0,5" Height="22"
+                                      Name="CheckMusicRandom" Checked="True" />
+                        <c:MyCheckBox Text="打开启动器自动开始播放" Margin="0,0,0,5" Height="22"
+                                      Name="CheckMusicAuto" Checked="True" />
+                        <c:MyCheckBox Text="游戏启动后自动开始播放，游戏退出后自动暂停播放" Margin="0,0,0,5" Height="22"
+                                      Name="CheckMusicStart" />
+                        <c:MyCheckBox Text="游戏启动后自动暂停播放，游戏退出后自动开始播放" Margin="0,0,0,5" Height="22"
+                                      Name="CheckMusicStop" />
+                    </StackPanel>
+                    <Grid Height="35">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" SharedSizeGroup="Button" />
+                            <ColumnDefinition Width="Auto" SharedSizeGroup="Button" />
+                            <ColumnDefinition Width="Auto" SharedSizeGroup="Button" />
+                        </Grid.ColumnDefinitions>
+                        <c:MyButton Name="BtnMusicOpen" Text="打开文件夹" MinWidth="140" Padding="13,0"
+                                    Margin="0,0,20,0"
+                                    ToolTip.Tip="将背景音乐放到该文件夹，PCL 将会播放其中的所有音乐" />
+                        <c:MyButton Name="BtnMusicRefresh" Text="刷新背景音乐" MinWidth="140" Padding="13,0"
+                                    Margin="0,0,20,0" Grid.Column="1"
+                                    ToolTip.Tip="刷新播放列表，并播放列表中的音乐" />
+                        <c:MyButton Name="BtnMusicClear" Text="清空背景音乐" MinWidth="140" IsVisible="False"
+                                    Padding="13,0" Margin="0,0,20,0" ColorType="Red" Grid.Column="2" />
+                    </Grid>
+                </StackPanel>
+            </c:MyCard>
+
+            <c:MyCard Name="CardLogo" Margin="0,0,0,15" Title="标题栏">
+                <StackPanel Margin="25,40,25,15">
+                    <Grid Margin="-1,0,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="1*" />
+                            <ColumnDefinition Width="1*" />
+                            <ColumnDefinition Width="1*" />
+                            <ColumnDefinition Width="1*" />
+                            <ColumnDefinition Width="0.2*" />
+                        </Grid.ColumnDefinitions>
+                        <c:MyRadioBox Text="无" Name="RadioLogoType0" Height="22" Grid.Column="0" />
+                        <c:MyRadioBox Text="默认" Name="RadioLogoType1" Height="22" Grid.Column="1"
+                                      Checked="True" />
+                        <c:MyRadioBox Text="文本" Name="RadioLogoType2" Height="22" Grid.Column="2" />
+                        <c:MyRadioBox Text="图片" Name="RadioLogoType3" Height="22" Grid.Column="3" />
+                    </Grid>
+                    <c:MyCheckBox Text="标题栏居左" Margin="-1,8,0,3" Height="22"
+                                  Name="CheckLogoLeft" IsVisible="False" />
+                    <Grid Name="PanLogoText" Margin="0,14,0,5" IsVisible="False">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" SharedSizeGroup="Name" />
+                            <ColumnDefinition />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock VerticalAlignment="Center" HorizontalAlignment="Left"
+                                   Text="标题栏文本" Margin="0,0,25,0" />
+                        <c:MyTextBox Name="TextLogoText" Grid.Column="1" MaxLength="100" />
+                    </Grid>
+                    <Grid Name="PanLogoChange" Margin="0,14,0,5" Height="35" IsVisible="False">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" SharedSizeGroup="Button" />
+                            <ColumnDefinition Width="Auto" SharedSizeGroup="Button" />
+                        </Grid.ColumnDefinitions>
+                        <c:MyButton Name="BtnLogoChange" Text="更改图片" MinWidth="140" Padding="13,0"
+                                    Margin="0,0,20,0" />
+                        <c:MyButton Name="BtnLogoDelete" Text="清空图片" MinWidth="140" Padding="13,0"
+                                    Margin="0,0,20,0" ColorType="Red" Grid.Column="1" />
+                    </Grid>
+                </StackPanel>
+            </c:MyCard>
+
+            <c:MyCard Margin="0,0,0,15" Title="主页" Name="CardCustom">
+                <StackPanel Margin="25,40,25,15">
+                    <Grid Margin="-1,0,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="1*" />
+                            <ColumnDefinition Width="1*" />
+                            <ColumnDefinition Width="1*" />
+                            <ColumnDefinition Width="1*" />
+                            <ColumnDefinition Width="0.2*" />
+                        </Grid.ColumnDefinitions>
+                        <c:MyRadioBox Text="空白" Name="RadioCustomType0" Height="22" Grid.Column="0"
+                                      Checked="True" />
+                        <c:MyRadioBox Text="预设" Name="RadioCustomType3" Height="22" Grid.Column="1" />
+                        <c:MyRadioBox Text="读取本地文件" Name="RadioCustomType1" Height="22" Grid.Column="2" />
+                        <c:MyRadioBox Text="联网更新" Name="RadioCustomType2" Height="22" Grid.Column="3" />
+                    </Grid>
+                    <c:MyHint Margin="0,15,0,-4" Text="内容见 ModSetup" HintTheme="Blue"
+                              Name="HintCustom" IsVisible="False" />
+                    <c:MyHint Margin="0,15,0,6" Text="请谨慎使用陌生人提供的主页，恶意代码可能会造成损害！"
+                              HintTheme="Yellow" Name="HintCustomWarn" CanClose="True"
+                              RelativeSetup="HintCustomWarn" IsVisible="False" />
+                    <WrapPanel Name="PanCustomLocal" IsVisible="False" Margin="0,0,0,5">
+                        <c:MyButton Name="BtnCustomRefresh" Text="刷新主页"
+                                    MinWidth="140" Height="35" Padding="13,0" Margin="0,10,20,0"
+                                    HorizontalAlignment="Left" ColorType="Highlight" />
+                        <c:MyButton Name="BtnCustomFile" Text="生成教学文件"
+                                    MinWidth="140" Height="35" Padding="13,0" Margin="0,10,20,0"
+                                    HorizontalAlignment="Left" />
+                        <c:MyButton Name="BtnCustomTutorial" Text="查看教程"
+                                    MinWidth="140" Height="35" Padding="13,0" Margin="0,10,20,0"
+                                    HorizontalAlignment="Left" />
+                        <c:MyButton Name="BtnCustomFolder" Text="打开主页文件夹"
+                                    MinWidth="140" Height="35" Padding="13,0" Margin="0,10,20,0"
+                                    HorizontalAlignment="Left" />
+                    </WrapPanel>
+                    <Grid Name="PanCustomNet" IsVisible="False" Margin="0,10,0,5">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" SharedSizeGroup="Name" />
+                            <ColumnDefinition />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock VerticalAlignment="Center" HorizontalAlignment="Left"
+                                   Text="下载地址" Margin="0,0,25,0" />
+                        <c:MyTextBox Name="TextCustomNet" Grid.Column="1" MaxHeight="28"
+                                     ToolTip.Tip="你可以用替换标记动态改变网址，以传入参数或变量。&#xa;在 更多 → 帮助 中搜索 “替换标记” 以了解用法。" />
+                    </Grid>
+                    <Grid Name="PanCustomPreset" IsVisible="False" Margin="0,12,10,5" Height="28">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" SharedSizeGroup="Name" />
+                            <ColumnDefinition />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock VerticalAlignment="Center" HorizontalAlignment="Left"
+                                   Text="主页预设" Margin="0,0,25,0" />
+                        <c:MyComboBox Grid.ColumnSpan="2" Grid.Column="1" SelectedIndex="0">
+                            <c:MyComboBoxItem Content="你知道吗？" />
+                            <c:MyComboBoxItem Content="回声洞" />
+                            <c:MyComboBoxItem Content="Minecraft 新闻（作者：最亮的信标）" />
+                            <c:MyComboBoxItem Content="每日整合包推荐（作者：wkea）" />
+                            <c:MyComboBoxItem Content="Minecraft 皮肤推荐（作者：wkea）" />
+                            <c:MyComboBoxItem Content="OpenBMCLAPI 仪表盘 Lite（作者：Silverteal、Mxmilu666）" />
+                            <c:MyComboBoxItem Content="PCL 新功能说明书（作者：WForst-Breeze）" />
+                            <c:MyComboBoxItem Content="杂志主页（作者：CreeperIsASpy）" />
+                            <c:MyComboBoxItem Content="PCL GitHub 仪表盘（作者：Deep-Dark-Forest）" />
+                            <c:MyComboBoxItem Content="Minecraft 更新摘要（作者：pynickle）" />
+                            <c:MyComboBoxItem Content="今日新闻热点（作者：EYicheng）" />
+                            <c:MyComboBoxItem Content="Minecraft 芝士站（作者：awaEric233）" />
+                            <c:MyComboBoxItem Content="整合包推荐引擎（作者：CHMYGZ）" />
+                            <c:MyComboBoxItem Content="Bangumi 番剧主页（作者：wzyaeu）" />
+                            <c:MyComboBoxItem Content="Bilibili 热门（作者：wzyaeu）" />
+                            <c:MyComboBoxItem Content="Music 云音乐热门（作者：wzyaeu）" />
+                            <c:MyComboBoxItem Content="模组推荐（作者：llsgllsg）" />
+                            <c:MyComboBoxItem Content="每日游戏推荐（作者：llsgllsg）" />
+                            <c:MyComboBoxItem Content="Wallpaper 每日壁纸（作者：wzyaeu）" />
+                            <c:MyComboBoxItem Content="Weather 天气预报（作者：wzyaeu）" />
+                            <c:MyComboBoxItem Content="新一代狗屁王大杂烩主页（作者：llsgllsg）" />
+                        </c:MyComboBox>
+                    </Grid>
+                </StackPanel>
+            </c:MyCard>
+
+            <c:MyCard Name="CardSwitch" Margin="0,0,0,15" Title="功能隐藏">
+                <StackPanel Margin="25,38,15,15">
+                    <TextBlock Margin="0,1,0,1"
+                               Text="你可以隐藏不需要的页面或关闭特定功能。在任意界面按 F12 可以暂时显示被隐藏的功能。"
+                               TextWrapping="Wrap" />
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="18" />
+                            <ColumnDefinition Width="0.8*" />
+                            <ColumnDefinition Width="0.9*" />
+                            <ColumnDefinition Width="0.8*" />
+                            <ColumnDefinition Width="0.8*" />
+                            <ColumnDefinition Width="1.0*" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="4" />
+                            <RowDefinition Height="30" />
+                            <RowDefinition Height="30" />
+                            <RowDefinition Height="30" />
+                            <RowDefinition Height="30" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <TextBlock Grid.Row="1" VerticalAlignment="Center" HorizontalAlignment="Left"
+                                   Text="主页面" />
+                        <c:MyCheckBox Height="22" VerticalAlignment="Center" Grid.Row="1" Grid.Column="2"
+                                      Text="下载" Name="CheckHiddenPageDownload" />
+                        <c:MyCheckBox Height="22" VerticalAlignment="Center" Grid.Row="1" Grid.Column="3"
+                                      Text="联机" Name="CheckHiddenPageLink" IsEnabled="False" />
+                        <c:MyCheckBox Height="22" VerticalAlignment="Center" Grid.Row="1" Grid.Column="4"
+                                      Text="设置" Name="CheckHiddenPageSetup" />
+                        <c:MyCheckBox Height="22" VerticalAlignment="Center" Grid.Row="1" Grid.Column="5"
+                                      Text="更多" Name="CheckHiddenPageOther" />
+                        <TextBlock Grid.Row="2" VerticalAlignment="Center" HorizontalAlignment="Left"
+                                   Text="设置 子页面" />
+                        <c:MyCheckBox Height="22" VerticalAlignment="Center" Grid.Row="2" Grid.Column="2"
+                                      Text="启动" Name="CheckHiddenSetupLaunch" />
+                        <c:MyCheckBox Height="22" VerticalAlignment="Center" Grid.Row="2" Grid.Column="3"
+                                      Text="联机" Name="CheckHiddenSetupLink" IsEnabled="False" />
+                        <c:MyCheckBox Height="22" VerticalAlignment="Center" Grid.Row="2" Grid.Column="4"
+                                      Text="个性化" Name="CheckHiddenSetupUI" />
+                        <c:MyCheckBox Height="22" VerticalAlignment="Center" Grid.Row="2" Grid.Column="5"
+                                      Text="其他" Name="CheckHiddenSetupSystem" />
+                        <TextBlock Grid.Row="3" VerticalAlignment="Center" HorizontalAlignment="Left"
+                                   Text="更多 子页面" />
+                        <c:MyCheckBox Height="22" VerticalAlignment="Center" Grid.Row="3" Grid.Column="2"
+                                      Text="帮助" Name="CheckHiddenOtherHelp" />
+                        <c:MyCheckBox Height="22" VerticalAlignment="Center" Grid.Row="3" Grid.Column="3"
+                                      Text="关于与鸣谢" Name="CheckHiddenOtherAbout" />
+                        <c:MyCheckBox Height="22" VerticalAlignment="Center" Grid.Row="3" Grid.Column="4"
+                                      Text="百宝箱" Name="CheckHiddenOtherTest" />
+                        <c:MyCheckBox Height="22" VerticalAlignment="Center" Grid.Row="3" Grid.Column="5"
+                                      Text="反馈" Name="CheckHiddenOtherFeedback" />
+                        <c:MyCheckBox Height="22" VerticalAlignment="Center" Grid.Row="3" Grid.Column="6"
+                                      Text="新功能投票" Name="CheckHiddenOtherVote" />
+                        <TextBlock Grid.Row="4" VerticalAlignment="Center" HorizontalAlignment="Left"
+                                   Text="特定功能" />
+                        <c:MyCheckBox Height="22" VerticalAlignment="Center" Grid.Row="4" Grid.Column="2"
+                                      Text="邮箱隐藏" Name="CheckLauncherEmail"
+                                      ToolTip.Tip="隐藏第三方登录的账号邮箱显示，以避免隐私泄露。&#xa;此选项的更改将在重启启动器后生效。" />
+                        <c:MyCheckBox Height="22" VerticalAlignment="Center" Grid.Row="4" Grid.Column="3"
+                                      Text="版本管理" Name="CheckHiddenFunctionSelect"
+                                      ToolTip.Tip="隐藏启动按钮下方的版本选择与版本设置入口。" />
+                        <c:MyCheckBox Height="22" VerticalAlignment="Center" Grid.Row="4" Grid.Column="4"
+                                      Text="Mod 更新" Name="CheckHiddenFunctionModUpdate"
+                                      ToolTip.Tip="禁止在 Mod 管理页面更新 Mod。" />
+                        <c:MyCheckBox Height="22" VerticalAlignment="Center" Grid.Row="4" Grid.Column="5"
+                                      Text="功能隐藏" Name="CheckHiddenFunctionHidden"
+                                      ToolTip.Tip="仅隐藏本选项卡，设置的禁用内容依然有效。&#xa;可以在保留个性化设置页面的情况下避免隐藏设置被修改。" />
+                        <c:MyCheckBox Height="22" VerticalAlignment="Center" Grid.Row="4" Grid.Column="6"
+                                      Text="版本修改" Name="CheckHiddenFunctionModify"
+                                      ToolTip.Tip="隐藏版本设置中的版本修改功能。" />
+                    </Grid>
+                </StackPanel>
+            </c:MyCard>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>
