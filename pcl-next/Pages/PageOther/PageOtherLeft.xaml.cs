@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Windows;
 using System.Windows.Controls;
 using MeloongCore;
@@ -21,14 +21,14 @@ namespace PCL
                 IsHiddenPage = true;
             if (this.ItemTest.Checked && Settings.Get<bool>("UiHiddenOtherTest"))
                 IsHiddenPage = true;
-            if (PageSetupUI.HiddenForceShow)
+            if (PageSetupHome.HiddenForceShow)
                 IsHiddenPage = false;
             // 若页面错误，或尚未加载，则继续
             if (IsLoad && !IsHiddenPage)
                 return;
             IsLoad = true;
             // 刷新子页面隐藏情况
-            PageSetupUI.HiddenRefresh();
+            PageSetupHome.HiddenRefresh();
             // 选择第一个未被禁用的子页面
             if (IsPageSwitched)
                 return;
@@ -209,7 +209,7 @@ namespace PCL
         }
         public static void TryFeedback()
         {
-            if (false.Equals(PageSetupSystem.IsLauncherNewest()))
+            if (false.Equals(PageSetupNotify.IsLauncherNewest()))
             {
                 if (ModMain.MyMsgBox($"你的 PCL Next 不是最新版，因此无法提交反馈。{Constants.vbCrLf}请在更新后，确认该问题在最新版中依然存在，然后再提交反馈。", "无法提交反馈", "更新", "取消") == 1)
                 {

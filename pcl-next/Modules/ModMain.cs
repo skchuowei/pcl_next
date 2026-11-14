@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -172,7 +172,10 @@ namespace PCL
                         ModAnimation.AniStart(Animations, Conversions.ToString(Operators.ConcatenateObject("Hint Show ", ((dynamic)NewHintControl.Tag)[1])));
                         // 结束动画
                         double Delay = (800 + CurrentHint.Text.Length.Clamp(5, 23) * 180) * ModAnimation.AniSpeed;
-                        ModAnimation.AniStart(new[] { ModAnimation.AaX(NewHintControl, -50, 200, (int)Math.Round(Delay), new ModAnimation.AniEaseInFluent()), ModAnimation.AaOpacity(NewHintControl, -1, 150, (int)Math.Round(Delay)), ModAnimation.AaCode(() => ((dynamic)NewHintControl.Tag)[0] = false, (int)Math.Round(Delay)), ModAnimation.AaHeight(NewHintControl, -26, 100, Ease: new ModAnimation.AniEaseOutFluent(), After: true), ModAnimation.AaCode(() => FrmMain.PanHint.Children.Remove(NewHintControl), After: true) }, Conversions.ToString(Operators.ConcatenateObject("Hint Hide ", ((dynamic)NewHintControl.Tag)[1])));
+                        // 开发者 UI 细调：弹窗消失动画保持帧数（UiDevAnimPopupHideFrames）
+                        int HideT = (int)Math.Round(ModAnimation.AniPopupHideTime);
+                        int HideDelay = (int)Math.Round(Delay);
+                        ModAnimation.AniStart(new[] { ModAnimation.AaX(NewHintControl, -50, HideT, HideDelay, new ModAnimation.AniEaseInFluent()), ModAnimation.AaOpacity(NewHintControl, -1, (int)Math.Round(HideT * 0.75d), HideDelay), ModAnimation.AaCode(() => ((dynamic)NewHintControl.Tag)[0] = false, HideDelay), ModAnimation.AaHeight(NewHintControl, -26, (int)Math.Round(HideT * 0.5d), Ease: new ModAnimation.AniEaseOutFluent(), After: true), ModAnimation.AaCode(() => FrmMain.PanHint.Children.Remove(NewHintControl), After: true) }, Conversions.ToString(Operators.ConcatenateObject("Hint Hide ", ((dynamic)NewHintControl.Tag)[1])));
                     }
                 // 结束处理
                 EndHint:
@@ -189,10 +192,11 @@ namespace PCL
         }
         private static void HideAllHint()
         {
+            int HideT = (int)Math.Round(ModAnimation.AniPopupHideTime);
             foreach (Border Control in FrmMain.PanHint.Children)
             {
                 Control.IsHitTestVisible = false;
-                ModAnimation.AniStart(new[] { ModAnimation.AaX(Control, -50, 200, Ease: new ModAnimation.AniEaseInFluent()), ModAnimation.AaOpacity(Control, -1, 150, Ease: new ModAnimation.AniEaseInFluent()), ModAnimation.AaCode(() => ((dynamic)Control.Tag)[0] = false), ModAnimation.AaHeight(Control, -26, 100, Ease: new ModAnimation.AniEaseOutFluent(), After: true), ModAnimation.AaCode(() => FrmMain.PanHint.Children.Remove(Control), After: true) }, Conversions.ToString(Operators.ConcatenateObject("Hint Hide ", ((dynamic)Control.Tag)[1])));
+                ModAnimation.AniStart(new[] { ModAnimation.AaX(Control, -50, HideT, Ease: new ModAnimation.AniEaseInFluent()), ModAnimation.AaOpacity(Control, -1, (int)Math.Round(HideT * 0.75d), Ease: new ModAnimation.AniEaseInFluent()), ModAnimation.AaCode(() => ((dynamic)Control.Tag)[0] = false), ModAnimation.AaHeight(Control, -26, (int)Math.Round(HideT * 0.5d), Ease: new ModAnimation.AniEaseOutFluent(), After: true), ModAnimation.AaCode(() => FrmMain.PanHint.Children.Remove(Control), After: true) }, Conversions.ToString(Operators.ConcatenateObject("Hint Hide ", ((dynamic)Control.Tag)[1])));
             }
         }
 
@@ -260,7 +264,8 @@ namespace PCL
             Text,
             Select,
             Input,
-            Login
+            Login,
+            Progress
         }
 
         /// <summary>
@@ -445,6 +450,14 @@ namespace PCL
                                 FrmMain.PanMsg.Children.Add(new MyMsgLogin(TargetMsgBox));
                                 break;
                             }
+                        case MyMsgBoxType.Progress:
+                            {
+                                var Ui = new MyMsgProgress(TargetMsgBox.Title, TargetMsgBox.Text, TargetMsgBox.HintText);
+                                FrmMain.PanMsg.Children.Add(Ui);
+                                if (TargetMsgBox.Content is MyMsgProgressHandle HandleInner)
+                                    HandleInner.Attach(Ui);
+                                break;
+                            }
                     }
                 }
                 // 没有弹窗，没有等待的弹窗
@@ -455,6 +468,90 @@ namespace PCL
             {
                 Logger.Error(ex, "处理等待中的弹窗失败");
             }
+        }
+
+        #endregion
+
+        #region 进度弹窗
+
+        /// <summary>不可关闭的模态进度弹窗句柄：后台线程用它更新阶段与百分比，最后必须调用 Finish。</summary>
+        public sealed class MyMsgProgressHandle
+        {
+            private MyMsgProgress Ui;
+            private readonly object Lock = new object();
+            private double PendingPercent;
+            private string PendingStage;
+            private bool IsFinished;
+
+            internal void Attach(MyMsgProgress Target)
+            {
+                lock (Lock)
+                {
+                    Ui = Target;
+                    Target.Report(PendingPercent, PendingStage);
+                }
+            }
+
+            /// <summary>更新阶段文案与进度（0~1），可从任意线程调用。</summary>
+            public void Report(double Percent, string Stage = null)
+            {
+                if (IsFinished)
+                    return;
+                lock (Lock)
+                {
+                    if (Percent >= 0d)
+                        PendingPercent = Math.Min(1d, Math.Max(PendingPercent, Percent));
+                    if (Stage is not null)
+                        PendingStage = Stage;
+                    Ui?.Report(PendingPercent, PendingStage);
+                }
+            }
+
+            /// <summary>关闭弹窗；结束后务必调用，否则界面会一直停在模态状态。</summary>
+            public void Finish()
+            {
+                lock (Lock)
+                {
+                    if (IsFinished)
+                        return;
+                    IsFinished = true;
+                    Ui?.Finish();
+                }
+            }
+        }
+
+        /// <summary>
+        /// 显示不可关闭的模态进度弹窗。会阻塞其他弹窗与页面交互，任务完成后由调用方 Finish。
+        /// </summary>
+        public static MyMsgProgressHandle MyMsgProgress(string Title, string Stage = "准备中……", string Note = null)
+        {
+            var Handle = new MyMsgProgressHandle();
+            var Converter = new MyMsgBoxConverter()
+            {
+                Type = MyMsgBoxType.Progress,
+                Title = Title,
+                Text = Stage,
+                HintText = Note ?? "",
+                Content = Handle,
+                Button1 = "",
+                Button2 = "",
+                Button3 = ""
+            };
+            if (FrmMain?.PanMsg is null)
+            {
+                Logger.Warn("主窗体尚未加载，无法显示进度弹窗：" + Title);
+                return Handle;
+            }
+            WaitingMyMsgBox.Enqueue(Converter);
+            try
+            {
+                System.Windows.Interop.ComponentDispatcher.PushModal();
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn(ex, "进度弹窗压入模态栈失败");
+            }
+            return Handle;
         }
 
         #endregion
@@ -490,6 +587,10 @@ namespace PCL
         public static PageSetupLeft FrmSetupLeft;
         public static PageSetupLaunch FrmSetupLaunch;
         public static PageSetupUI FrmSetupUI;
+        public static PageSetupBackdrop FrmSetupBackdrop;
+        public static PageSetupHome FrmSetupHome;
+        public static PageSetupDownload FrmSetupDownload;
+        public static PageSetupNotify FrmSetupNotify;
         public static PageSetupSystem FrmSetupSystem;
         public static PageSetupLink FrmSetupLink;
         public static PageSetupAccount FrmSetupAccount;
@@ -517,6 +618,7 @@ namespace PCL
         public static PageInstanceModDisabled FrmInstanceModDisabled;
         public static PageInstanceSetup FrmInstanceSetup;
         public static PageInstanceExport FrmInstanceExport;
+        public static PageInstanceBackup FrmInstanceBackup;
         public static PageDownloadModify FrmDownloadModify;
 
         // 资源信息分页声明

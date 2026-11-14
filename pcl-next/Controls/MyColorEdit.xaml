@@ -3,13 +3,18 @@
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
       xmlns:local="clr-namespace:PCL"
       Margin="0,7">
+    <Grid.RowDefinitions>
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="Auto" />
+    </Grid.RowDefinitions>
     <Grid.ColumnDefinitions>
         <ColumnDefinition Width="108" />
         <ColumnDefinition Width="*" />
         <ColumnDefinition Width="Auto" />
     </Grid.ColumnDefinitions>
-    <TextBlock x:Name="LabTitle" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,12,0" TextWrapping="Wrap" FontSize="13" />
-    <StackPanel Grid.Column="1" x:Name="PanSliders" VerticalAlignment="Center">
+    <TextBlock x:Name="LabTitle" Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,12,0" TextWrapping="Wrap" FontSize="13" />
+    <StackPanel Grid.Row="0" Grid.Column="1" x:Name="PanSliders" VerticalAlignment="Center">
         <Grid Height="22" Margin="0,1">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="14" />
@@ -43,9 +48,43 @@
             <local:MySlider x:Name="SliderB" Grid.Column="1" HorizontalAlignment="Stretch" MaxValue="255" Height="22" />
         </Grid>
     </StackPanel>
-    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="14,0,0,0">
+    <StackPanel Grid.Row="0" Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="14,0,0,0">
         <Border x:Name="Preview" Width="36" Height="36" CornerRadius="3" BorderThickness="1" BorderBrush="{DynamicResource ColorBrushGray4}" />
         <local:MyTextBox x:Name="HexBox" Width="98" Height="28" Margin="10,0,0,0" HintText="#AARRGGBB" MaxLength="9" VerticalAlignment="Center" />
-        <local:MyButton x:Name="BtnReset" Width="64" Height="28" Margin="10,0,0,0" Text="重置" Padding="0" VerticalAlignment="Center" />
+        <local:MyButton x:Name="BtnPalette" Width="64" Height="28" Margin="8,0,0,0" Text="调色板" Padding="0" VerticalAlignment="Center" />
+        <local:MyButton x:Name="BtnReset" Width="56" Height="28" Margin="8,0,0,0" Text="重置" Padding="0" VerticalAlignment="Center" />
     </StackPanel>
+    <TextBlock x:Name="LabRgb" Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" Margin="0,6,0,0" FontSize="12"
+               Foreground="{DynamicResource ColorBrushGray3}" Text="RGB(0, 0, 0)" />
+    <Border x:Name="PanPalette" Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="3" Visibility="Collapsed"
+            Margin="0,10,0,4" Padding="10" CornerRadius="4"
+            Background="{DynamicResource ColorBrushBg0}" BorderBrush="{DynamicResource ColorBrushGray4}" BorderThickness="1">
+        <StackPanel>
+            <TextBlock Text="颜色调色板：点击色块选色，或用 H / S / L 细调后点「取用此色」" FontSize="12" Margin="0,0,0,8"
+                       Foreground="{DynamicResource ColorBrushGray3}" TextWrapping="Wrap" />
+            <WrapPanel x:Name="PanSwatches" Width="264" HorizontalAlignment="Left" Margin="0,0,0,10" />
+            <Grid Margin="0,0,0,8">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="20" />
+                    <ColumnDefinition Width="150" />
+                    <ColumnDefinition Width="20" />
+                    <ColumnDefinition Width="150" />
+                    <ColumnDefinition Width="20" />
+                    <ColumnDefinition Width="150" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="H" Grid.Column="0" VerticalAlignment="Center" Foreground="{DynamicResource ColorBrushGray3}" />
+                <local:MySlider x:Name="SliderH" Grid.Column="1" MaxValue="360" Height="22" />
+                <TextBlock Text="S" Grid.Column="2" VerticalAlignment="Center" Foreground="{DynamicResource ColorBrushGray3}" />
+                <local:MySlider x:Name="SliderS" Grid.Column="3" MaxValue="100" Height="22" />
+                <TextBlock Text="L" Grid.Column="4" VerticalAlignment="Center" Foreground="{DynamicResource ColorBrushGray3}" />
+                <local:MySlider x:Name="SliderL" Grid.Column="5" MaxValue="100" Height="22" />
+            </Grid>
+            <StackPanel Orientation="Horizontal">
+                <Border x:Name="PalettePreview" Width="64" Height="30" CornerRadius="3" BorderThickness="1" BorderBrush="{DynamicResource ColorBrushGray4}" />
+                <TextBlock x:Name="LabPaletteRgb" VerticalAlignment="Center" Margin="10,0" FontSize="12" Foreground="{DynamicResource ColorBrushGray3}" Text="RGB(0, 0, 0)" />
+                <local:MyButton x:Name="BtnPaletteUse" Width="96" Height="28" Text="取用此色" Padding="0" />
+                <local:MyButton x:Name="BtnPaletteClose" Width="60" Height="28" Margin="8,0,0,0" Text="收起" Padding="0" />
+            </StackPanel>
+        </StackPanel>
+    </Border>
 </Grid>

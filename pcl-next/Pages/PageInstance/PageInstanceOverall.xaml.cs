@@ -500,7 +500,19 @@ namespace PCL
                 bool IsHintIndie = PageInstanceLeft.Instance.State != ModMinecraft.McInstance.McInstanceState.Error && (PageInstanceLeft.Instance.PathIndie ?? "") != (ModMinecraft.McFolderSelected ?? "");
                 var SavesFolder = DirectoryUtils.GetInfo(PageInstanceLeft.Instance.PathIndie + @"saves\");
                 var SaveEntries = IsHintIndie && SavesFolder.Exists ? SavesFolder.EnumerateDirectories().OrderByDescending(Save => Save.LastWriteTime).Select(Save => $"{Save.Name}（上次修改：{StringUtils.FormatTimeSpan(Save.LastWriteTime - DateTime.Now, false)}）").ToList() : new List<string>();
-                switch (ModMain.MyMsgBox($"你确定要{(IsShiftPressed ? "永久" : "")}删除版本 {PageInstanceLeft.Instance.Name} 吗？" + (IsHintIndie ? Constants.vbCrLf + "该版本对应的存档、资源包、Mod 等文件也将被一并删除！" + (SaveEntries.Any() ? Constants.vbCrLf + Constants.vbCrLf + "这会删除以下存档：" + Constants.vbCrLf + "· " + SaveEntries.Join(Constants.vbCrLf + "· ") : "") : ""), "版本删除确认", Button2: "取消", IsWarn: IsHintIndie || IsShiftPressed))
+                int BackupCount = 0;
+                try
+                {
+                    BackupCount = ModBackup.ListBackups(ModBackup.ContextFromInstance(PageInstanceLeft.Instance)).Count;
+                }
+                catch (Exception ex)
+                {
+                    Logger.Warn(ex, "统计实例备份数量失败，删除提示中将不显示备份信息");
+                }
+                string BackupHint = BackupCount > 0
+                    ? Constants.vbCrLf + $"该实例下的 {BackupCount} 份备份（backups 目录）也将被一并删除，且不会影响其他实例的备份！"
+                    : "";
+                switch (ModMain.MyMsgBox($"你确定要{(IsShiftPressed ? "永久" : "")}删除版本 {PageInstanceLeft.Instance.Name} 吗？" + (IsHintIndie ? Constants.vbCrLf + "该版本对应的存档、资源包、Mod 等文件也将被一并删除！" + (SaveEntries.Any() ? Constants.vbCrLf + Constants.vbCrLf + "这会删除以下存档：" + Constants.vbCrLf + "· " + SaveEntries.Join(Constants.vbCrLf + "· ") : "") : "") + BackupHint, "版本删除确认", Button2: "取消", IsWarn: IsHintIndie || IsShiftPressed || BackupCount > 0))
                 {
                     case 1:
                         {

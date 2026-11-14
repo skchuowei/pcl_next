@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -1616,7 +1616,7 @@ namespace PCL
                 }
             }
 
-            return Results.Join(@"\n\n此外，").Replace(@"\n", Constants.vbCrLf).Replace(@"\h", "").Replace(@"\e", IsHandAnalyze ? "" : Constants.vbCrLf + "你可以查看错误报告了解错误具体是如何发生的。").ReplaceLineEndings(Constants.vbCrLf).Trim(Constants.vbCrLf.ToCharArray()) + (!Results.Any(r => r.EndsWithF(@"\h")) || IsHandAnalyze ? "" : Constants.vbCrLf + "如果要寻求帮助，请把错误报告文件发给对方，而不是发送这个窗口的照片或者截图。" + (PageSetupSystem.IsLauncherNewest() ?? true ? "" : Constants.vbCrLf + Constants.vbCrLf + "此外，你正在使用老版本 PCL Next，更新 PCL Next 或许也能解决这个问题。" + Constants.vbCrLf + "你可以点击 [设置 → 其他 → 启动器 → 检查更新] 更新 PCL Next。"));
+            return Results.Join(@"\n\n此外，").Replace(@"\n", Constants.vbCrLf).Replace(@"\h", "").Replace(@"\e", IsHandAnalyze ? "" : Constants.vbCrLf + "你可以查看错误报告了解错误具体是如何发生的。").ReplaceLineEndings(Constants.vbCrLf).Trim(Constants.vbCrLf.ToCharArray()) + (!Results.Any(r => r.EndsWithF(@"\h")) || IsHandAnalyze ? "" : Constants.vbCrLf + "如果要寻求帮助，请把错误报告文件发给对方，而不是发送这个窗口的照片或者截图。" + (PageSetupNotify.IsLauncherNewest() ?? true ? "" : Constants.vbCrLf + Constants.vbCrLf + "此外，你正在使用老版本 PCL Next，更新 PCL Next 或许也能解决这个问题。" + Constants.vbCrLf + "你可以点击 [设置 → 其他 → 启动器 → 检查更新] 更新 PCL Next。"));
         }
 
     }

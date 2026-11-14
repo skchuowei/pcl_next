@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -102,7 +102,7 @@ namespace PCL
             // 无背景音乐
             // 有背景音乐
 
-            ModBase.RunInUi(() => { try { if (!MusicAllList.Any()) { ModMain.FrmMain.BtnExtraMusic.Show = false; } else { ModMain.FrmMain.BtnExtraMusic.Show = true; string ToolTipText; if (MusicState == MusicStates.Pause) { ModMain.FrmMain.BtnExtraMusic.Logo = ModBase.Logo.IconPlay; ModMain.FrmMain.BtnExtraMusic.LogoScale = 0.8d; ToolTipText = "已暂停：" + PathUtils.GetFileNameWithoutExtension(MusicCurrent); if (MusicAllList.Count > 1) { ToolTipText += Constants.vbCrLf + "左键恢复播放，右键播放下一曲。"; } else { ToolTipText += Constants.vbCrLf + "左键恢复播放，右键重新从头播放。"; } } else { ModMain.FrmMain.BtnExtraMusic.Logo = ModBase.Logo.IconMusic; ModMain.FrmMain.BtnExtraMusic.LogoScale = 1d; ToolTipText = "正在播放：" + PathUtils.GetFileNameWithoutExtension(MusicCurrent); if (MusicAllList.Count > 1) { ToolTipText += Constants.vbCrLf + "左键暂停，右键播放下一曲。"; } else { ToolTipText += Constants.vbCrLf + "左键暂停，右键重新从头播放。"; } } ModMain.FrmMain.BtnExtraMusic.ToolTip = ToolTipText; } if (ModMain.FrmSetupUI is not null) ModMain.FrmSetupUI.MusicRefreshUI(); } catch (Exception ex) { Logger.Error(ex, "刷新背景音乐 UI 失败"); } });
+            ModBase.RunInUi(() => { try { if (!MusicAllList.Any()) { ModMain.FrmMain.BtnExtraMusic.Show = false; } else { ModMain.FrmMain.BtnExtraMusic.Show = true; string ToolTipText; if (MusicState == MusicStates.Pause) { ModMain.FrmMain.BtnExtraMusic.Logo = ModBase.Logo.IconPlay; ModMain.FrmMain.BtnExtraMusic.LogoScale = 0.8d; ToolTipText = "已暂停：" + PathUtils.GetFileNameWithoutExtension(MusicCurrent); if (MusicAllList.Count > 1) { ToolTipText += Constants.vbCrLf + "左键恢复播放，右键播放下一曲。"; } else { ToolTipText += Constants.vbCrLf + "左键恢复播放，右键重新从头播放。"; } } else { ModMain.FrmMain.BtnExtraMusic.Logo = ModBase.Logo.IconMusic; ModMain.FrmMain.BtnExtraMusic.LogoScale = 1d; ToolTipText = "正在播放：" + PathUtils.GetFileNameWithoutExtension(MusicCurrent); if (MusicAllList.Count > 1) { ToolTipText += Constants.vbCrLf + "左键暂停，右键播放下一曲。"; } else { ToolTipText += Constants.vbCrLf + "左键暂停，右键重新从头播放。"; } } ModMain.FrmMain.BtnExtraMusic.ToolTip = ToolTipText; } if (ModMain.FrmSetupBackdrop is not null) ModMain.FrmSetupBackdrop.MusicRefreshUI(); } catch (Exception ex) { Logger.Error(ex, "刷新背景音乐 UI 失败"); } });
         }
 
         /// <summary>

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
@@ -95,6 +95,11 @@ namespace PCL
                                 break;
                             } // MCBBS 整合包
                         }
+                        if (Archive.GetEntry("pcln-selfpack.json") is not null)
+                        {
+                            PackType = 10;
+                            break;
+                        } // pcl-next 自建导入包（由实例备份生成）
                         if (Archive.GetEntry("modpack.json") is not null)
                         {
                             PackType = 1;
@@ -220,6 +225,11 @@ namespace PCL
                         {
                             Logger.Info("整合包种类：带启动器的压缩包");
                             return InstallPackLauncherPack(File, Archive, ArchiveBaseFolder);
+                        }
+                    case 10:
+                        {
+                            Logger.Info("整合包种类：pcl-next 自建导入包");
+                            return InstallPackSelf(File, Archive, ArchiveBaseFolder, InstanceName);
                         }
 
                     default:
@@ -556,6 +566,8 @@ namespace PCL
                 throw new OperationCanceledException();
             }
 
+            // 安装完成后为该实例生成初始基准备份（失败不影响安装）
+            ModBackup.AppendInitialBackupTask(Loaders, InstanceName ?? PathUtils.GetLastPart(VersionFolder.TrimEnd('\\')), VersionFolder, FileAddress);
             // 启动
             var Loader = new ModLoader.LoaderCombo<string>(LoaderName, Loaders) { OnStateChanged = ModDownloadLib.McInstallState };
             Loader.Start(VersionFolder);
@@ -741,6 +753,8 @@ namespace PCL
                 throw new OperationCanceledException();
             }
 
+            // 安装完成后为该实例生成初始基准备份（失败不影响安装）
+            ModBackup.AppendInitialBackupTask(Loaders, InstanceName ?? PathUtils.GetLastPart(VersionFolder.TrimEnd('\\')), VersionFolder, FileAddress);
             // 启动
             var Loader = new ModLoader.LoaderCombo<string>(LoaderName, Loaders) { OnStateChanged = ModDownloadLib.McInstallState };
             Loader.Start(VersionFolder);
@@ -803,6 +817,8 @@ namespace PCL
                 ModMain.Hint("该整合包正在安装中！", ModMain.HintType.Red);
                 throw new OperationCanceledException();
             }
+            // 安装完成后为该实例生成初始基准备份（失败不影响安装）
+            ModBackup.AppendInitialBackupTask(Loaders, InstanceName ?? PathUtils.GetLastPart(VersionFolder.TrimEnd('\\')), VersionFolder, FileAddress);
             // 启动
             var Loader = new ModLoader.LoaderCombo<string>(LoaderName, Loaders) { OnStateChanged = ModDownloadLib.McInstallState };
             Loader.Start(VersionFolder);
@@ -990,6 +1006,8 @@ namespace PCL
                 throw new OperationCanceledException();
             }
 
+            // 安装完成后为该实例生成初始基准备份（失败不影响安装）
+            ModBackup.AppendInitialBackupTask(Loaders, InstanceName ?? PathUtils.GetLastPart(VersionFolder.TrimEnd('\\')), VersionFolder, FileAddress);
             // 启动
             var Loader = new ModLoader.LoaderCombo<string>(LoaderName, Loaders) { OnStateChanged = ModDownloadLib.McInstallState };
             Loader.Start(VersionFolder);
@@ -1102,6 +1120,8 @@ namespace PCL
                 throw new OperationCanceledException();
             }
 
+            // 安装完成后为该实例生成初始基准备份（失败不影响安装）
+            ModBackup.AppendInitialBackupTask(Loaders, InstanceName ?? PathUtils.GetLastPart(VersionFolder.TrimEnd('\\')), VersionFolder, FileAddress);
             // 启动
             var Loader = new ModLoader.LoaderCombo<string>(LoaderName, Loaders) { OnStateChanged = ModDownloadLib.McInstallState };
             // If Archive IsNot Nothing Then Archive.Dispose() '解除占用，以免在加载器中触发 “正由另一进程使用，因此该进程无法访问此文件”
@@ -1182,6 +1202,102 @@ namespace PCL
             ModLoader.LoaderTaskbarAdd(Loader);
             ModMain.FrmMain.BtnExtraDownload.ShowRefresh();
             ModMain.FrmMain.BtnExtraDownload.Ribble();
+            return Loader;
+        }
+
+        /// <summary>
+        /// 安装 pcl-next 自建导入包（由实例备份生成）：解压 minecraft/ 覆盖内容，再按包内记录的版本与加载器重新安装游戏本体。
+        /// 还原导入包备份走的就是这条路径——先由调用方清空实例内容，再按普通导入重来一遍。
+        /// </summary>
+        private static ModLoader.LoaderCombo<string> InstallPackSelf(string FileAddress, ZipArchive Archive, string ArchiveBaseFolder, string InstanceName)
+        {
+            JObject Json;
+            try
+            {
+                Json = (JObject)Archive.GetEntry(ArchiveBaseFolder + "pcln-selfpack.json").Open().ReadString(Encoding.UTF8).DeserializeJson();
+            }
+            catch (Exception ex)
+            {
+                throw new Exception("自建导入包的安装信息读取失败", ex);
+            }
+
+            string Name = InstanceName;
+            if (string.IsNullOrWhiteSpace(Name))
+                Name = (string)Json["name"] ?? "";
+            // 名称已确定（还原 / 重装场景）时直接沿用，绝不再弹输入框：
+            // 还原时进度弹窗是模态的，这里再弹一个输入框会互相挡住、进度永远卡在起点。
+            if (string.IsNullOrWhiteSpace(Name))
+            {
+                var Validate = new ValidateFolderName(ModMinecraft.McFolderSelected + "versions");
+                Name = ModMain.MyMsgBoxInput("输入版本名称", "", "", new Collection<ValidateType>() { Validate });
+            }
+            if (string.IsNullOrEmpty(Name))
+                throw new OperationCanceledException();
+            string VersionFolder = Path.Combine(ModMinecraft.McFolderSelected, "versions", Name) + @"\";
+
+            string GameVersion = (Json["gameVersion"] ?? "").ToString();
+            if (string.IsNullOrEmpty(GameVersion))
+                throw new Exception("该导入包未记录游戏版本，无法重新安装！");
+            var ModLoadersMap = new Dictionary<ModLoaders, string>();
+            if (Json["loaders"] is JObject LoaderJson)
+            {
+                foreach (var Prop in LoaderJson.Properties())
+                {
+                    string Version = Prop.Value is null ? "" : Prop.Value.ToString();
+                    if (string.IsNullOrEmpty(Version))
+                        continue;
+                    switch (Prop.Name.ToLower())
+                    {
+                        case "forge":
+                            ModLoadersMap[ModLoaders.Forge] = Version;
+                            break;
+                        case "neoforge":
+                            ModLoadersMap[ModLoaders.NeoForge] = Version;
+                            break;
+                        case "fabric":
+                            ModLoadersMap[ModLoaders.Fabric] = Version;
+                            break;
+                    }
+                }
+            }
+            var Target = new McComponents(GameVersion, ModLoadersMap);
+
+            string InstallTemp = ModMain.RequestTaskTempFolder();
+            var InstallLoaders = new List<ModLoader.LoaderBase>();
+            InstallLoaders.Add(new ModLoader.LoaderTask<string, int>("解压导入包文件", (Task) =>
+            {
+                ExtractModpackFiles(InstallTemp, FileAddress, Task.CreateCancellationToken(), Task.CreateSyncProgressProvider(ToPercentage: 0.6d));
+                string Overrides = InstallTemp + ArchiveBaseFolder + "minecraft";
+                if (DirectoryUtils.Exists(Overrides))
+                    CopyOverrideDirectory(Overrides, VersionFolder, Task);
+            })
+            {
+                ProgressWeight = FileUtils.GetInfo(FileAddress).Length / 1024d / 1024d / 6d,
+                Block = false
+            });
+
+            var MergeLoaders = ModDownloadLib.McInstallLoadersGet(new ModDownloadLib.McInstallRequest()
+            {
+                NewInstanceName = Name,
+                InstanceFolder = VersionFolder,
+                Components = Target
+            });
+
+            var Loaders = new List<ModLoader.LoaderBase>()
+            {
+                new ModLoader.LoaderCombo<string>("导入包安装", InstallLoaders) { Show = false, Block = false, ProgressWeight = InstallLoaders.Sum(l => l.ProgressWeight) },
+                new ModLoader.LoaderCombo<string>("游戏安装", MergeLoaders) { Show = false, ProgressWeight = MergeLoaders.Sum(l => l.ProgressWeight) }
+            };
+
+            string LoaderName = "导入包重新安装：" + Name + " ";
+            if (ModLoader.LoaderTaskbar.Any(l => (l.Name ?? "") == (LoaderName ?? "")))
+                throw new OperationCanceledException();
+            ModBackup.AppendInitialBackupTask(Loaders, Name, VersionFolder, FileAddress);
+
+            var Loader = new ModLoader.LoaderCombo<string>(LoaderName, Loaders) { OnStateChanged = ModDownloadLib.McInstallState };
+            Loader.Start(VersionFolder);
+            ModLoader.LoaderTaskbarAdd(Loader);
+            ModMain.FrmMain.BtnExtraDownload.ShowRefresh();
             return Loader;
         }
 

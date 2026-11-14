@@ -29,7 +29,9 @@
         <local:MyButton Grid.Row="3" Grid.Column="3" x:Name="BtnMore" Visibility="Collapsed" Height="35" Margin="0,10,10,0" TextPadding="36" Text="版本设置" />
         <Grid Grid.ColumnSpan="5" Grid.Row="1" Margin="20,0" x:Name="PanCenter">
             <!-- 完成态：只显示当前账号的大头像与信息 -->
-            <StackPanel x:Name="PanAccountCompact" VerticalAlignment="Center" HorizontalAlignment="Center" Visibility="Collapsed">
+            <!-- 透明背景参与命中测试：对齐社区版 PageLoginProfileSkin 的 PanData，头像周围整块区域悬停即显示按钮 -->
+            <StackPanel x:Name="PanAccountCompact" VerticalAlignment="Center" HorizontalAlignment="Center" Visibility="Collapsed"
+                        Background="{StaticResource ColorBrushTransparent}" Margin="16,12,16,12">
                 <Border Width="64" Height="64" HorizontalAlignment="Center" Background="Transparent">
                     <Image x:Name="ImgCompactHead" Stretch="Fill" RenderOptions.BitmapScalingMode="NearestNeighbor" />
                 </Border>

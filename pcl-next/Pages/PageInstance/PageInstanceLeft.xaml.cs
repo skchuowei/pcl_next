@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
@@ -24,6 +24,7 @@ namespace PCL
             this.ItemSetup.Check += (p1, p2) => PageCheck((FrameworkElement)p1, (ModBase.RouteEventArgs)p2);
             this.ItemModify.Check += (p1, p2) => PageCheck((FrameworkElement)p1, (ModBase.RouteEventArgs)p2);
             this.ItemExport.Check += (p1, p2) => PageCheck((FrameworkElement)p1, (ModBase.RouteEventArgs)p2);
+            this.ItemBackup.Check += (p1, p2) => PageCheck((FrameworkElement)p1, (ModBase.RouteEventArgs)p2);
             this.Loaded += PageInstanceLeft_Loaded;
             this.Loaded += (_, __) => RefreshModDisabled();
             this.Loaded += (_, __) => ReloadCurrentJava();
@@ -31,7 +32,7 @@ namespace PCL
 
         private void PageInstanceLeft_Loaded(object sender, RoutedEventArgs e)
         {
-            PageSetupUI.HiddenRefresh();
+            PageSetupHome.HiddenRefresh();
         }
 
         public void RefreshModDisabled()
@@ -107,6 +108,12 @@ namespace PCL
                         if (ModMain.FrmDownloadModify is null)
                             ModMain.FrmDownloadModify = new PageDownloadModify();
                         return ModMain.FrmDownloadModify;
+                    }
+                case FormMain.PageSubType.InstanceBackup:
+                    {
+                        if (ModMain.FrmInstanceBackup is null)
+                            ModMain.FrmInstanceBackup = new PageInstanceBackup();
+                        return ModMain.FrmInstanceBackup;
                     }
 
                 default:
@@ -203,6 +210,12 @@ namespace PCL
                     {
                         ModMain.FrmDownloadModify?.PageLoaderRestart();
                         this.ItemModify.Checked = true;
+                        break;
+                    }
+                case FormMain.PageSubType.InstanceBackup:
+                    {
+                        ModMain.FrmInstanceBackup?.RefreshAll();
+                        this.ItemBackup.Checked = true;
                         break;
                     }
             }

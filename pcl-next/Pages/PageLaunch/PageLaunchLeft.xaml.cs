@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -35,11 +35,13 @@ namespace PCL
             this.BtnLaunch.Loaded += (p1, p2) => RefreshButtonsUI();
             this.BtnCancel.Click += (p1, p2) => BtnCancel_Click();
             this.BtnMore.Click += (p1, p2) => BtnMore_Click();
-            this.PanCenter.MouseEnter += (p1, p2) => ShowCompactButtons(true);
-            this.PanCenter.MouseLeave += (p1, p2) => ShowCompactButtons(false);
+            // 事件挂在带透明背景的账号容器上（对齐社区版 PageLoginProfileSkin 的 PanData），
+            // 头像周围整块区域都参与命中；PanCenter 无背景、空白处不参与命中测试，不能作为事件源
+            this.PanAccountCompact.MouseEnter += (p1, p2) => ShowCompactButtons(true);
+            this.PanAccountCompact.MouseLeave += (p1, p2) => ShowCompactButtons(false);
             // 切换账号后面板内容会被整体重建，此时鼠标仍停留在面板内、收不到新的 MouseEnter，
             // 这里用 MouseMove 兜底，保证重建后卡片依然按悬停状态显示
-            this.PanCenter.MouseMove += (p1, p2) =>
+            this.PanAccountCompact.MouseMove += (p1, p2) =>
             {
                 if (this.PanCompactCard is not null && this.PanCompactCard.Opacity < 1d)
                     ShowCompactButtons(true);
@@ -654,7 +656,7 @@ namespace PCL
             this.LabCompactInfo.Text = Current is null ? "" : Current.InfoText;
             string Head = Current is null ? "" : GetAccountHead(Current, Current, 128);
             // 操作卡片只在鼠标位于账号区时显示（切回完成态时鼠标通常还在区内，直接给到 1）
-            this.PanCompactCard.Opacity = this.PanCenter.IsMouseOver ? 1d : 0d;
+            this.PanCompactCard.Opacity = this.PanAccountCompact.IsMouseOver ? 1d : 0d;
             try
             {
                 this.ImgCompactHead.Source = string.IsNullOrEmpty(Head) || !FileUtils.Exists(Head) ? null : new MyBitmap(Head);
@@ -1579,7 +1581,7 @@ namespace PCL
             }
             else if (ModMinecraft.McInstanceSelected is null)
             {
-                if (ModDownloadPolicy.RestrictMcDownload || Settings.Get<bool>("UiHiddenPageDownload") && !PageSetupUI.HiddenForceShow)
+                if (ModDownloadPolicy.RestrictMcDownload || Settings.Get<bool>("UiHiddenPageDownload") && !PageSetupHome.HiddenForceShow)
                 {
                     CurrentState = 1;
                 }
@@ -1645,7 +1647,7 @@ namespace PCL
             ;
 
             // 功能隐藏
-            ModMain.FrmLaunchLeft.BtnVersion.Visibility = !PageSetupUI.HiddenForceShow && Settings.Get<bool>("UiHiddenFunctionSelect") ? Visibility.Collapsed : Visibility.Visible;
+            ModMain.FrmLaunchLeft.BtnVersion.Visibility = !PageSetupHome.HiddenForceShow && Settings.Get<bool>("UiHiddenFunctionSelect") ? Visibility.Collapsed : Visibility.Visible;
             if (CurrentState == 3)
             {
                 ModMain.FrmLaunchLeft.BtnMore.Visibility = ModMain.FrmLaunchLeft.BtnVersion.Visibility;

@@ -53,7 +53,7 @@ namespace PCL
                     }
                 case LogBehavior.AlertThenFeedback:
                     {
-                        if (PageSetupSystem.IsLauncherNewest() == true)
+                        if (PageSetupNotify.IsLauncherNewest() == true)
                         {
                             if (ModMain.MyMsgBox(DetailText + Constants.vbCrLf + Constants.vbCrLf + "是否反馈此问题？如果不反馈，这个问题可能永远无法得到解决！", "错误", "反馈", "取消", IsWarn: true) == 1)
                                 ModMain.Feedback(false, true);
@@ -71,7 +71,7 @@ namespace PCL
                         {
                             // 首次触发
                             _HandleBehavior_FirstTrigger = false;
-                            if (PageSetupSystem.IsLauncherNewest() == true)
+                            if (PageSetupNotify.IsLauncherNewest() == true)
                             {
                                 if (Interaction.MsgBox(DetailText + Constants.vbCrLf + Constants.vbCrLf + "是否反馈此问题？如果不反馈，这个问题可能永远无法得到解决！", (MsgBoxStyle)((int)MsgBoxStyle.Critical + (int)MsgBoxStyle.YesNo), "错误") == MsgBoxResult.Yes)
                                     ModMain.Feedback(false, true);

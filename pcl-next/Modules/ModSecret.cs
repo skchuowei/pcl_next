@@ -154,7 +154,7 @@ namespace PCL
                 ColorBg1 = new ModBase.MyColor(190d, Color7);
 
                 ColorSemiTransparent = new ModBase.MyColor(1d, Color8);
-                ModBase.MyColor ColorCard, ColorPopup, ColorTooltip, ColorOverlay, ColorSidebar, ColorWindow;
+                ModBase.MyColor ColorCard, ColorPopup, ColorTooltip, ColorOverlay, ColorSidebar, ColorSidebarGlass, ColorWindow;
                 if (IsDark)
                 {
                     ColorCard = new ModBase.MyColor(242d, new ModBase.MyColor().FromHSL2(ColorHue, ColorSat * 0.3d, 20d));
@@ -162,6 +162,7 @@ namespace PCL
                     ColorTooltip = new ModBase.MyColor().FromHSL2(ColorHue, ColorSat * 0.28d, 22d);
                     ColorOverlay = new ModBase.MyColor(221d, new ModBase.MyColor().FromHSL2(ColorHue, ColorSat * 0.2d, 6d));
                     ColorSidebar = new ModBase.MyColor(241d, new ModBase.MyColor().FromHSL2(ColorHue, ColorSat * 0.28d, 13d));
+                    ColorSidebarGlass = new ModBase.MyColor(150d, new ModBase.MyColor().FromHSL2(ColorHue, ColorSat * 0.28d, 13d));
                     ColorWindow = new ModBase.MyColor().FromHSL2(ColorHue, ColorSat * 0.3d, 10d);
                 }
                 else
@@ -171,6 +172,7 @@ namespace PCL
                     ColorTooltip = new ModBase.MyColor(251d, 251d, 251d);
                     ColorOverlay = new ModBase.MyColor(221d, 221d, 221d);
                     ColorSidebar = new ModBase.MyColor(241d, 255d, 255d);
+                    ColorSidebarGlass = new ModBase.MyColor(150d, 255d, 255d, 255d);
                     ColorWindow = new ModBase.MyColor(245d, 245d, 245d);
                 }
 
@@ -200,6 +202,7 @@ namespace PCL
                 SetBrush("ColorBrushTooltip", ColorTooltip);
                 SetBrush("ColorBrushOverlay", ColorOverlay);
                 SetBrush("ColorBrushSidebar", ColorSidebar);
+                SetBrush("ColorBrushSidebarGlass", ColorSidebarGlass);
                 SetBrush("ColorBrushWindow", ColorWindow);
                 SetBrush("ColorBrushInk", IsDark ? Color.FromArgb(160, 232, 235, 240) : Color.FromArgb(160, 0, 0, 0));
                 SetBrush("ColorBrushInkHover", IsDark ? Color.FromArgb(230, 240, 243, 248) : Color.FromArgb(230, 0, 0, 0));

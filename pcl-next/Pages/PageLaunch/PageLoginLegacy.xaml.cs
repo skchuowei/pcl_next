@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Windows;
 using System.Windows.Controls;
@@ -102,7 +102,7 @@ namespace PCL
         }
         private void Skin_Click()
         {
-            if ((Settings.Get<bool>("UiHiddenPageSetup") || Settings.Get<bool>("UiHiddenSetupLaunch")) && !PageSetupUI.HiddenForceShow)
+            if ((Settings.Get<bool>("UiHiddenPageSetup") || Settings.Get<bool>("UiHiddenSetupLaunch")) && !PageSetupHome.HiddenForceShow)
             {
                 ModMain.Hint("启动设置已被禁用！", ModMain.HintType.Red);
             }

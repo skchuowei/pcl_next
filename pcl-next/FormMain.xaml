@@ -97,6 +97,7 @@
                 </Grid.RowDefinitions>
                 <Canvas x:Name="ImgBack" IsHitTestVisible="False" Grid.Row="1" RenderOptions.BitmapScalingMode="LowQuality"
                         HorizontalAlignment="Stretch" VerticalAlignment="Stretch" />
+                <Rectangle x:Name="RectBackdropTint" Grid.Row="1" IsHitTestVisible="False" Visibility="Collapsed" />
                 <Grid x:Name="PanTitle" Height="48">
                     <Grid.Background>
                         <LinearGradientBrush EndPoint="1,0" StartPoint="0,0">
@@ -141,7 +142,7 @@
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="1*"/>
                     </Grid.ColumnDefinitions>
-                    <Rectangle x:Name="RectLeftBackground" Width="0" Fill="{DynamicResource ColorBrushBackgroundTransparentSidebar}" IsHitTestVisible="False" />
+                    <Rectangle x:Name="RectLeftBackground" Width="0" Fill="{DynamicResource ColorBrushSidebarGlass}" IsHitTestVisible="False" />
                     <Rectangle x:Name="RectLeftShadow" Width="4" HorizontalAlignment="Left" IsHitTestVisible="False" Grid.Column="1" >
                         <Rectangle.Fill>
                             <LinearGradientBrush EndPoint="1,0" StartPoint="0,0" Opacity="0.04">

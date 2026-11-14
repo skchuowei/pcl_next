@@ -5,19 +5,19 @@
     mc:Ignorable="d" x:Class="PCL.PageSetupUIAdv"
     PanScroll="PanBack">
     <local:MyScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" x:Name="PanBack">
-        <StackPanel x:Name="PanMain" Margin="25,10">
-            <local:MyHint Theme="Yellow" Margin="0,0,0,12" Text="该选项仅供开发测试使用。所有调整仅叠加在主题之上、实时预览，重置即可恢复正式配色与动画基线，不会影响其它页面。" />
+        <StackPanel x:Name="PanMain" Margin="16,10">
+            <local:MyHint Theme="Yellow" Margin="0,0,0,12" Text="该选项仅供开发测试使用。调整不会立即生效，点击「应用」后统一套用；「取消」可丢弃未应用的改动，恢复默认可回到正式配色与动画基线。" />
 
             <local:MyCard Margin="0,0,0,15" Title="配色设置">
                 <StackPanel Margin="25,40,25,17">
-                    <local:MyColorEdit Title="主题色（含标题栏）" local:SettingService.Key="UiDevColorAccent" BaseBrushKey="ColorBrush3" />
-                    <local:MyColorEdit Title="背景色" local:SettingService.Key="UiDevColorBg" BaseBrushKey="ColorBrushWindow" />
-                    <local:MyColorEdit Title="文字色" local:SettingService.Key="UiDevColorText" BaseBrushKey="ColorBrush1" />
-                    <local:MyColorEdit Title="按钮 · 默认" local:SettingService.Key="UiDevColorBtnDefault" BaseBrushKey="ColorBrushButton" />
-                    <local:MyColorEdit Title="按钮 · 悬停" local:SettingService.Key="UiDevColorBtnHover" BaseBrushKey="ColorBrushButtonHover" />
-                    <local:MyColorEdit Title="按钮 · 按下" local:SettingService.Key="UiDevColorBtnPressed" BaseBrushKey="ColorBrushButtonPressed" />
-                    <local:MyColorEdit Title="按钮 · 禁用" local:SettingService.Key="UiDevColorBtnDisabled" BaseBrushKey="ColorBrushButtonDisabled" />
-                    <local:MyColorEdit Title="弹窗色" local:SettingService.Key="UiDevColorPopup" BaseBrushKey="ColorBrushPopup" />
+                    <local:MyColorEdit x:Name="ColorAccent" Title="主题色（含标题栏）" local:SettingService.Key="UiDevColorAccent" BaseBrushKey="ColorBrush3" />
+                    <local:MyColorEdit x:Name="ColorBg" Title="背景色" local:SettingService.Key="UiDevColorBg" BaseBrushKey="ColorBrushWindow" />
+                    <local:MyColorEdit x:Name="ColorText" Title="文字色" local:SettingService.Key="UiDevColorText" BaseBrushKey="ColorBrush1" />
+                    <local:MyColorEdit x:Name="ColorBtnDefault" Title="按钮 · 默认" local:SettingService.Key="UiDevColorBtnDefault" BaseBrushKey="ColorBrushButton" />
+                    <local:MyColorEdit x:Name="ColorBtnHover" Title="按钮 · 悬停" local:SettingService.Key="UiDevColorBtnHover" BaseBrushKey="ColorBrushButtonHover" />
+                    <local:MyColorEdit x:Name="ColorBtnPressed" Title="按钮 · 按下" local:SettingService.Key="UiDevColorBtnPressed" BaseBrushKey="ColorBrushButtonPressed" />
+                    <local:MyColorEdit x:Name="ColorBtnDisabled" Title="按钮 · 禁用" local:SettingService.Key="UiDevColorBtnDisabled" BaseBrushKey="ColorBrushButtonDisabled" />
+                    <local:MyColorEdit x:Name="ColorPopup" Title="弹窗色" local:SettingService.Key="UiDevColorPopup" BaseBrushKey="ColorBrushPopup" />
                 </StackPanel>
             </local:MyCard>
 
@@ -26,24 +26,42 @@
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" SharedSizeGroup="Name1" />
                         <ColumnDefinition Width="1*" />
+                        <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
-                    <TextBlock VerticalAlignment="Center" HorizontalAlignment="Left" Text="动画速度" Margin="0,0,20,0" />
-                    <local:MySlider local:SettingService.Key="UiDevAnimSpeed" MaxValue="30" ValueByKey="1" Grid.Column="1" x:Name="SliderAnimSpeed" Margin="0,4,0,0" />
+                    <TextBlock Grid.Row="0" VerticalAlignment="Center" HorizontalAlignment="Left" Text="动画速度" Margin="0,0,20,0" />
+                    <local:MySlider x:Name="SliderAnimSpeed" Grid.Row="0" Grid.Column="1" MaxValue="30" Height="22" Margin="0,4,0,0" />
+                    <TextBlock x:Name="LabSpeed" Grid.Row="0" Grid.Column="2" VerticalAlignment="Center" Margin="14,4,0,0" FontSize="12"
+                               Foreground="{DynamicResource ColorBrushGray3}" Text="速度：10（1.0×）" />
                     <TextBlock Grid.Row="1" VerticalAlignment="Center" HorizontalAlignment="Left" Text="动画缓动" Margin="0,14,20,0" />
-                    <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Margin="0,14,0,0">
-                        <local:MyRadioBox local:SettingService.Key="UiDevAnimEase" local:SettingService.Value="0" Text="线性" Margin="0,0,16,0" />
-                        <local:MyRadioBox local:SettingService.Key="UiDevAnimEase" local:SettingService.Value="1" Text="标准" Margin="0,0,16,0" />
-                        <local:MyRadioBox local:SettingService.Key="UiDevAnimEase" local:SettingService.Value="2" Text="缓入" Margin="0,0,16,0" />
-                        <local:MyRadioBox local:SettingService.Key="UiDevAnimEase" local:SettingService.Value="3" Text="缓出" />
+                    <StackPanel Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" Orientation="Horizontal" Margin="0,14,0,0">
+                        <local:MyRadioBox x:Name="RadioEase0" Text="线性" Margin="0,0,16,0" />
+                        <local:MyRadioBox x:Name="RadioEase1" Text="标准" Margin="0,0,16,0" />
+                        <local:MyRadioBox x:Name="RadioEase2" Text="缓入" Margin="0,0,16,0" />
+                        <local:MyRadioBox x:Name="RadioEase3" Text="缓出" />
                     </StackPanel>
-                    <local:MyButton Grid.Row="2" Grid.Column="1" x:Name="BtnResetAll" Width="120" Height="32" Margin="0,16,0,0" Text="恢复默认" HorizontalAlignment="Left" Padding="0" />
+                    <TextBlock Grid.Row="2" VerticalAlignment="Center" HorizontalAlignment="Left" Text="渲染帧率" Margin="0,14,20,0" />
+                    <local:MySlider x:Name="SliderAnimFps" Grid.Row="2" Grid.Column="1" MaxValue="240" Height="22" Margin="0,14,0,0" />
+                    <TextBlock x:Name="LabFps" Grid.Row="2" Grid.Column="2" VerticalAlignment="Center" Margin="14,14,0,0" FontSize="12"
+                               Foreground="{DynamicResource ColorBrushGray3}" Text="渲染帧率：60 FPS" />
+                    <TextBlock Grid.Row="3" VerticalAlignment="Center" HorizontalAlignment="Left" Text="弹窗消失保帧数" Margin="0,14,20,0" />
+                    <local:MySlider x:Name="SliderPopupFrames" Grid.Row="3" Grid.Column="1" MaxValue="60" Height="22" Margin="0,14,0,0" />
+                    <TextBlock x:Name="LabPopupFrames" Grid.Row="3" Grid.Column="2" VerticalAlignment="Center" Margin="14,14,0,0" FontSize="12"
+                               Foreground="{DynamicResource ColorBrushGray3}" Text="消失保帧：12 帧" />
                 </Grid>
             </local:MyCard>
+
+            <TextBlock x:Name="LabPending" Margin="2,0,0,10" FontSize="12" Foreground="{DynamicResource ColorBrushGray3}" Text="" />
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                <local:MyButton x:Name="BtnApply" Width="120" Height="32" Text="应用" Padding="0" />
+                <local:MyButton x:Name="BtnCancel" Width="100" Height="32" Margin="10,0,0,0" Text="取消" Padding="0" />
+                <local:MyButton x:Name="BtnResetAll" Width="120" Height="32" Margin="10,0,0,0" Text="恢复默认" Padding="0" />
+            </StackPanel>
         </StackPanel>
     </local:MyScrollViewer>
 </local:MyPageRight>

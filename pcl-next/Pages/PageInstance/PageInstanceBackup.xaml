@@ -1,0 +1,39 @@
+<local:MyPageRight
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="clr-namespace:PCL" xmlns:d="http://schemas.microsoft.com/expression/blend/2008" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d" x:Class="PCL.PageInstanceBackup"
+    PanScroll="PanBack">
+    <local:MyScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" x:Name="PanBack">
+        <StackPanel x:Name="PanMain" Margin="25,10">
+            <local:MyCard Margin="0,15" Title="当前实例">
+                <StackPanel Margin="25,30,25,15">
+                    <TextBlock x:Name="LabInstance" FontSize="16" FontWeight="Bold" Text="当前实例：未知" TextTrimming="CharacterEllipsis" />
+                    <TextBlock x:Name="LabBackupRoot" Margin="0,8,0,0" TextWrapping="Wrap" Opacity="0.6" FontSize="12" Text="备份目录：—" />
+                    <TextBlock Margin="0,8,0,0" TextWrapping="Wrap" Opacity="0.6" FontSize="12"
+                               Text="备份严格跟随实例：切换实例只显示该实例的备份，删除实例时其全部备份会一同删除，不会影响其他实例。" />
+                </StackPanel>
+            </local:MyCard>
+            <local:MyCard Margin="0,0,0,15" Title="新建备份">
+                <StackPanel Margin="25,30,25,15">
+                    <WrapPanel x:Name="PanButtons">
+                        <local:MyButton x:Name="BtnBackupFull" Text="完整备份" MinWidth="130" Height="35" Padding="13,0" Margin="0,0,15,10" ToolTip="备份当前实例的全部数据（不含日志、缓存与备份目录）。" />
+                        <local:MyButton x:Name="BtnBackupModpack" Text="整合包备份" MinWidth="130" Height="35" Padding="13,0" Margin="0,0,15,10" ToolTip="生成导入包备份：把当前实例的整合包相关内容连同版本与加载器信息打包留档；还原时按它清空实例并重新导入安装。" />
+                        <local:MyButton x:Name="BtnBackupIncremental" Text="增量备份" MinWidth="130" Height="35" Padding="13,0" Margin="0,0,15,10" ToolTip="以当前实例最近的基准包为对照，只保存变化的文件。" />
+                        <local:MyButton x:Name="BtnInitPack" Text="初始化整合包" MinWidth="130" Height="35" Padding="13,0" Margin="0,0,15,10" ToolTip="把当前实例打包成初始基准包（锁定不可删），之后可随时还原到它。" />
+                        <local:MyButton x:Name="BtnRestoreInitial" Text="还原到初始包" MinWidth="130" Height="35" Padding="13,0" Margin="0,0,15,10" ToolTip="用最新的初始基准包还原当前实例。" />
+                        <local:MyButton x:Name="BtnOpenFolder" Text="打开备份文件夹" MinWidth="130" Height="35" Padding="13,0" Margin="0,0,15,10" />
+                    </WrapPanel>
+                    <local:MyCheckBox x:Name="ChkSmartBackup" Text="智能备份：还原前先做一次完整备份，10 分钟后自动换成体积更小的整合包备份" Margin="0,6,0,0" />
+                    <TextBlock x:Name="LabIncrementalHint" Margin="0,4,0,0" TextWrapping="Wrap" Opacity="0.6" FontSize="12" />
+                </StackPanel>
+            </local:MyCard>
+            <local:MyCard Margin="0,0,0,15" Title="备份列表">
+                <StackPanel Margin="25,30,25,15">
+                    <TextBlock x:Name="LabEmpty" Text="当前实例还没有任何备份。" Opacity="0.6" FontSize="12" Margin="0,0,0,4" />
+                    <StackPanel x:Name="PanList" />
+                </StackPanel>
+            </local:MyCard>
+        </StackPanel>
+    </local:MyScrollViewer>
+</local:MyPageRight>

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Windows;
 
 namespace PCL
@@ -26,7 +26,7 @@ namespace PCL
 
         public void BtnDownload_Loaded()
         {
-            var NewVisibility = ModDownloadPolicy.RestrictMcDownload || Settings.Get<bool>("UiHiddenPageDownload") && !PageSetupUI.HiddenForceShow || (ModMain.FrmSelectRight is null ? false : ModMain.FrmSelectRight.ShowHidden) ? Visibility.Collapsed : Visibility.Visible;
+            var NewVisibility = ModDownloadPolicy.RestrictMcDownload || Settings.Get<bool>("UiHiddenPageDownload") && !PageSetupHome.HiddenForceShow || (ModMain.FrmSelectRight is null ? false : ModMain.FrmSelectRight.ShowHidden) ? Visibility.Collapsed : Visibility.Visible;
             if (this.BtnDownload.Visibility != NewVisibility)
             {
                 this.BtnDownload.Visibility = NewVisibility;

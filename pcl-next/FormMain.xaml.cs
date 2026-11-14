@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
@@ -515,8 +515,8 @@ namespace PCL
             ModBase.Handle = new WindowInteropHelper(this).Handle;
             // 读取设置
             UpdateBackgroundAndTitleBar();
-            PageSetupUI.HiddenRefresh();
-            PageSetupUI.BackgroundRefresh(false, true);
+            PageSetupHome.HiddenRefresh();
+            PageSetupBackdrop.BackgroundRefresh(false, true);
             ModMusic.MusicRefreshPlay(false, true);
             // 扩展按钮
             this.BtnExtraDownload.Click += (p1, p2) => BtnExtraDownload_Click(p1, p2);
@@ -982,6 +982,8 @@ namespace PCL
                 this.ImgBack.Effect = new System.Windows.Media.Effects.BlurEffect() { Radius = BlurRadius };
             }
             this.ImgBack.Margin = new Thickness(-BlurRadius / 1.8d);
+            // 磨砂风格蒙层（整窗背景之上、内容之下；右侧间隙与左侧栏统一跟随）
+            ApplyBackdropTint();
             // 背景图片适应方式
             int BackgroundType = Settings.Get<int>("UiBackgroundSuit");
             if (this.ImgBack.Background is not null)
@@ -1165,6 +1167,51 @@ namespace PCL
             this.PanTitleMain.ColumnDefinitions[0].Width = new GridLength(Settings.Get<bool>("UiLogoLeft") && Settings.Get<int>("UiLogoType") == 0 ? 0 : 1, GridUnitType.Star);
         }
 
+        /// <summary>
+        /// 按「磨砂风格」设置左侧栏的薄半透明蒙层；整窗不再叠加白色蒙层，背景图原样透出，
+        /// 左右两侧统一跟随底层背景与全局「背景模糊」（ImgBack.Effect），不做左侧独立局部模糊。
+        /// 档位由设置项 UiBackgroundBlurStyle 控制：0 经典磨砂 / 1 通透柔化 / 2 深色磨砂 / 3 主题亚克力。
+        /// 无背景图时侧栏回退到主题默认侧栏画刷。
+        /// </summary>
+        private void ApplyBackdropTint()
+        {
+            // 整窗白色蒙层：始终隐藏，避免把背景图洗成白雾。
+            this.RectBackdropTint.Visibility = Visibility.Collapsed;
+            this.RectBackdropTint.Fill = null;
+
+            bool hasImage = this.ImgBack.Visibility == Visibility.Visible && this.ImgBack.Background is not null;
+            if (!hasImage)
+            {
+                this.RectLeftBackground.Fill = (Brush)Application.Current.Resources["ColorBrushSidebarGlass"];
+                return;
+            }
+            bool isDark = ModSecret.ThemeNow == ModSecret.ThemeDarkId;
+            int style = Settings.Get<int>("UiBackgroundBlurStyle");
+            Color tint;
+            switch (style)
+            {
+                case 1: // 通透柔化：更淡的蒙层，背景更多透出
+                    tint = isDark ? Color.FromArgb(28, 255, 255, 255) : Color.FromArgb(38, 255, 255, 255);
+                    break;
+                case 2: // 深色磨砂：压暗的黑色蒙层
+                    tint = Color.FromArgb(95, 0, 0, 0);
+                    break;
+                case 3: // 主题亚克力：主题强调色低透明度
+                    {
+                        Color accent = Application.Current.Resources.Contains("ColorObject3")
+                            ? (Color)Application.Current.Resources["ColorObject3"]
+                            : Colors.Gray;
+                        tint = Color.FromArgb(55, accent.R, accent.G, accent.B);
+                        break;
+                    }
+                default: // 0 经典磨砂：薄半透明白，背景与全局模糊仍可透出
+                    tint = isDark ? Color.FromArgb(80, 24, 24, 28) : Color.FromArgb(70, 255, 255, 255);
+                    break;
+            }
+            this.RectLeftBackground.Fill = new SolidColorBrush(tint);
+        }
+
+
         #endregion
 
         #region 窗体事件
@@ -1227,8 +1274,8 @@ namespace PCL
             // 更改功能隐藏可见性
             if (e.Key == Key.F12)
             {
-                PageSetupUI.HiddenForceShow = !PageSetupUI.HiddenForceShow;
-                if (PageSetupUI.HiddenForceShow)
+                PageSetupHome.HiddenForceShow = !PageSetupHome.HiddenForceShow;
+                if (PageSetupHome.HiddenForceShow)
                 {
                     ModMain.Hint("功能隐藏设置已暂时关闭！", ModMain.HintType.Green);
                 }
@@ -1236,7 +1283,7 @@ namespace PCL
                 {
                     ModMain.Hint("功能隐藏设置已重新开启！", ModMain.HintType.Green);
                 }
-                PageSetupUI.HiddenRefresh();
+                PageSetupHome.HiddenRefresh();
                 return;
             }
             // 按 F5 刷新页面
@@ -1719,9 +1766,13 @@ namespace PCL
             SetupLaunch = 0,
             SetupLink = 1,
             SetupUI = 2,
-            SetupSystem = 3,
-            SetupUIAdv = 4,
-            SetupAccount = 5,
+            SetupBackdrop = 3,
+            SetupHome = 4,
+            SetupDownload = 5,
+            SetupNotify = 6,
+            SetupAccount = 7,
+            SetupSystem = 8,
+            SetupUIAdv = 9,
             LinkMain = 0,
             OtherHelp = 0,
             OtherAbout = 1,
@@ -1731,7 +1782,8 @@ namespace PCL
             InstanceModify = 2,
             InstanceMod = 3,
             InstanceModDisabled = 4,
-            InstanceExport = 5
+            InstanceExport = 5,
+            InstanceBackup = 6
         }
         /// <summary>
     /// 获取次级页面的名称。若并非次级页面则返回空字符串，故可以以此判断是否为次级页面。

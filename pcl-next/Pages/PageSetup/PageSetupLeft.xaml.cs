@@ -19,18 +19,30 @@ namespace PCL
                 IsHiddenPage = true;
             if (this.ItemUI.Checked && Settings.Get<bool>("UiHiddenSetupUi"))
                 IsHiddenPage = true;
+            if (this.ItemBackdrop.Checked && Settings.Get<bool>("UiHiddenSetupUi"))
+                IsHiddenPage = true;
+            if (this.ItemHome.Checked && Settings.Get<bool>("UiHiddenSetupUi"))
+                IsHiddenPage = true;
+            if (this.ItemDownload.Checked && Settings.Get<bool>("UiHiddenSetupSystem"))
+                IsHiddenPage = true;
+            if (this.ItemNotify.Checked && Settings.Get<bool>("UiHiddenSetupSystem"))
+                IsHiddenPage = true;
+            if (this.ItemAccount.Checked && Settings.Get<bool>("UiHiddenSetupSystem"))
+                IsHiddenPage = true;
             if (this.ItemSystem.Checked && Settings.Get<bool>("UiHiddenSetupSystem"))
+                IsHiddenPage = true;
+            if (this.ItemUIAdv.Checked && Settings.Get<bool>("UiHiddenSetupSystem"))
                 IsHiddenPage = true;
             if (this.ItemLink.Checked && Settings.Get<bool>("UiHiddenSetupLink"))
                 IsHiddenPage = true;
-            if (PageSetupUI.HiddenForceShow)
+            if (PageSetupHome.HiddenForceShow)
                 IsHiddenPage = false;
             // 若页面错误，或尚未加载，则继续
             if (IsLoad && !IsHiddenPage)
                 return;
             IsLoad = true;
             // 刷新子页面隐藏情况
-            PageSetupUI.HiddenRefresh();
+            PageSetupHome.HiddenRefresh();
             // 选择第一个未被禁用的子页面
             if (IsPageSwitched)
                 return;
@@ -44,7 +56,7 @@ namespace PCL
             }
             else if (!Settings.Get<bool>("UiHiddenSetupSystem"))
             {
-                this.ItemSystem.SetChecked(true, false, false);
+                this.ItemDownload.SetChecked(true, false, false);
             }
             else if (!Settings.Get<bool>("UiHiddenSetupLink"))
             {
@@ -60,21 +72,62 @@ namespace PCL
             IsPageSwitched = false;
         }
 
+        /// <summary>
+        /// 按「功能隐藏」设置同步各个导航项与分组标题的可见性。
+        /// 三个旧设置键的语义映射：Launch → 启动；Ui → 外观/背景与音乐/主页与入口；
+        /// System → 下载与资源/通知与更新/账号与皮肤/调试与实验/界面试验台；Link → 联机。
+        /// </summary>
+        public void RefreshHiddenItems()
+        {
+            bool ForceShow = PageSetupHome.HiddenForceShow;
+            bool HideGame = !ForceShow && Settings.Get<bool>("UiHiddenSetupLaunch");
+            bool HideUi = !ForceShow && Settings.Get<bool>("UiHiddenSetupUi");
+            bool HideSystem = !ForceShow && Settings.Get<bool>("UiHiddenSetupSystem");
+            bool HideLink = !ForceShow && Settings.Get<bool>("UiHiddenSetupLink");
+            this.ItemLaunch.Visibility = HideGame ? Visibility.Collapsed : Visibility.Visible;
+            this.ItemLink.Visibility = HideLink ? Visibility.Collapsed : Visibility.Visible;
+            this.ItemUI.Visibility = HideUi ? Visibility.Collapsed : Visibility.Visible;
+            this.ItemBackdrop.Visibility = HideUi ? Visibility.Collapsed : Visibility.Visible;
+            this.ItemHome.Visibility = HideUi ? Visibility.Collapsed : Visibility.Visible;
+            this.ItemDownload.Visibility = HideSystem ? Visibility.Collapsed : Visibility.Visible;
+            this.ItemNotify.Visibility = HideSystem ? Visibility.Collapsed : Visibility.Visible;
+            this.ItemAccount.Visibility = HideSystem ? Visibility.Collapsed : Visibility.Visible;
+            this.ItemSystem.Visibility = HideSystem ? Visibility.Collapsed : Visibility.Visible;
+            this.ItemUIAdv.Visibility = HideSystem ? Visibility.Collapsed : Visibility.Visible;
+            // 分组标题：组内还有可见项时才显示
+            this.LabGroupGame.Visibility = (!HideGame || !ForceShow) ? Visibility.Visible : Visibility.Collapsed;
+            this.LabGroupLauncher.Visibility = !HideUi ? Visibility.Visible : Visibility.Collapsed;
+            this.LabGroupAdvanced.Visibility = !HideSystem ? Visibility.Visible : Visibility.Collapsed;
+            // 全部隐藏时收回整栏
+            int AvaliableCount = 0;
+            if (!Settings.Get<bool>("UiHiddenSetupLaunch"))
+                AvaliableCount += 1;
+            if (!Settings.Get<bool>("UiHiddenSetupUi"))
+                AvaliableCount += 1;
+            if (!Settings.Get<bool>("UiHiddenSetupSystem"))
+                AvaliableCount += 1;
+            this.PanItem.Visibility = AvaliableCount < 2 && !ForceShow ? Visibility.Collapsed : Visibility.Visible;
+        }
+
         #region 页面切换
 
         /// <summary>
-    /// 当前页面的编号。从左往右从 0 开始计算。
-    /// </summary>
+        /// 当前页面的编号。按导航顺序从 0 开始计算。
+        /// </summary>
         public FormMain.PageSubType PageID;
         public PageSetupLeft()
         {
             this.InitializeComponent();
             this.ItemLaunch.Check += (p1, p2) => PageCheck((MyListItem)p1, (EventArgs)p2);
-            this.ItemSystem.Check += (p1, p2) => PageCheck((MyListItem)p1, (EventArgs)p2);
-            this.ItemUI.Check += (p1, p2) => PageCheck((MyListItem)p1, (EventArgs)p2);
             this.ItemLink.Check += (p1, p2) => PageCheck((MyListItem)p1, (EventArgs)p2);
-            this.ItemUIAdv.Check += (p1, p2) => PageCheck((MyListItem)p1, (EventArgs)p2);
+            this.ItemUI.Check += (p1, p2) => PageCheck((MyListItem)p1, (EventArgs)p2);
+            this.ItemBackdrop.Check += (p1, p2) => PageCheck((MyListItem)p1, (EventArgs)p2);
+            this.ItemHome.Check += (p1, p2) => PageCheck((MyListItem)p1, (EventArgs)p2);
+            this.ItemDownload.Check += (p1, p2) => PageCheck((MyListItem)p1, (EventArgs)p2);
+            this.ItemNotify.Check += (p1, p2) => PageCheck((MyListItem)p1, (EventArgs)p2);
             this.ItemAccount.Check += (p1, p2) => PageCheck((MyListItem)p1, (EventArgs)p2);
+            this.ItemSystem.Check += (p1, p2) => PageCheck((MyListItem)p1, (EventArgs)p2);
+            this.ItemUIAdv.Check += (p1, p2) => PageCheck((MyListItem)p1, (EventArgs)p2);
             // 选择第一个未被禁用的子页面
             if (!Settings.Get<bool>("UiHiddenSetupLaunch"))
             {
@@ -86,7 +139,7 @@ namespace PCL
             }
             else if (!Settings.Get<bool>("UiHiddenSetupSystem"))
             {
-                PageID = FormMain.PageSubType.SetupSystem;
+                PageID = FormMain.PageSubType.SetupDownload;
             }
             else if (!Settings.Get<bool>("UiHiddenSetupLink"))
             {
@@ -102,8 +155,8 @@ namespace PCL
         }
 
         /// <summary>
-    /// 勾选事件改变页面。
-    /// </summary>
+        /// 勾选事件改变页面。
+        /// </summary>
         private void PageCheck(MyListItem sender, EventArgs e)
         {
             // 尚未初始化控件属性时，sender.Tag 为 Nothing，会跳过切换，且由于 PageID 默认为 0 而切换到第一个页面
@@ -113,8 +166,8 @@ namespace PCL
         }
 
         /// <summary>
-    /// 获取当前导航指定的右页面。
-    /// </summary>
+        /// 获取当前导航指定的右页面。
+        /// </summary>
         public object PageGet(FormMain.PageSubType ID = (FormMain.PageSubType)(-1))
         {
             if ((int)ID == -1)
@@ -127,17 +180,47 @@ namespace PCL
                             ModMain.FrmSetupLaunch = new PageSetupLaunch();
                         return ModMain.FrmSetupLaunch;
                     }
+                case FormMain.PageSubType.SetupLink:
+                    {
+                        if (ModMain.FrmSetupLink is null)
+                            ModMain.FrmSetupLink = new PageSetupLink();
+                        return ModMain.FrmSetupLink;
+                    }
                 case FormMain.PageSubType.SetupUI:
                     {
                         if (ModMain.FrmSetupUI is null)
                             ModMain.FrmSetupUI = new PageSetupUI();
                         return ModMain.FrmSetupUI;
                     }
-                case FormMain.PageSubType.SetupLink:
+                case FormMain.PageSubType.SetupBackdrop:
                     {
-                        if (ModMain.FrmSetupLink is null)
-                            ModMain.FrmSetupLink = new PageSetupLink();
-                        return ModMain.FrmSetupLink;
+                        if (ModMain.FrmSetupBackdrop is null)
+                            ModMain.FrmSetupBackdrop = new PageSetupBackdrop();
+                        return ModMain.FrmSetupBackdrop;
+                    }
+                case FormMain.PageSubType.SetupHome:
+                    {
+                        if (ModMain.FrmSetupHome is null)
+                            ModMain.FrmSetupHome = new PageSetupHome();
+                        return ModMain.FrmSetupHome;
+                    }
+                case FormMain.PageSubType.SetupDownload:
+                    {
+                        if (ModMain.FrmSetupDownload is null)
+                            ModMain.FrmSetupDownload = new PageSetupDownload();
+                        return ModMain.FrmSetupDownload;
+                    }
+                case FormMain.PageSubType.SetupNotify:
+                    {
+                        if (ModMain.FrmSetupNotify is null)
+                            ModMain.FrmSetupNotify = new PageSetupNotify();
+                        return ModMain.FrmSetupNotify;
+                    }
+                case FormMain.PageSubType.SetupAccount:
+                    {
+                        if (ModMain.FrmSetupAccount is null)
+                            ModMain.FrmSetupAccount = new PageSetupAccount();
+                        return ModMain.FrmSetupAccount;
                     }
                 case FormMain.PageSubType.SetupSystem:
                     {
@@ -151,12 +234,6 @@ namespace PCL
                             ModMain.FrmSetupUIAdv = new PageSetupUIAdv();
                         return ModMain.FrmSetupUIAdv;
                     }
-                case FormMain.PageSubType.SetupAccount:
-                    {
-                        if (ModMain.FrmSetupAccount is null)
-                            ModMain.FrmSetupAccount = new PageSetupAccount();
-                        return ModMain.FrmSetupAccount;
-                    }
 
                 default:
                     {
@@ -166,8 +243,8 @@ namespace PCL
         }
 
         /// <summary>
-    /// 切换现有页面。
-    /// </summary>
+        /// 切换现有页面。
+        /// </summary>
         public void PageChange(FormMain.PageSubType ID)
         {
             if (PageID == ID)
@@ -186,6 +263,13 @@ namespace PCL
                             PageSetupLeft.PageChangeRun(ModMain.FrmSetupLaunch);
                             break;
                         }
+                    case FormMain.PageSubType.SetupLink:
+                        {
+                            if (ModMain.FrmSetupLink == null)
+                                ModMain.FrmSetupLink = new PageSetupLink();
+                            PageSetupLeft.PageChangeRun(ModMain.FrmSetupLink);
+                            break;
+                        }
                     case FormMain.PageSubType.SetupUI:
                         {
                             if (ModMain.FrmSetupUI == null)
@@ -193,11 +277,39 @@ namespace PCL
                             PageSetupLeft.PageChangeRun(ModMain.FrmSetupUI);
                             break;
                         }
-                    case FormMain.PageSubType.SetupLink:
+                    case FormMain.PageSubType.SetupBackdrop:
                         {
-                            if (ModMain.FrmSetupLink == null)
-                                ModMain.FrmSetupLink = new PageSetupLink();
-                            PageSetupLeft.PageChangeRun(ModMain.FrmSetupLink);
+                            if (ModMain.FrmSetupBackdrop == null)
+                                ModMain.FrmSetupBackdrop = new PageSetupBackdrop();
+                            PageSetupLeft.PageChangeRun(ModMain.FrmSetupBackdrop);
+                            break;
+                        }
+                    case FormMain.PageSubType.SetupHome:
+                        {
+                            if (ModMain.FrmSetupHome == null)
+                                ModMain.FrmSetupHome = new PageSetupHome();
+                            PageSetupLeft.PageChangeRun(ModMain.FrmSetupHome);
+                            break;
+                        }
+                    case FormMain.PageSubType.SetupDownload:
+                        {
+                            if (ModMain.FrmSetupDownload == null)
+                                ModMain.FrmSetupDownload = new PageSetupDownload();
+                            PageSetupLeft.PageChangeRun(ModMain.FrmSetupDownload);
+                            break;
+                        }
+                    case FormMain.PageSubType.SetupNotify:
+                        {
+                            if (ModMain.FrmSetupNotify == null)
+                                ModMain.FrmSetupNotify = new PageSetupNotify();
+                            PageSetupLeft.PageChangeRun(ModMain.FrmSetupNotify);
+                            break;
+                        }
+                    case FormMain.PageSubType.SetupAccount:
+                        {
+                            if (ModMain.FrmSetupAccount == null)
+                                ModMain.FrmSetupAccount = new PageSetupAccount();
+                            PageSetupLeft.PageChangeRun(ModMain.FrmSetupAccount);
                             break;
                         }
                     case FormMain.PageSubType.SetupSystem:
@@ -212,13 +324,6 @@ namespace PCL
                             if (ModMain.FrmSetupUIAdv == null)
                                 ModMain.FrmSetupUIAdv = new PageSetupUIAdv();
                             PageSetupLeft.PageChangeRun(ModMain.FrmSetupUIAdv);
-                            break;
-                        }
-                    case FormMain.PageSubType.SetupAccount:
-                        {
-                            if (ModMain.FrmSetupAccount == null)
-                                ModMain.FrmSetupAccount = new PageSetupAccount();
-                            PageSetupLeft.PageChangeRun(ModMain.FrmSetupAccount);
                             break;
                         }
 
@@ -282,7 +387,7 @@ namespace PCL
                     }
                 case (double)FormMain.PageSubType.SetupUI:
                     {
-                        if (ModMain.MyMsgBox("是否要初始化 个性化 页面的所有设置？该操作不可撤销。" + Constants.vbCrLf + "（背景图片与音乐、主页等外部文件不会被删除）", "初始化确认", Button2: "取消", IsWarn: true) == 1)
+                        if (ModMain.MyMsgBox("是否要初始化 外观 页面的所有设置？该操作不可撤销。" + Constants.vbCrLf + "（背景图片与音乐、主页等外部文件不会被删除）", "初始化确认", Button2: "取消", IsWarn: true) == 1)
                         {
                             if (ModMain.FrmSetupUI == null)
                                 ModMain.FrmSetupUI = new PageSetupUI();
@@ -292,9 +397,57 @@ namespace PCL
 
                         break;
                     }
+                case (double)FormMain.PageSubType.SetupBackdrop:
+                    {
+                        if (ModMain.MyMsgBox("是否要初始化 背景与音乐 页面的所有设置？该操作不可撤销。" + Constants.vbCrLf + "（背景图片与音乐等外部文件不会被删除）", "初始化确认", Button2: "取消", IsWarn: true) == 1)
+                        {
+                            if (ModMain.FrmSetupBackdrop == null)
+                                ModMain.FrmSetupBackdrop = new PageSetupBackdrop();
+                            ModMain.FrmSetupBackdrop.Reset();
+                            this.ItemBackdrop.Checked = true;
+                        }
+
+                        break;
+                    }
+                case (double)FormMain.PageSubType.SetupHome:
+                    {
+                        if (ModMain.MyMsgBox("是否要初始化 主页与入口 页面的所有设置？该操作不可撤销。" + Constants.vbCrLf + "（主页文件等外部内容不会被删除）", "初始化确认", Button2: "取消", IsWarn: true) == 1)
+                        {
+                            if (ModMain.FrmSetupHome == null)
+                                ModMain.FrmSetupHome = new PageSetupHome();
+                            ModMain.FrmSetupHome.Reset();
+                            this.ItemHome.Checked = true;
+                        }
+
+                        break;
+                    }
+                case (double)FormMain.PageSubType.SetupDownload:
+                    {
+                        if (ModMain.MyMsgBox("是否要初始化 下载与资源 页面的所有设置？该操作不可撤销。", "初始化确认", Button2: "取消", IsWarn: true) == 1)
+                        {
+                            if (ModMain.FrmSetupDownload == null)
+                                ModMain.FrmSetupDownload = new PageSetupDownload();
+                            ModMain.FrmSetupDownload.Reset();
+                            this.ItemDownload.Checked = true;
+                        }
+
+                        break;
+                    }
+                case (double)FormMain.PageSubType.SetupNotify:
+                    {
+                        if (ModMain.MyMsgBox("是否要初始化 通知与更新 页面的所有设置？该操作不可撤销。", "初始化确认", Button2: "取消", IsWarn: true) == 1)
+                        {
+                            if (ModMain.FrmSetupNotify == null)
+                                ModMain.FrmSetupNotify = new PageSetupNotify();
+                            ModMain.FrmSetupNotify.Reset();
+                            this.ItemNotify.Checked = true;
+                        }
+
+                        break;
+                    }
                 case (double)FormMain.PageSubType.SetupSystem:
                     {
-                        if (ModMain.MyMsgBox("是否要初始化 其他 页面的所有设置？该操作不可撤销。", "初始化确认", Button2: "取消", IsWarn: true) == 1)
+                        if (ModMain.MyMsgBox("是否要初始化 调试与实验 页面的所有设置？该操作不可撤销。", "初始化确认", Button2: "取消", IsWarn: true) == 1)
                         {
                             if (ModMain.FrmSetupSystem == null)
                                 ModMain.FrmSetupSystem = new PageSetupSystem();

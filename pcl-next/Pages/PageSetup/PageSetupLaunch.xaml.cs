@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
@@ -22,7 +22,6 @@ namespace PCL
         public PageSetupLaunch()
         {
             InitializeComponent();
-            this.RadioSkinType4.PreviewCheck += (p1, p2) => RadioSkinType3_Check((object)p1, (ModBase.RouteEventArgs)p2);
             this.SliderRamCustom.Change += (p1, p2) => RefreshRam((bool)p1);
             this.RadioRamType0.Check += (p1, p2) => RefreshRam((bool)p1);
             this.RadioRamType1.Check += (p1, p2) => RefreshRam((bool)p1);
@@ -37,12 +36,9 @@ namespace PCL
             this.TextAdvanceJvm.ValidatedTextChanged += (p1, p2) => TextAdvanceJvm_TextChanged();
             this.TextAdvanceJvm.TextChanged += (p1, p2) => ReplaceEnter((MyTextBox)p1, (TextChangedEventArgs)p2);
             this.TextAdvanceGame.TextChanged += (p1, p2) => ReplaceEnter((MyTextBox)p1, (TextChangedEventArgs)p2);
-            // VB 原版全部靠 Handles 绑定，迁移后一个都没订阅：离线皮肤四个按钮、JVM 参数重设、
+            // VB 原版全部靠 Handles 绑定，迁移后一个都没订阅：JVM 参数重设、
             // 「版本独立设置」跳转全部点了无反应（2026-11-11 修复）。
-            this.BtnSkinChange.Click += (p1, p2) => BtnSkinChange_Click(p1, p2);
-            this.BtnSkinDelete.Click += (p1, p2) => BtnSkinDelete_Click(p1, p2);
-            this.BtnSkinSave.Click += (p1, p2) => BtnSkinSave_Click(p1, p2);
-            this.BtnSkinCache.Click += (p1, p2) => BtnSkinCache_Click(p1, p2);
+            // 离线皮肤相关按钮已迁至「账号与皮肤」页（2026-11-14 设置页拆分）。
             this.BtnAdvanceJvmReset.Click += (p1, p2) => BtnAdvanceJvmReset_Click(p1, p2);
             this.BtnSwitch.Click += (p1, p2) => BtnSwitch_Click(p1, p2);
             // VB 的 Handles BtnAdvanceJavaSearch.Click 迁移时被丢弃 → 设置里「手动搜索 Java」点了没反应（2026-11-11 补）。
@@ -75,7 +71,6 @@ namespace PCL
             try
             {
                 SettingService.RefreshSettings(this);
-                UpdateSkinType();
                 UpdateRamType();
                 UpdateJavaList();
             }
@@ -107,123 +102,7 @@ namespace PCL
             Refresh();
         }
 
-        #region 离线皮肤
-
-        private void BtnSkinChange_Click(object sender, MouseButtonEventArgs e)
-        {
-            var SkinInfo = ModMinecraft.McSkinSelect();
-            if (!SkinInfo.IsVaild)
-                return;
-            ChangeSkin(SkinInfo);
-        }
-        private void RadioSkinType3_Check(object sender, ModBase.RouteEventArgs e)
-        {
-            if (!(ModAnimation.AniControlEnabled == 0 && e.RaiseByMouse))
-                return;
-            // 已有图片则不再选择
-            if (FileUtils.Exists(Paths.AppDataThenName + "CustomSkin.png"))
-                return;
-            // 没有图片则要求选择
-            var SkinInfo = ModMinecraft.McSkinSelect();
-            if (!SkinInfo.IsVaild)
-            {
-                e.Handled = true;
-                return;
-            }
-            // 正式改变
-            if (!ChangeSkin(SkinInfo))
-                e.Handled = true;
-        }
-        // 返回是否成功改变
-        private bool ChangeSkin(ModMinecraft.McSkinInfo SkinInfo)
-        {
-            try
-            {
-                // 复制文件
-                FileUtils.Copy(SkinInfo.LocalFile, Paths.AppDataThenName + "CustomSkin.png");
-                // 将单层皮肤扩展到双层
-                var Bitmap = new MyBitmap(Paths.AppDataThenName + "CustomSkin.png");
-                if (Bitmap.Pic.Width == 64 && Bitmap.Pic.Height == 32)
-                {
-                    System.Drawing.Image Img = Bitmap;
-                    var NewBitmap = new System.Drawing.Bitmap(64, 64);
-                    using (var g = System.Drawing.Graphics.FromImage(NewBitmap))
-                    {
-                        g.DrawImageUnscaled(Img, new System.Drawing.Point(0, 0));
-                    }
-                    FileUtils.Delete(Paths.AppDataThenName + "CustomSkin.png");
-                    NewBitmap.Save(Paths.AppDataThenName + "CustomSkin.png");
-                }
-                // 更新设置
-                Settings.Set("LaunchSkinSlim", SkinInfo.IsSlim);
-                return true;
-            }
-            catch (Exception ex)
-            {
-                Logger.Error(ex, "改变离线皮肤失败", LogBehavior.Alert);
-                return false;
-            }
-            finally
-            {
-                // 设置当前显示
-                PageLaunchLeft.SkinLegacy.Start(IsForceRestart: true);
-            }
-        }
-        private void BtnSkinDelete_Click(object sender, MouseButtonEventArgs e)
-        {
-            try
-            {
-                FileUtils.Delete(Paths.AppDataThenName + "CustomSkin.png");
-                this.RadioSkinType0.SetChecked(true, true);
-                ModMain.Hint("离线皮肤已清空！", ModMain.HintType.Green);
-            }
-            catch (Exception ex)
-            {
-                Logger.Error(ex, "清空离线皮肤失败", LogBehavior.Alert);
-            }
-        }
-        private void BtnSkinSave_Click(object sender, MouseButtonEventArgs e)
-        {
-            MySkin.Save(PageLaunchLeft.SkinLegacy);
-        }
-        private void BtnSkinCache_Click(object sender, MouseButtonEventArgs e)
-        {
-            MySkin.RefreshCache(null);
-        }
-
-        public static void UpdateSkinType()
-        {
-            PageLaunchLeft.SkinLegacy.Start();
-            // 设置 UI 改变
-            if (ModMain.FrmSetupLaunch is null)
-                return;
-            switch (Settings.Get<int>("LaunchSkinType"))
-            {
-                case 0:
-                case 1:
-                case 2: // 默认
-                    {
-                        ModMain.FrmSetupLaunch.PanSkinID.Visibility = Visibility.Collapsed;
-                        ModMain.FrmSetupLaunch.PanSkinChange.Visibility = Visibility.Collapsed;
-                        break;
-                    }
-                case 3: // 正版
-                    {
-                        ModMain.FrmSetupLaunch.PanSkinID.Visibility = Visibility.Visible;
-                        ModMain.FrmSetupLaunch.PanSkinChange.Visibility = Visibility.Collapsed;
-                        break;
-                    }
-                case 4: // 自定义
-                    {
-                        ModMain.FrmSetupLaunch.PanSkinID.Visibility = Visibility.Collapsed;
-                        ModMain.FrmSetupLaunch.PanSkinChange.Visibility = Visibility.Visible;
-                        break;
-                    }
-            }
-            ModMain.FrmSetupLaunch.CardSkin.TriggerForceResize();
-        }
-
-        #endregion
+        // 离线皮肤相关实现已迁至「账号与皮肤」页（2026-11-14 设置页拆分）
 
         #region 游戏内存
 

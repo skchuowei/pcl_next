@@ -53,6 +53,58 @@ namespace PCL
     public static class ModAccountList
     {
 
+        /// <summary>
+        /// 界面展示顺序缓存。切换当前账号时存储必须把该账号提到 ¨ 列表首位（首位 = 当前账号），
+        /// 若界面直接按存储顺序渲染，点一下别的账号列表就会整排往上跳。
+        /// 这里记录首次枚举到的顺序：老账号位置固定，新账号追加到末尾，重命名/删除原地生效。
+        /// </summary>
+        private static readonly Dictionary<ModLaunch.McLoginType, List<string>> DisplayOrders = new Dictionary<ModLaunch.McLoginType, List<string>>();
+
+        private static List<AccountEntry> ApplyDisplayOrder(List<AccountEntry> Entries)
+        {
+            var Result = new List<AccountEntry>(Entries.Count);
+            // 按「类型首次出现」分组，保持 GetAll 里各类型的先后顺序
+            foreach (var Group in Entries.GroupBy(e => e.Type))
+            {
+                if (!DisplayOrders.TryGetValue(Group.Key, out var Order))
+                {
+                    Order = new List<string>();
+                    DisplayOrders[Group.Key] = Order;
+                }
+                foreach (var Entry in Group)
+                {
+                    if (!Order.Contains(Entry.Name))
+                        Order.Add(Entry.Name);
+                }
+                // OrderBy 是稳定排序，缺失项（理论上不会有）统一排到末尾
+                foreach (var Entry in Group.OrderBy(e =>
+                {
+                    int Index = Order.IndexOf(e.Name);
+                    return Index < 0 ? int.MaxValue : Index;
+                }))
+                    Result.Add(Entry);
+            }
+            return Result;
+        }
+
+        /// <summary>重命名后同步展示顺序，避免改名把该账号甩到列表末尾。</summary>
+        private static void RenameInOrder(ModLaunch.McLoginType Type, string OldName, string NewName)
+        {
+            if (!DisplayOrders.TryGetValue(Type, out var Order))
+                return;
+            int Index = Order.FindIndex(p => p == OldName);
+            if (Index < 0)
+                return;
+            Order[Index] = NewName;
+        }
+
+        private static void RemoveFromOrder(ModLaunch.McLoginType Type, string Name)
+        {
+            if (!DisplayOrders.TryGetValue(Type, out var Order))
+                return;
+            Order.RemoveAll(p => p == Name);
+        }
+
         /// <summary>枚举全部登录类型的账号（只读，不修改存储）。</summary>
         public static List<AccountEntry> GetAll()
         {
@@ -95,7 +147,7 @@ namespace PCL
                 if (!string.IsNullOrEmpty(Name.Trim()))
                     List.Add(new AccountEntry() { Type = ModLaunch.McLoginType.Auth, Name = Name.Trim(), Server = AuthServer });
             }
-            return List;
+            return ApplyDisplayOrder(List);
         }
 
         /// <summary>
@@ -300,6 +352,7 @@ namespace PCL
                 return "已存在同名账号";
             Names[Index] = NewName;
             Settings.Set("LoginLegacyName", string.Join("¨", Names));
+            RenameInOrder(ModLaunch.McLoginType.Legacy, Entry.Name, NewName);
             ModMain.FrmLoginLegacy?.Reload(false);
             ModMain.FrmLaunchLeft?.RefreshPage(false, true);
             return "";
@@ -402,6 +455,7 @@ namespace PCL
             {
                 Logger.Warn(ex, "删除账号失败");
             }
+            RemoveFromOrder(Entry.Type, Entry.Name);
             ModMain.FrmLaunchLeft?.RefreshPage(false, true);
         }
 

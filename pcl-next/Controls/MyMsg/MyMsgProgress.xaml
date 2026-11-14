@@ -1,0 +1,44 @@
+<Grid x:Class="PCL.MyMsgProgress"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:my="clr-namespace:PCL"
+      RenderTransformOrigin="0,0.5" UseLayoutRounding="True" SnapsToDevicePixels="True" MinWidth="420" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="25">
+    <Grid.RenderTransform>
+        <TransformGroup>
+            <RotateTransform x:Name="TransformRotate" Angle="-4" />
+            <TranslateTransform x:Name="TransformPos" X="0" Y="40" />
+        </TransformGroup>
+    </Grid.RenderTransform>
+    <Border Name="PanBorder" CornerRadius="7" Background="{DynamicResource ColorBrushTooltip}">
+        <Border.Effect>
+            <DropShadowEffect Color="{DynamicResource ColorObjectShadow}" BlurRadius="20" ShadowDepth="4" RenderingBias="Performance" Opacity="0.8" x:Name="EffectShadow" />
+        </Border.Effect>
+        <Grid Name="PanMain" VerticalAlignment="Top" Margin="22,22,22,20">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="2" />
+                <RowDefinition Height="16" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="12" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="8" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="14" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+            <TextBlock Grid.Row="0" FontSize="23" TextTrimming="None" Foreground="{DynamicResource ColorBrush2}" HorizontalAlignment="Left"
+                       Name="LabTitle" Margin="7,-1,70,9" Text="正在还原实例" VerticalAlignment="Top" SnapsToDevicePixels="False" UseLayoutRounding="False" />
+            <Rectangle x:Name="ShapeLine" Grid.Row="1" Height="2" Fill="{Binding Foreground, ElementName=LabTitle}" />
+            <TextBlock Grid.Row="3" Name="LabStage" Margin="7,0,7,0" FontSize="15" Foreground="{DynamicResource ColorBrushGray2}"
+                       TextWrapping="Wrap" Text="准备中……" />
+            <Grid Grid.Row="5" Margin="7,0,7,0" Height="8">
+                <Rectangle Name="BarBack" RadiusX="4" RadiusY="4" Fill="{DynamicResource ColorBrushGray3}" Opacity="0.35" />
+                <Rectangle Name="BarFill" RadiusX="4" RadiusY="4" HorizontalAlignment="Left" Width="0" Fill="{DynamicResource ColorBrush1}" />
+            </Grid>
+            <TextBlock Grid.Row="7" Name="LabPercent" Margin="7,0,7,0" FontSize="13" Foreground="{DynamicResource ColorBrushGray2}" Text="0%" />
+            <TextBlock Grid.Row="9" Name="LabNote" Margin="7,0,7,0" FontSize="12" Opacity="0.6" TextWrapping="Wrap"
+                       Foreground="{DynamicResource ColorBrushGray2}"
+                       Text="还原期间无法进行其他操作，完成后窗口会自动关闭。" />
+        </Grid>
+    </Border>
+</Grid>
