@@ -1,0 +1,19 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="PCL.Desktop.Linux.Views.PageOtherTestView">
+
+    <!--
+      1:1 对照基准：pcl-next/Pages/PageOther/PageOtherTest.xaml（全文 12 行）
+      外层：MyScrollViewer(Auto/Disabled) → 居中 TextBlock（15 号、高 30、水平/垂直居中）
+    -->
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                  HorizontalScrollBarVisibility="Disabled"
+                  VerticalContentAlignment="Center">
+        <TextBlock Text="为便于维护，开源内容中不包含百宝箱功能……"
+                   HorizontalAlignment="Center"
+                   FontSize="15"
+                   Height="30"
+                   VerticalAlignment="Center" />
+    </ScrollViewer>
+</UserControl>

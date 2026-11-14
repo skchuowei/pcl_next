@@ -1,0 +1,76 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="using:PCL.Desktop.Linux.Controls"
+             x:Class="PCL.Desktop.Linux.Views.PageOtherHelpView">
+
+    <!--
+      1:1 对照基准：pcl-next/Pages/PageOther/PageOtherHelp.xaml（全文 23 行）
+      外层：MyPageRight PanScroll="PanBack" → Grid
+        · PanBack：MyScrollViewer(Auto/Disabled) → StackPanel Margin 25,25,25,10
+          - 搜索框：MySearchBox Margin 0,0,0,15、Height 40（TextBox Padding 32,0,40,0 / MaxLength 50 /
+            13.5 号 + 左侧 14×14 放大镜 + 右侧 24×24 清空按钮，见 Controls/MySearchBox.xaml）
+          - PanSearch（搜索结果卡，默认隐藏）+ PanList（分类卡片列表）
+        · PanLoad：居中加载卡片（「正在加载帮助列表」）
+
+      静态态取「加载完成且无内容」：PanBack 可见、PanLoad 隐藏（原由 PageLoaderInit 切换）。
+      差异登记：
+      · R43 —— 帮助加载器（HelpLoader / HelpEntry / 内置帮助 JSON+XAML 解压）与帮助详情页
+        PageOtherHelpDetail 未移植：PanList 为空、搜索只清空/显示按钮不过滤；刷新按钮空操作
+    -->
+
+    <Grid>
+        <ScrollViewer VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled"
+                      Name="PanBack">
+            <StackPanel Name="PanMain" Margin="25,25,25,10">
+
+                <!-- MySearchBox：MyCard Height 40 + 无背景输入框 + 放大镜 + 清空按钮 -->
+                <c:MyCard Height="40" Margin="0,0,0,15">
+                    <Grid>
+                        <c:MyTextBox Name="SearchBox"
+                                     Background="Transparent"
+                                     BorderThickness="0"
+                                     Padding="32,0,40,0"
+                                     MaxLength="50"
+                                     FontSize="13.5"
+                                     VerticalContentAlignment="Center"
+                                     HintText="搜索帮助" />
+                        <Path Width="14" Height="14" Margin="14,0,0,0"
+                              HorizontalAlignment="Left"
+                              Stretch="Uniform"
+                              IsHitTestVisible="False"
+                              Fill="{DynamicResource ColorBrush1}"
+                              Data="M675.9168 242.816C556.3008 123.2 362.4448 123.2 242.8288 242.816 123.2128 362.432 123.2128 556.288 242.8288 675.904 362.4448 795.52 556.3008 795.52 675.9168 675.904 795.5328 556.288 795.5328 362.432 675.9168 242.816L675.9168 242.816ZM1000.7168 892.48C1030.6048 922.368 1030.6048 970.816 1000.7168 1000.704 970.8288 1030.656 922.3808 1030.656 892.4288 1000.704L730.0608 838.336C728.1408 836.416 727.4368 833.92 725.7728 831.872 546.3168 960.448 295.7568 945.408 134.5408 784.192-44.8512 604.8-44.8512 313.92 134.5408 134.528 313.9328-44.864 604.8128-44.864 784.2048 134.528 945.4208 295.744 960.4608 546.304 831.8848 725.76 833.9328 727.424 836.4288 728.128 838.3488 730.048L1000.7168 892.48Z" />
+                        <c:MyIconButton Name="BtnClear"
+                                        IsVisible="True"
+                                        Opacity="0"
+                                        IsHitTestVisible="False"
+                                        Width="24" Height="24"
+                                        Margin="0,0,10,0"
+                                        LogoScale="0.75"
+                                        IconTheme="Black"
+                                        HorizontalAlignment="Right"
+                                        Logo="F1 M2,0 L0,2 8,10 0,18 2,20 10,12 18,20 20,18 12,10 20,2 18,0 10,8 2,0Z" />
+                    </Grid>
+                </c:MyCard>
+
+                <Grid>
+                    <c:MyCard Name="PanSearch" Title=" " MinHeight="40"
+                              VerticalAlignment="Top" Opacity="0" Margin="0,0,0,15"
+                              IsVisible="False">
+                        <StackPanel Name="PanSearchList" Margin="20,40,18,18" VerticalAlignment="Top" />
+                    </c:MyCard>
+                    <StackPanel Name="PanList" />
+                </Grid>
+
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- R43：帮助加载器未移植，加载卡片按「已完成」态保持隐藏 -->
+        <c:MyCard HorizontalAlignment="Center" VerticalAlignment="Center" Margin="40,0"
+                  IsVisible="False" Name="PanLoad">
+            <c:MyLoading Text="正在加载帮助列表" Margin="20,20,20,17"
+                         HorizontalAlignment="Center" VerticalAlignment="Center" />
+        </c:MyCard>
+    </Grid>
+</UserControl>

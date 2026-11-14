@@ -43,6 +43,10 @@ public partial class MainWindow : Window
     private PageSetupLaunchView? _setupLaunchPage;
     private PageSetupUIView? _setupUiPage;
     private PageSetupSystemView? _setupSystemPage;
+    private PageOtherLeftView? _otherLeftPage;
+    private PageOtherHelpView? _otherHelpPage;
+    private PageOtherAboutView? _otherAboutPage;
+    private PageOtherTestView? _otherTestPage;
     private CancellationTokenSource? _leftWidthAnimation;
 
     public MainWindow()
@@ -114,7 +118,7 @@ public partial class MainWindow : Window
 
     /// <summary>
     /// 切换页面栈（vb L1438–L1471）。
-    /// 0 启动 / 1 下载 / 2 联机 / 3 设置 已有页面；4 更多 尚未移植（宿主置空，R20）；
+    /// 0 启动 / 1 下载 / 2 联机 / 3 设置 / 4 更多 均已有页面；
     /// 5 = 版本选择次级栈（`PageType.InstanceSelect`，标题栏保持「启动」选中，与原逻辑一致）。
     /// </summary>
     private void ShowStack(int index)
@@ -152,6 +156,21 @@ public partial class MainWindow : Window
                 Dispatcher.UIThread.Post(() =>
                 {
                     _setupLeftPage.TriggerShowAnimation();
+                    UpdateLeftBackgroundWidth();
+                }, DispatcherPriority.Loaded);
+                return;
+            case 4:
+                if (_otherLeftPage is null)
+                {
+                    _otherLeftPage = new PageOtherLeftView();
+                    _otherLeftPage.PageChanged += (_, id) => ShowOtherPage(id);
+                }
+                PageLeft.Content = _otherLeftPage;
+                // 更多栈默认子页 = 帮助（`PageOtherLeft.xaml.vb` L37–L47）
+                ShowOtherPage(_otherLeftPage.PageId);
+                Dispatcher.UIThread.Post(() =>
+                {
+                    _otherLeftPage.TriggerShowAnimation();
                     UpdateLeftBackgroundWidth();
                 }, DispatcherPriority.Loaded);
                 return;
@@ -215,6 +234,21 @@ public partial class MainWindow : Window
             1 => _linkPage,
             2 => _setupUiPage ??= new PageSetupUIView(),
             3 => _setupSystemPage ??= new PageSetupSystemView(),
+            _ => null
+        };
+    }
+
+    /// <summary>
+    /// 更多栈子页切换（对应 `PageOtherLeft.xaml.vb` L58–L73 `PageGet`）：
+    /// 0 帮助 / 1 关于与鸣谢 / 2 百宝箱（3 反馈 / 4 新功能投票不切页，R46）。
+    /// </summary>
+    private void ShowOtherPage(int pageId)
+    {
+        PageRight.Content = pageId switch
+        {
+            0 => _otherHelpPage ??= new PageOtherHelpView(),
+            1 => _otherAboutPage ??= new PageOtherAboutView(),
+            2 => _otherTestPage ??= new PageOtherTestView(),
             _ => null
         };
     }
