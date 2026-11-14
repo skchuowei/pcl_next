@@ -110,7 +110,7 @@
 | **R17** | 标题栏渐变与主页面背景**已在 Linux 侧按同一 HSL 算法、同一取整算**（`Theme/PclTheme.cs`：`FromHSL2` / `FromHSL` / `Hue` 逐行移植自 `ModBase.vb` L360–L409），主题参数已由 `const` 改为**皮肤参数字段 + `Refresh(theme)` 早退语义**（同 `ModSecret.vb` L69–L110），默认值 `ColorHue=210`、`ColorSat=85`、`ColorLightAdjust=0`、`ColorHueTopbarDelta=0`（`ModSecret.vb` L66）。**核实结论（§13.8）：Windows 端本 fork 不存在「皮肤编号 → 参数」的映射表，四个参数全程无赋值点，故参数恒为默认值、配色恒为 PCL 蓝**；`UiBackgroundColorful` 开关与设置页联动待设置页接入 | 参数恒定本身与 Windows 端一致，不算降级 | 算法与取整不得改成近似值；不得自行发明映射表；取得映射数据后在 `PclTheme.Refresh` 单点接入 |
 | **R18** | 标题栏 logo 只接入 `UiLogoType=1`（默认档：文字 `PCL Next`、17 号白字、`Margin 18,0,0,0`）；其余三档（`0` 形状 / `2` 自定义文本 / `3` 图片）与 `UiLogoLeft`、`UiLogoText`、`ImgTitle` 背景图未接入 | 未接入档不影响默认外观 | 默认档的位置/字号/色值不得改；接入时按 vb L820–L869 的分支补齐 |
 | **R19** | 窗口壳的行为近似：① 开场/关闭动画缓动由 `AniEaseOutBack` 改 `BackEaseOut`（时长 600/500ms 照抄）；② `IsMouseDirectlyOver` 无等价物，标题栏拖拽改为「向上找 `MyIconButton`/`MyRadioButton` 祖先」；③ Avalonia 11 无 `CanMinimize` 属性，最小化走 `WindowState.Minimized`；④ `Topmost` 启动瞬间、`UiOpacity` 窗口不透明度、窗口尺寸/位置记忆（`Settings`）未接入 | 只允许实现手段差异 | 标题栏高度 48、按钮 28×28 与边距 12/44、缩放热区 8/13px 不得改 |
-| **R20** | **【临时状态，2026-11-14 第二次收窄】**页面栈与外壳其余部件：标题栏五个栈（启动 0 / 下载 1 / 联机 2 / 设置 3 + 四个子页 / 更多 4 + 三个子页）与版本选择次级栈（5）均已移植；**初始选中已恢复 Windows 默认「启动」**（vb L1438–L1471、`FormMain.xaml` L121 `BtnTitleSelect0 Checked=True`）；剩余缺口为实例系列页面（`PageInstance*` 实例设置 / Mod 管理 / 导出等）与外壳部件；`ImgBack` 背景图（`UiBackgroundOpacity` / `Blur` / `Suit`）、`PanTitleInner`（次级页面标题栏）、`PanHint`、`BtnExtra*` 未接入；设置 / 下载 / 更多左导航的重置 / 刷新按钮点击为空操作 | **临时状态不算允许差异**：页面补齐后必须继续回收，不得以「Linux 少几个页面」沉淀成既定行为 | 已回收项（初始选中、启动栈、版本选择栈、下载栈、设置栈、更多栈）不得回退；「联机」页与外壳几何不得因此改动；每移植完一个栈就必须回收对应降级项并在本节留痕 |
+| **R20** | **【临时状态，2026-11-14 第三次收窄】**页面栈与外壳其余部件：标题栏五个栈（启动 0 / 下载 1 / 联机 2 / 设置 3 + 四个子页 / 更多 4 + 三个子页）、版本选择次级栈（5）与实例设置次级栈（6，概览 / 设置 / Mod / ModDisabled 四页）均已移植；**初始选中已恢复 Windows 默认「启动」**（vb L1438–L1471、`FormMain.xaml` L121 `BtnTitleSelect0 Checked=True`）；剩余缺口为实例「修改」「导出」两页（R50）与外壳部件；`ImgBack` 背景图（`UiBackgroundOpacity` / `Blur` / `Suit`）、`PanTitleInner`（次级页面标题栏）、`PanHint`、`BtnExtra*` 未接入；设置 / 下载 / 更多 / 实例左导航的刷新按钮点击为空操作 | **临时状态不算允许差异**：页面补齐后必须继续回收，不得以「Linux 少几个页面」沉淀成既定行为 | 已回收项（初始选中、启动栈、版本选择栈、下载栈、设置栈、更多栈、实例栈四页）不得回退；「联机」页与外壳几何不得因此改动；每移植完一个栈就必须回收对应降级项并在本节留痕 |
 | **R21** | 左竖条（`RectLeftBackground`）宽度动画的触发时机：Windows 由 `PanMainLeft.SizeChanged` 驱动；Linux 改为「切换栈并完成布局后取 `PanMainLeft.Bounds.Width` 驱动一次」。因左列为 `Auto`、内容固定，窗口缩放不改变该宽度，实际表现一致 | 仅触发时机 | 目标宽度值、180ms 时长、阴影淡出条件不得改；若后续左页宽度随内容变化，必须补回尺寸监听 |
 | **R22** | 右页宿主 `MyPageRight` 尚未移植：Windows 端右页继承 `MyPageRight`，由 `PanScroll` 提供滚动条横向滑入（350ms / 90ms）、内容逐个进入（0→1 淡入 100ms、-16→0 位移 250+350ms）与退出动画；Linux 右页为普通 `UserControl` + 原生 `ScrollViewer`，无这些动画 | 仅动画；不改变任何静态布局 | 右页内容的 `Margin`、卡片间距、字号、滚动条宽度不得改；移植 `MyPageRight` 时逐项补齐并在 §13 留痕 |
 | **R23** | `MyTextBox` 属性差异：WPF 自定义属性 `HasBackground="False"`（启动日志）在 Avalonia 无等价物，改 `Background=Transparent`；WPF `TextBox.VerticalScrollBarVisibility/HorizontalScrollBarVisibility=Disabled` 在 Avalonia 是 `ScrollViewer` 附加属性，本轮未设（只读日志框内容为空，不出现滚动条） | 仅属性表达方式 | 内边距 `Padding 0,4`、`Margin 15,34,15,13`、`BorderThickness 0`、字号 13 不得改 |
@@ -137,6 +137,10 @@
 | **R44** | 关于页头像位图缺失：`/pcl-next;component/Images/Heads/*`（Logo / PCL2 / LTCat / HerobrineXia / bangbang93 / wiki / z0z0r4 / EasyTier / ChongQing / 00ll00 / Patrick / Hao_Tian / MCBBS 共 13 张）在 Linux 项目内不存在，以 34×34 透明圆形占位保留布局 | 仅位图 | 头像列宽 40、行高 45、`Margin 3` 与 `EllipseGeometry Radius 17` 的占位尺寸不得改；接入图片资源后按原名还原 |
 | **R45** | 关于页动作未接入：项目仓库 / 检查更新 / 赞助上游 PCL / 赞助镜像源 / 打开百科 / MCIM 主页 / GitHub 页面 / 打开镜像站 / 查看来源网站 / 查看许可文档 / 生成土豆码 / 复制识别码 / 输入土豆码 均只保留按钮形态（系统集成按 R7）；Dev 渠道 `ChannelIsInternal=True` 时 Windows 会隐藏「赞助作者」并显示「生成土豆码」（`PageOtherAbout.xaml.vb` L18–L23），Linux 侧按 Dev 渠道静态呈现该分支 | 仅动作与渠道分支 | 按钮 `Width/MinWidth 140/170`、`Height 35`、`Padding 13,0`、间距 20 与卡片顺序不得改 |
 | **R46** | 更多栈左导航行为边界：反馈 / 新功能投票在 Windows 端由 `Changed` 事件弹 MessageBox 并把事件标记为已处理（`PageOtherLeft.xaml.vb` L128–L157），条目不会保持选中；Linux 无 MessageBox 等价物，`Click` 直接 `Handled=True` 阻止选中；`UiHiddenOther*` 五项隐藏联动（`PageSetupUI.HiddenRefresh` L476–L488）因 Settings 服务未移植而全部按默认可见呈现 | 仅弹窗与显隐联动 | 五项高 36、`MinPaddingRight 35`、Logo 缩放（0.97/0.98/0.97/0.9/0.92）、帮助项刷新按钮 25×25 不得改 |
+| **R47** | 实例服务缺失：`McInstance` / `McInstanceListLoader` / `McInstanceLock` 未移植，实例设置栈（`PageType.InstanceSetup`）无数据来源与入口。左导航按 `Instance Is Nothing` 呈现 ModDisabled 分支；概览页头卡（`Instance.ToListItem()`）为空；版本设置页全部输入框 / 下拉 / 单选 / 滑动条为静态默认；Mod 管理固定「尚未安装 Mod」空态；初始化 / 刷新 / 全部按钮动作为空操作 | 仅数据、入口与动作 | 所有页面布局、尺寸、文案、卡片顺序不得改；接入实例服务后逐项还原并在 §13 留痕 |
+| **R48** | 版本设置页绑定：`local:SettingService.Key/Value` 双向绑定、`ValidateRules`（`ValidateExcept` / `ValidateLength` / `ValidateHttp`）与版本独立 `PCL\Setup.ini` 读写未接入；输入框仅保留 `HintText` / `MaxLength` / `ToolTip`，`ComboArgumentIndieV2` / `ComboArgumentJava` 无实例数据时保持未选中 | 仅绑定与校验 | 行高 28/9、`Margin 25,40,25,21`、内存条三段列宽 4.7/2.5/0.7、四个 `MyCheckBox Height 28` 不得改 |
+| **R49** | Mod 管理多选浮卡未建：`CardSelect`（底部居中、`TranslateTransform Y=-10`、`LabSelect` 与 5 个 `MyIconTextButton`：更新 / 启用 / 禁用 / 删除 / 取消选择）在 Linux 侧整体缺失；`MyIconTextButton` 控件亦未移植 | 仅多选模式（默认关闭） | 搜索框、管理按钮卡（四个 `MinWidth 110`）、筛选卡与空态卡的几何不得改；接入多选时必须按原 XAML 补 `MyIconTextButton` 与本浮卡 |
+| **R50** | 实例系列剩余页面：`PageInstanceExport`（314 行，含 `ExportOption` 规则清单与动态显隐）与「修改」页 `PageDownloadModify`（360 行）尚未移植，左导航对应项切换后右页为空；实例设置栈入口（版本选择页「版本设置」按钮）随实例列表服务（R26/R47）一并待接 | 仅缺失页面与入口 | 已移植的概览 / 设置 / Mod / ModDisabled 四页不得因此简化；补齐导出页时必须逐项复刻 `ExportOption` 的标题、描述与默认勾选 |
 
 ---
 
@@ -906,6 +910,38 @@ dotnet build PCL.Desktop.Linux/PCL.Desktop.Linux.csproj -c Release -r linux-x64
 （产物 `bin-net10/Dev/2.100.0.4-0.96/linux-x64/`）。
 **未验证项**：左导航五项逐个进入动画、搜索框清空按钮淡入淡出与聚焦、关于页长页滚动、两张折叠卡点击展开/箭头旋转、头像占位与文本列对齐 —— 需统一验收目视（V16）。
 
+### 13.17 实例设置栈（LU9 首批，2026-11-14，只做编译验证、不弹窗）
+
+**对照来源**：
+`pcl-next/Pages/PageInstance/PageInstanceLeft.xaml`（43 行）+ `.xaml.vb`（L13–L21 Mod/ModDisabled 分支、L33–L37 页面切换、L105–L135 刷新与初始化）；
+`PageInstanceOverall.xaml`（88 行）+ `.xaml.vb`（L23–L50 头卡与下拉、L52–L175 个性化、L181–L207 文件夹、L214–L301 管理）；
+`PageInstanceSetup.xaml`（276 行）+ `.xaml.vb`（L7 Loaded、L1–L570 绑定与服务器 / 内存分支）；
+`PageInstanceMod.xaml`（79 行）+ `.xaml.vb`（L56 加载器、L80–L84 空态分支、L176–L180 筛选可见性）；
+`PageInstanceModDisabled.xaml`（30 行）+ `.xaml.vb`（L10–L15 两个跳转按钮）。
+
+**Linux 实现**：`Views/PageInstanceLeftView.axaml(.cs)`、`PageInstanceOverallView`、`PageInstanceSetupView`、
+`PageInstanceModView`、`PageInstanceModDisabledView`；`MainWindow.axaml.cs` 新增次级栈 6（`StackInstanceSetup`）
+与 `ShowInstancePage`；ModDisabled 的两个按钮接回下载栈 / 版本选择栈。
+
+| 区域 | Windows 取值 | Linux 实现 | 结论 |
+|---|---|---|---|
+| 左导航 | StackPanel `Margin 0,12,0,0`；六项高 36、`Type=RadioBox`、`MinPaddingRight 35`、`IsScaleAnimationEnabled=False`；概览 `Checked=True`；设置 / 修改 / Mod / 导出带 25×25 图标按钮（初始化 / 刷新） | 同；`Tag` 换 `Index`；无实例时 Mod 隐藏、ModDisabled 显示（vb L13–L21） | 一致（R47） |
+| 概览 · 头卡 | `MyCard Margin 0,15` + `Grid Margin 10,7`，运行期注入 `Instance.ToListItem()` | 同结构，头卡为空（`MinHeight 42` 保留行高） | R47 |
+| 概览 · 个性化 | 图标 / 分类两行 28+9+28；图标下拉 14 项（自动 / 自定义 / 12 种方块）、分类下拉 6 项；三个 `MinWidth 140` 按钮 | 同；下拉按首项默认选中 | 一致（R47） |
+| 概览 · 快捷方式 / 高级管理 | WrapPanel `Margin 25,30,25,20` 四个高 35 / MinWidth 140 按钮；管理卡三个按钮（删除为 `ColorType=Red`） | 同；Mod 文件夹按钮按 `Instance.Modable=False` 隐藏 | 一致（R47） |
+| 设置 · 启动选项 | 行高 28/9/28/9/28/9/28/Auto；版本隔离 2 项、Java 4 项；Java 区间框宽 200 `Margin 7,0,0,0` | 同；`SettingService` 与校验规则未接（输入框只留 Hint / MaxLength） | 一致（R48） |
+| 设置 · 内存分配 | 单选「跟随全局设置」默认勾选、`SliderRamCustom` `MaxValue 49 / Value 13 / IsEnabled False`；内存条列宽 4.7*/2.5*/0.7*、中间 4 高、三段配色 `ColorObject3/2`、`ColorBrush3@0.5`、`ColorBrush6@0.7`；读数 4.7 / 2.5 / 7.9 GB | 同 | 一致（R48） |
+| 设置 · 服务器 | 登录方式 5 项（首项选中）；服务器 ID / 认证服务器 / 注册链接 / 名称四个字段默认隐藏；「自动进入服务器」；服主后台与 LittleSkin 两个高 35 按钮 | 同；按钮空操作 | 一致（R48 / R47） |
+| 设置 · 高级选项 | `CanSwap=True IsSwapped=True`（折叠 40）；JVM 框 `Height 100 / Padding 0,5 / AcceptsReturn`；GC 下拉 6 项；四个 `MyCheckBox Height 28` | 同；折叠交互由 MyCard 提供（R5） | 一致（R48） |
+| Mod · 空态 | 加载完成后无 Mod：`PanAllBack` 隐藏、`PanEmpty` 居中（`Margin 40`），标题 19 号、2 高分隔线、三按钮 `Margin 0,0,17,0` | 同；`PanLoad` 隐藏 | 一致（R47） |
+| Mod · 列表态 | 搜索框 `Margin 0,15` + 管理卡四个 `MinWidth 110` 按钮 + 筛选卡（全部 / 已启用 / 已禁用 / 可更新）+ `PanList` | 结构照抄，列表态默认隐藏 | 一致（R49） |
+| ModDisabled | 居中卡：标题 19 号、2 高线、两行说明、两个 `MinWidth 140` 按钮 `Margin 10,10,10,0` | 同；两个按钮已接跳转 | 一致 |
+| 修改 / 导出 | `PageDownloadModify`（360 行）/ `PageInstanceExport`（314 行） | 未移植，切换后右页为空 | R50 |
+
+**验证**：`dotnet build PCL.Desktop.Linux/PCL.Desktop.Linux.csproj -c Release -r linux-x64` → **0 警告 / 0 错误**
+（产物 `bin-net10/Dev/2.100.0.4-0.97/linux-x64/`）。
+**未验证项**：左导航六项切换与 Mod/ModDisabled 二选一、概览长页滚动、设置页折叠卡展开、内存条三段比例、ModDisabled 两个跳转按钮 —— 需统一验收目视（V17）。
+
 ## 14. 待统一验收清单（UI 全部成型后一次性执行）
 
 | 编号 | 待验收项 | 为什么必须靠运行判断 | 当前已知线索 |
@@ -926,3 +962,4 @@ dotnet build PCL.Desktop.Linux/PCL.Desktop.Linux.csproj -c Release -r linux-x64
 | **V14** | 设置·其他页（13.14） | 五个下拉弹出层、调试卡折叠、滑块拖动、按钮排布均需运行观察 | 需目视：左导航点「其他」后右页出现「下载 / 社区资源 / 辅助功能 / 启动器」四张卡片 + 40 高「调试选项」折叠条；下载卡两条滑块分别停在 63/255 与 42/42；缓存框显示灰色「默认」占位；启动器卡两排按钮（3 + 2）左对齐、间距 20；展开调试卡后动画滑条停在 9/30；`PanDonate` 在 Dev 渠道可见 |
 | **V15** | 下载栈（13.15） | 左导航选中态、加载卡片、六个下拉弹出层、五个资源子页切换均需运行观察 | 需目视：标题栏进「下载」后左导航 7 项（原版游戏选中、社区资源小标题灰字）、右页居中「正在加载」卡片带进度环；点「Mod」等五项后右页出现同名搜索卡（标题「搜索 Mod」等）、类型下拉分别为 27/19/17/33/21 项；资源页结果区为空、分页卡居中且首页/前页灰显；点回「原版游戏」恢复加载卡片 |
 | **V16** | 更多栈（13.16） | 左导航五项排布与切换、搜索框清空按钮、关于页长页滚动与折叠卡均需运行观察 | 需目视：标题栏进「更多」后左导航五项（帮助选中，右侧刷新按钮悬停淡入）、右页顶部 40 高搜索框（放大镜在左、输入后右侧 × 出现、点击清空并聚焦）、下方无分类卡；点「关于与鸣谢」出现七张卡片（`法律信息` / `许可与版权声明` 为 40 高折叠条，点击展开箭头旋转）、头像列为空白占位但文本列对齐；点「百宝箱」显示居中提示；点「反馈」/「新功能投票」不切页且条目不保持选中 |
+| **V17** | 实例设置栈（13.17） | 栈入口、左导航六项、四张页面、折叠卡与跳转按钮均需运行观察 | 需目视：进入实例设置栈后左导航显示五项（概览选中；无实例时 Mod 项不出现、ModDisabled 项出现）、右侧概览页头卡为空白行、个性化（14 项图标下拉 / 6 项分类下拉）与快捷方式（3 个按钮，无 Mod 文件夹）及高级管理三按钮排布正常；点「设置」出现四张卡（高级选项为 40 高折叠条、内存条三段按 4.7/2.5/0.7 铺满、读数 4.7 / 2.5 / 7.9 GB）；点「Mod 管理」显示居中「尚未安装 Mod」空态卡；ModDisabled 页两个按钮分别跳下载栈与版本选择栈 |

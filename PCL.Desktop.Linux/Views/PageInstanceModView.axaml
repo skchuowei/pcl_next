@@ -1,0 +1,111 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="using:PCL.Desktop.Linux.Controls"
+             x:Class="PCL.Desktop.Linux.Views.PageInstanceModView">
+
+    <!--
+      1:1 对照基准：pcl-next/Pages/PageInstance/PageInstanceMod.xaml（79 行）
+      三层叠放：PanAllBack（搜索框 + 管理按钮卡 + 筛选/列表卡）/ PanEmpty（居中空态卡）/ PanLoad（加载卡）
+      静态初始态（R47 / R49）：无实例与 Mod 列表服务，按「加载完成且无 Mod」分支
+      （`PageInstanceMod.xaml.vb` L80–L84）固定 PanAllBack 隐藏、PanEmpty 可见、PanLoad 隐藏；
+      多选操作浮卡 CardSelect（`MyIconTextButton` × 5）本轮未建，登记 R49。
+    -->
+
+    <Grid>
+        <Grid x:Name="PanAllBack" IsVisible="False">
+            <ScrollViewer VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled"
+                          x:Name="PanBack">
+                <StackPanel x:Name="PanMain" Margin="25,10,25,10" Grid.IsSharedSizeScope="True">
+
+                    <!-- MySearchBox：Margin 0,15、Height 40、HintText 搜索 Mod 名称 / 描述 / 标签 -->
+                    <c:MyCard Height="40" Margin="0,15">
+                        <Grid>
+                            <c:MyTextBox Name="SearchBox"
+                                         Background="Transparent"
+                                         BorderThickness="0"
+                                         Padding="32,0,40,0"
+                                         MaxLength="50"
+                                         FontSize="13.5"
+                                         VerticalContentAlignment="Center"
+                                         HintText="搜索 Mod 名称 / 描述 / 标签" />
+                            <Path Width="14" Height="14" Margin="14,0,0,0"
+                                  HorizontalAlignment="Left"
+                                  Stretch="Uniform"
+                                  IsHitTestVisible="False"
+                                  Fill="{DynamicResource ColorBrush1}"
+                                  Data="M675.9168 242.816C556.3008 123.2 362.4448 123.2 242.8288 242.816 123.2128 362.432 123.2128 556.288 242.8288 675.904 362.4448 795.52 556.3008 795.52 675.9168 675.904 795.5328 556.288 795.5328 362.432 675.9168 242.816L675.9168 242.816ZM1000.7168 892.48C1030.6048 922.368 1030.6048 970.816 1000.7168 1000.704 970.8288 1030.656 922.3808 1030.656 892.4288 1000.704L730.0608 838.336C728.1408 836.416 727.4368 833.92 725.7728 831.872 546.3168 960.448 295.7568 945.408 134.5408 784.192-44.8512 604.8-44.8512 313.92 134.5408 134.528 313.9328-44.864 604.8128-44.864 784.2048 134.528 945.4208 295.744 960.4608 546.304 831.8848 725.76 833.9328 727.424 836.4288 728.128 838.3488 730.048L1000.7168 892.48Z" />
+                            <c:MyIconButton Name="BtnClear"
+                                            Opacity="0"
+                                            IsHitTestVisible="False"
+                                            Width="24" Height="24"
+                                            Margin="0,0,10,0"
+                                            LogoScale="0.75"
+                                            IconTheme="Black"
+                                            HorizontalAlignment="Right"
+                                            Logo="F1 M2,0 L0,2 8,10 0,18 2,20 10,12 18,20 20,18 12,10 20,2 18,0 10,8 2,0Z" />
+                        </Grid>
+                    </c:MyCard>
+
+                    <c:MyCard Margin="0,0,0,15" x:Name="PanManage">
+                        <Grid Margin="15,15,0,15" Height="35">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" SharedSizeGroup="Button" />
+                                <ColumnDefinition Width="Auto" SharedSizeGroup="Button" />
+                                <ColumnDefinition Width="Auto" SharedSizeGroup="Button" />
+                                <ColumnDefinition Width="Auto" SharedSizeGroup="Button" />
+                                <ColumnDefinition Width="Auto" SharedSizeGroup="Button" />
+                            </Grid.ColumnDefinitions>
+                            <c:MyButton x:Name="BtnManageOpen" Grid.Column="0" MinWidth="110" Text="打开文件夹" Padding="13,0" Margin="0,0,15,0" HorizontalAlignment="Left" ColorType="Highlight" />
+                            <c:MyButton x:Name="BtnManageInstall" Grid.Column="1" MinWidth="110" Text="从文件安装" Padding="13,0" Margin="0,0,15,0" HorizontalAlignment="Left" />
+                            <c:MyButton x:Name="BtnManageDownload" Grid.Column="2" MinWidth="110" Text="下载新 Mod" Padding="13,0" Margin="0,0,15,0" HorizontalAlignment="Left" />
+                            <c:MyButton x:Name="BtnManageSelectAll" Grid.Column="3" MinWidth="110" Text="全选" Padding="13,0" Margin="0,0,15,0" HorizontalAlignment="Left" />
+                        </Grid>
+                    </c:MyCard>
+
+                    <c:MyCard x:Name="PanListBack" VerticalAlignment="Top" Opacity="0" Margin="0,0,0,14" Title=" " MinHeight="55">
+                        <Grid>
+                        <StackPanel x:Name="PanFilter" Margin="15,13,0,0" Orientation="Horizontal"
+                                    VerticalAlignment="Top" HorizontalAlignment="Left" Height="28">
+                            <c:MyRadioButton Tag="0" VerticalAlignment="Center" Margin="2,0" Text="全部" x:Name="BtnFilterAll" Checked="True" />
+                            <c:MyRadioButton Tag="1" VerticalAlignment="Center" Margin="2,0" Text="已启用" x:Name="BtnFilterEnabled" />
+                            <c:MyRadioButton Tag="2" VerticalAlignment="Center" Margin="2,0" Text="已禁用" x:Name="BtnFilterDisabled" />
+                            <c:MyRadioButton Tag="3" VerticalAlignment="Center" Margin="2,0" Text="可更新" x:Name="BtnFilterCanUpdate" />
+                        </StackPanel>
+                        <StackPanel Margin="20,48,18,22" Name="PanList" VerticalAlignment="Top" />
+                        </Grid>
+                    </c:MyCard>
+
+                </StackPanel>
+            </ScrollViewer>
+        </Grid>
+
+        <c:MyCard HorizontalAlignment="Center" VerticalAlignment="Center" Margin="40" x:Name="PanEmpty">
+            <StackPanel Margin="20,17">
+                <TextBlock Margin="0,0,0,9" HorizontalAlignment="Center" Text="尚未安装 Mod" FontSize="19"
+                           Foreground="{DynamicResource ColorBrush3}" />
+                <Rectangle HorizontalAlignment="Stretch" Height="2" Fill="{DynamicResource ColorBrush3}" />
+                <TextBlock Margin="10,10,10,0" TextWrapping="Wrap"
+                           Text="你可以下载新的 Mod，或者从已经下载好的文件安装 Mod。&#10;如果你已经安装了 Mod，可能是版本隔离设置有误，请在设置中调整版本隔离选项。" />
+                <Grid Margin="15,20,0,5" Height="35" HorizontalAlignment="Center">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" SharedSizeGroup="Button" />
+                        <ColumnDefinition Width="Auto" SharedSizeGroup="Button" />
+                        <ColumnDefinition Width="Auto" SharedSizeGroup="Button" />
+                    </Grid.ColumnDefinitions>
+                    <c:MyButton Height="35" HorizontalAlignment="Center" Grid.Column="0" x:Name="BtnHintDownload"
+                                MinWidth="140" Text="下载 Mod" Margin="0,0,17,0" Padding="13,0" ColorType="Highlight" />
+                    <c:MyButton Height="35" HorizontalAlignment="Center" Grid.Column="1" x:Name="BtnHintInstall"
+                                MinWidth="140" Text="从文件安装 Mod" Margin="0,0,17,0" Padding="13,0" />
+                    <c:MyButton Height="35" HorizontalAlignment="Center" Grid.Column="2" x:Name="BtnHintOpen"
+                                MinWidth="140" Text="打开 Mod 文件夹" Margin="0,0,17,0" Padding="13,0" />
+                </Grid>
+            </StackPanel>
+        </c:MyCard>
+
+        <c:MyCard HorizontalAlignment="Center" VerticalAlignment="Center" Margin="40,0" x:Name="PanLoad" IsVisible="False">
+            <c:MyLoading Text="正在加载 Mod 列表" Margin="20,20,20,17" x:Name="Load"
+                         HorizontalAlignment="Center" VerticalAlignment="Center" />
+        </c:MyCard>
+    </Grid>
+</UserControl>

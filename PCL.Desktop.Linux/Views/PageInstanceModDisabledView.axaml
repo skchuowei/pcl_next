@@ -1,0 +1,37 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="using:PCL.Desktop.Linux.Controls"
+             x:Class="PCL.Desktop.Linux.Views.PageInstanceModDisabledView">
+
+    <!-- 1:1 对照 pcl-next/Pages/PageInstance/PageInstanceModDisabled.xaml（30 行）：
+         居中 MyCard（Margin 40）→ Grid Margin 20,17，四行；标题 19 号 ColorBrush3、2 高分隔线、
+         两行说明、两个 MinWidth 140 / Height 35 / Padding 13,0 的按钮（Margin 10,10,10,0）。 -->
+
+    <c:MyCard HorizontalAlignment="Center" VerticalAlignment="Center" Margin="40" x:Name="PanMain">
+        <Grid Margin="20,17">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="1*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="1*" />
+            </Grid.ColumnDefinitions>
+            <TextBlock Grid.Row="0" Grid.ColumnSpan="4" Margin="0,0,0,9" HorizontalAlignment="Center"
+                       Text="该版本不可使用 Mod" FontSize="19"
+                       Foreground="{DynamicResource ColorBrush3}" />
+            <Rectangle Grid.Row="1" Grid.ColumnSpan="4" HorizontalAlignment="Stretch" Height="2"
+                       Fill="{DynamicResource ColorBrush3}" />
+            <TextBlock Grid.Row="2" Grid.ColumnSpan="4" Margin="10,15,10,5" TextWrapping="Wrap"
+                       Text="你需要先安装 Forge、Fabric 等 Mod 加载器才能使用 Mod，请在下载页面安装这些版本。&#10;如果你已经安装过了 Mod 加载器，那么你很可能选择了错误的版本，请点击版本选择按钮切换版本。" />
+            <c:MyButton Grid.Row="3" Grid.Column="1" Height="35" HorizontalAlignment="Center" x:Name="BtnDownload"
+                        MinWidth="140" Text="转到下载页面" Margin="10,10,10,0" Padding="13,0" ColorType="Highlight" />
+            <c:MyButton Grid.Row="3" Grid.Column="2" Height="35" HorizontalAlignment="Center" x:Name="BtnVersion"
+                        MinWidth="140" Text="版本选择" Margin="10,10,10,0" Padding="13,0" />
+        </Grid>
+    </c:MyCard>
+</UserControl>

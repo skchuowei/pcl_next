@@ -31,6 +31,9 @@ public partial class MainWindow : Window
     /// <summary>版本选择是次级页面栈（Windows `PageType.InstanceSelect`），不属于标题栏 5 个 Tab。</summary>
     private const int StackVersionSelect = 5;
 
+    /// <summary>版本设置是次级页面栈（Windows `PageType.InstanceSetup`，左导航为 `FrmInstanceLeft`）。</summary>
+    private const int StackInstanceSetup = 6;
+
     private readonly Control? _linkPage;
     private readonly PageLaunchLeftView _launchLeft;
     private readonly PageLaunchRightView _launchRight;
@@ -47,6 +50,11 @@ public partial class MainWindow : Window
     private PageOtherHelpView? _otherHelpPage;
     private PageOtherAboutView? _otherAboutPage;
     private PageOtherTestView? _otherTestPage;
+    private PageInstanceLeftView? _instanceLeftPage;
+    private PageInstanceOverallView? _instanceOverallPage;
+    private PageInstanceSetupView? _instanceSetupPage;
+    private PageInstanceModView? _instanceModPage;
+    private PageInstanceModDisabledView? _instanceModDisabledPage;
     private CancellationTokenSource? _leftWidthAnimation;
 
     public MainWindow()
@@ -179,6 +187,20 @@ public partial class MainWindow : Window
                 PageRight.Content = _selectRight;
                 Dispatcher.UIThread.Post(() => _selectLeft.TriggerShowAnimation(), DispatcherPriority.Loaded);
                 break;
+            case StackInstanceSetup:
+                if (_instanceLeftPage is null)
+                {
+                    _instanceLeftPage = new PageInstanceLeftView();
+                    _instanceLeftPage.PageChanged += (_, id) => ShowInstancePage(id);
+                }
+                PageLeft.Content = _instanceLeftPage;
+                ShowInstancePage(_instanceLeftPage.PageId);
+                Dispatcher.UIThread.Post(() =>
+                {
+                    _instanceLeftPage.TriggerShowAnimation();
+                    UpdateLeftBackgroundWidth();
+                }, DispatcherPriority.Loaded);
+                return;
             default:
                 PageLeft.Content = null;
                 PageRight.Content = null;
@@ -251,6 +273,39 @@ public partial class MainWindow : Window
             2 => _otherTestPage ??= new PageOtherTestView(),
             _ => null
         };
+    }
+
+    /// <summary>
+    /// 实例设置栈子页切换（对应 `PageInstanceLeft.xaml.vb` L39–L63 `PageGet`）：
+    /// 0 概览 / 1 设置 / 3 Mod / 4 ModDisabled 已移植；2 修改（PageDownloadModify）与 5 导出尚未移植（R50）。
+    /// </summary>
+    private void ShowInstancePage(int pageId)
+    {
+        switch (pageId)
+        {
+            case 0:
+                PageRight.Content = _instanceOverallPage ??= new PageInstanceOverallView();
+                break;
+            case 1:
+                PageRight.Content = _instanceSetupPage ??= new PageInstanceSetupView();
+                break;
+            case 3:
+                PageRight.Content = _instanceModPage ??= new PageInstanceModView();
+                break;
+            case 4:
+                if (_instanceModDisabledPage is null)
+                {
+                    _instanceModDisabledPage = new PageInstanceModDisabledView();
+                    _instanceModDisabledPage.DownloadRequested += (_, _) => ShowStack(1);
+                    _instanceModDisabledPage.VersionSelectRequested += (_, _) => ShowStack(StackVersionSelect);
+                }
+                PageRight.Content = _instanceModDisabledPage;
+                break;
+            default:
+                // 2 修改 / 5 导出：页面未移植（R50），宿主置空
+                PageRight.Content = null;
+                break;
+        }
     }
 
     /// <summary>
