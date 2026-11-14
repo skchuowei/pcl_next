@@ -1,0 +1,136 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="using:PCL.Desktop.Linux.Controls"
+             x:Class="PCL.Desktop.Linux.Views.PageInstanceExportView">
+
+    <!--
+      1:1 对照基准：pcl-next/Pages/PageInstance/PageInstanceExport.xaml（314 行）
+      外层：MyPageRight PanScroll="PanBack" → Grid → MyScrollViewer → StackPanel Margin 25,10,25,65
+      卡片：整合包信息（名称 / 版本）→ 导出内容（26 高复选框树 + 右上「重置」胶囊）→ 高级选项（折叠）。
+      静态默认（R47）：无实例数据，HintOptiFine / HintJava 隐藏、名称与版本输入框无 HintText、
+      「游戏本体」项只显示标题；ExportOption 的 Rules / RequireOptiFine / RequireModLoader 规则未移植
+      （仅保留勾选默认值与子项显隐），「开始导出」「读取配置」「保存配置」「整合包制作指南」为空操作（R51）。
+      子项显隐按 Windows 的 Visibility 绑定等价实现（CheckOptionsMod / ResourcePacks / ShaderPacks / Saves / Pcl）。
+    -->
+
+    <UserControl.Styles>
+        <Style Selector="c|MyCheckBox">
+            <Setter Property="Height" Value="26" />
+        </Style>
+    </UserControl.Styles>
+
+    <Grid>
+        <ScrollViewer VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled"
+                      x:Name="PanBack">
+            <StackPanel Margin="25,10,25,65">
+                <c:MyHint Margin="0,15,0,0" Text="受 Modrinth 整合包规范限制，导出的整合包中不会包含 OptiFine。"
+                          HintTheme="Yellow" x:Name="HintOptiFine" IsVisible="False" />
+                <c:MyHint Margin="0,15,0,0" HintTheme="Yellow" x:Name="HintJava" IsVisible="False" />
+
+                <c:MyCard Margin="0,15">
+                    <Grid Margin="22,15,25,15">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="1*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="0.3*" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="28" />
+                        </Grid.RowDefinitions>
+                        <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" HorizontalAlignment="Left"
+                                   Text="整合包名称" Margin="0,0,20,0" />
+                        <c:MyTextBox Grid.Row="0" Grid.Column="1" x:Name="TextExportName" MaxLength="100" />
+                        <TextBlock Grid.Row="0" Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Left"
+                                   Text="整合包版本" Margin="30,0,20,0" />
+                        <c:MyTextBox Grid.Row="0" Grid.Column="3" x:Name="TextExportVersion" MaxLength="100" />
+                    </Grid>
+                </c:MyCard>
+
+                <c:MyCard Margin="0,0,0,15" x:Name="CardOptions" MinHeight="39">
+                    <Grid>
+                        <c:MyIconTextButton x:Name="BtnOverrideCancel" Height="24"
+                                            HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,5,0"
+                                            IsHitTestVisible="False" Opacity="0.5"
+                                            Text="重置" LogoScale="0.9"
+                                            Logo="M530 0c287 0 521 229 521 511s-233 511-521 511c-233 0-436-151-500-368a63 63 0 0 1 44-79 65 65 0 0 1 80 43c48 162 200 276 375 276 215 0 390-171 390-383s-174-383-390-383c-103 0-199 39-270 106l21-5a63 63 0 0 1 33 123l-157 42a65 65 0 0 1-90-42l-49-183a65 65 0 1 1 126-33l6 26A524 524 0 0 1 530 0z" />
+                        <StackPanel Margin="25,38,15,15" Name="PanOptions">
+                            <c:MyCheckBox x:Name="CheckOptionsBasic" IsEnabled="False" Checked="True" Text="游戏本体" />
+                            <c:MyCheckBox x:Name="CheckOptionsOptions" Margin="30,0,0,0" Checked="True"
+                                          Text="游戏本体设置" Description="键位、音量、视频设置等" />
+                            <c:MyCheckBox Margin="30,0,0,0" Text="游戏本体个人信息" Description="命令历史、已保存的快捷栏" />
+                            <c:MyCheckBox Margin="30,0,0,0" Checked="True" Text="OptiFine 设置" />
+                            <c:MyCheckBox x:Name="CheckOptionsMod" Checked="True" Text="Mod" Description="模组" />
+                            <StackPanel Margin="30,0,0,0" x:Name="PanOptionsMod" IsVisible="True">
+                                <c:MyCheckBox Text="已禁用的 Mod" />
+                                <c:MyCheckBox Checked="True" Text="整合包重要数据" Description="脚本文件、内置资源包、数据包等" />
+                                <c:MyCheckBox Checked="True" Text="Mod 设置" />
+                                <c:MyCheckBox Checked="True" Text="TaCZ 枪包" />
+                                <c:MyCheckBox Checked="True" Text="已上传的沉浸画" />
+                                <c:MyCheckBox Text="已绘制的地图" Description="地图类 Mod 为现有的存档、服务器记录的地图、路标点等" />
+                                <c:MyCheckBox Text="JEI 个人信息" Description="物品收藏夹等" />
+                                <c:MyCheckBox Text="EMI 个人信息" Description="物品收藏夹、默认配方、合成历史记录等" />
+                                <c:MyCheckBox Text="帕秋莉手册个人信息" Description="教程书的已读记录、书签、阅读历史记录等" />
+                            </StackPanel>
+                            <c:MyCheckBox x:Name="CheckOptionsResourcePacks" Checked="True" Text="资源包" Description="纹理包/材质包" />
+                            <StackPanel Margin="30,0,0,0" x:Name="PanOptionsResourcePacks" IsVisible="True" />
+                            <c:MyCheckBox x:Name="CheckOptionsShaderPacks" Checked="True" Text="光影包" />
+                            <StackPanel Margin="30,0,0,0" x:Name="PanOptionsShaderSettings" IsVisible="True">
+                                <c:MyCheckBox x:Name="CheckOptionsShaderPackSettings" Checked="True"
+                                              Text="光影包设置" Description="已选光影包的自定义设置" />
+                            </StackPanel>
+                            <StackPanel Margin="30,0,0,0" x:Name="PanOptionsShaderPacks" IsVisible="True" />
+                            <c:MyCheckBox Text="截图" />
+                            <c:MyCheckBox Text="导出的结构" Description="schematics 文件夹" />
+                            <c:MyCheckBox Text="录像回放" Description="Replay Mod 的录像文件" />
+                            <c:MyCheckBox x:Name="CheckOptionsSaves" Text="单人游戏存档" Description="世界/地图" />
+                            <StackPanel Margin="30,0,0,0" x:Name="PanOptionsSaves" IsVisible="False" />
+                            <c:MyCheckBox Checked="True" Text="协议" Description="Licence 文件" />
+                            <c:MyCheckBox Text="多人游戏服务器列表" />
+                            <c:MyCheckBox x:Name="CheckOptionsJava" Checked="True" Text="版本文件夹中的 Java" />
+                            <c:MyCheckBox x:Name="CheckOptionsPcl" Checked="True" Text="PCL Next 启动器程序"
+                                          Description="打包正式版 PCL Next，以便没有启动器的玩家安装整合包" />
+                            <StackPanel Margin="30,0,0,0" x:Name="PanOptionsPcl" IsVisible="True">
+                                <c:MyCheckBox x:Name="CheckOptionsPclCustom" Checked="True"
+                                              Text="PCL Next 个性化内容" Description="功能隐藏设置、主页、背景音乐和图片等" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Grid>
+                </c:MyCard>
+
+                <c:MyCard Title="高级选项" Margin="0,0,0,15" CanSwap="True" IsSwapped="True">
+                    <StackPanel Margin="25,37,23,20">
+                        <c:MyHint x:Name="HintAdvanced" HintTheme="Yellow" Margin="0,2,0,8" IsVisible="False"
+                                  Text="建议仅在无法稳定连接 CurseForge 或 Modrinth 时才打包资源文件。&#10;请不要公开发布含资源文件的整合包，这会违反部分 Mod 的使用协议！" />
+                        <c:MyCheckBox x:Name="CheckAdvancedInclude" Text="打包资源文件，以避免在导入时下载"
+                                      ToolTip.Tip="将 Mod、资源包、光影包的文件直接放入整合包中，这样在导入时就无需联网下载它们。&#10;建议仅在无法稳定连接 CurseForge 或 Modrinth 时才考虑勾选。" />
+                        <c:MyCheckBox x:Name="CheckAdvancedModrinth" Text="仅从 Modrinth 下载资源文件"
+                                      ToolTip.Tip="若资源未在 Modrinth 上托管，则将其原始文件直接放入整合包中。&#10;如果你想将整合包上传到 Modrinth，这能帮助你分辨哪些文件未在 Modrinth 上托管。" />
+                        <c:MyHint HintTheme="Yellow" x:Name="HintModrinthFormat" Margin="26,2,0,2"
+                                  Text="若不勾选 “PCL Next 启动器程序”，导出时才能在 “保存类型” 中选择 .mrpack 格式！" />
+                        <c:MyHint HintTheme="Blue" RelativeSetup="HintExportConfig" CanClose="True" Margin="0,20,0,2"
+                                  Text="配置文件中含有更多高级选项，例如精准控制导出的文件、设置整合包存放位置等。&#10;要修改这些选项，请先点击 “保存配置”，在编辑配置文件后再导入。" />
+                        <Grid Height="35" Margin="0,12,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" SharedSizeGroup="Button" />
+                                <ColumnDefinition Width="Auto" SharedSizeGroup="Button" />
+                                <ColumnDefinition Width="Auto" SharedSizeGroup="Button" />
+                            </Grid.ColumnDefinitions>
+                            <c:MyButton Grid.Column="0" x:Name="BtnAdvancedImport" MinWidth="140" Text="读取配置"
+                                        Padding="13,0" Margin="0,0,20,0" ColorType="Highlight" />
+                            <c:MyButton Grid.Column="1" x:Name="BtnAdvancedExport" MinWidth="140" Text="保存配置"
+                                        Padding="13,0" Margin="0,0,20,0" />
+                            <c:MyButton Grid.Column="2" MinWidth="140" Text="整合包制作指南"
+                                        Padding="13,0" Margin="0,0,20,0" x:Name="BtnAdvancedHelp" />
+                        </Grid>
+                    </StackPanel>
+                </c:MyCard>
+            </StackPanel>
+        </ScrollViewer>
+
+        <c:MyExtraTextButton HorizontalAlignment="Center" VerticalAlignment="Bottom"
+                             x:Name="BtnExport" Text="开始导出" LogoScale="1.1"
+                             Logo="M511 995a128 128 0 0 1-57-13L70 791a126 126 0 0 1-70-113V311a126 126 0 0 1 15-60V248c1-2 3-5 5-8a127 127 0 0 1 49-42L454 13a128 128 0 0 1 112 0l383 190a126 126 0 0 1 72 113v360a126 126 0 0 1-70 115L568 984c-17 7-37 11-57 11z m42-470v370l360-178c14-7 23-21 23-38v-335L554 524zM85 330v347a42 42 0 0 0 23 38l360 178V523L85 330zM135 260l375 189 137-65L286 188 135 260z m245-118l363 197 150-71-365-180a42 42 0 0 0-37 0l-111 53z" />
+    </Grid>
+</UserControl>

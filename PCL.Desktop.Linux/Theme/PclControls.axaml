@@ -546,9 +546,15 @@
                             </Transitions>
                         </Path.Transitions>
                     </Path>
-                    <TextBlock Name="PART_LabText" Text="{TemplateBinding Text}" Margin="26,0,0,0"
-                               FontSize="{TemplateBinding FontSize}" FontFamily="{TemplateBinding FontFamily}"
-                               Foreground="{TemplateBinding Foreground}" VerticalAlignment="Center" />
+                    <StackPanel Orientation="Horizontal" Margin="26,0,0,0" VerticalAlignment="Center">
+                        <TextBlock Name="PART_LabText" Text="{TemplateBinding Text}"
+                                   FontSize="{TemplateBinding FontSize}" FontFamily="{TemplateBinding FontFamily}"
+                                   Foreground="{TemplateBinding Foreground}" VerticalAlignment="Center" />
+                        <TextBlock Name="PART_LabDesc" Text="{TemplateBinding Description}" Margin="9,0,0,0"
+                                   FontSize="{TemplateBinding FontSize}" FontFamily="{TemplateBinding FontFamily}"
+                                   Foreground="{DynamicResource ColorBrushGray5}" VerticalAlignment="Center"
+                                   IsVisible="False" />
+                    </StackPanel>
                 </Grid>
             </ControlTemplate>
         </Setter>
@@ -575,6 +581,50 @@
     <Style Selector="c|MyCheckBox:pressed /template/ Border#PART_ShapeBorder">
         <Setter Property="Background" Value="{DynamicResource ColorBrushBg1}" />
         <Setter Property="RenderTransform" Value="scale(0.917)" />
+    </Style>
+
+    <!-- ===== MyIconTextButton（1:1 对齐 MyIconTextButton.xaml；颜色过渡改为即时切换，R10） ===== -->
+    <Style Selector="c|MyIconTextButton">
+        <Setter Property="Template">
+            <ControlTemplate>
+                <Border Name="PART_Back" CornerRadius="13.5" MinHeight="27" MaxHeight="27"
+                        Background="{DynamicResource ColorBrushSemiTransparent}" Cursor="Hand">
+                    <StackPanel Orientation="Horizontal">
+                        <Path Name="PART_Logo" MaxWidth="16" MaxHeight="16" Margin="12,0,0,0"
+                              HorizontalAlignment="Left" VerticalAlignment="Center" Stretch="Uniform"
+                              Fill="{DynamicResource ColorBrush1}" />
+                        <TextBlock Name="PART_Text" Text="{TemplateBinding Text}" Margin="7,0,12,1"
+                                   VerticalAlignment="Center"
+                                   FontSize="{TemplateBinding FontSize}" FontFamily="{TemplateBinding FontFamily}"
+                                   Foreground="{DynamicResource ColorBrush1}" />
+                    </StackPanel>
+                </Border>
+            </ControlTemplate>
+        </Setter>
+    </Style>
+    <Style Selector="c|MyIconTextButton:highlight /template/ Path#PART_Logo">
+        <Setter Property="Fill" Value="{DynamicResource ColorBrush3}" />
+    </Style>
+    <Style Selector="c|MyIconTextButton:highlight /template/ TextBlock#PART_Text">
+        <Setter Property="Foreground" Value="{DynamicResource ColorBrush3}" />
+    </Style>
+    <Style Selector="c|MyIconTextButton:pointerover /template/ Border#PART_Back">
+        <Setter Property="Background" Value="{DynamicResource ColorBrushBg1}" />
+    </Style>
+    <Style Selector="c|MyIconTextButton:pointerover /template/ Path#PART_Logo">
+        <Setter Property="Fill" Value="{DynamicResource ColorBrush3}" />
+    </Style>
+    <Style Selector="c|MyIconTextButton:pointerover /template/ TextBlock#PART_Text">
+        <Setter Property="Foreground" Value="{DynamicResource ColorBrush3}" />
+    </Style>
+    <Style Selector="c|MyIconTextButton:pressed /template/ Border#PART_Back">
+        <Setter Property="Background" Value="{DynamicResource ColorBrush6}" />
+    </Style>
+    <Style Selector="c|MyIconTextButton:disabled /template/ Path#PART_Logo">
+        <Setter Property="Fill" Value="{DynamicResource ColorBrushGray5}" />
+    </Style>
+    <Style Selector="c|MyIconTextButton:disabled /template/ TextBlock#PART_Text">
+        <Setter Property="Foreground" Value="{DynamicResource ColorBrushGray5}" />
     </Style>
 
     <!-- ===== MyHint（1:1 对齐 MyHint.xaml；关闭记忆与收高动画未移植，R11） ===== -->

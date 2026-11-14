@@ -222,6 +222,9 @@ public class MyCheckBox : TemplatedControl
     public static readonly StyledProperty<string?> TextProperty =
         AvaloniaProperty.Register<MyCheckBox, string?>(nameof(Text));
 
+    public static readonly StyledProperty<string?> DescriptionProperty =
+        AvaloniaProperty.Register<MyCheckBox, string?>(nameof(Description));
+
     public bool Checked
     {
         get => GetValue(CheckedProperty);
@@ -234,24 +237,42 @@ public class MyCheckBox : TemplatedControl
         set => SetValue(TextProperty, value);
     }
 
+    /// <summary>标题后的灰色补充说明（对应 Windows 导出页 `CheckBox.Inlines` 里的 `ColorGray5` Run）。</summary>
+    public string? Description
+    {
+        get => GetValue(DescriptionProperty);
+        set => SetValue(DescriptionProperty, value);
+    }
+
     /// <summary>勾选状态改变；user 表示是否由用户手动触发（对应 WPF 的 Change(sender, user)）。</summary>
     public event EventHandler<bool>? Changed;
 
     private bool _isPointerDown;
+    private TextBlock? _descriptionText;
 
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {
         base.OnPropertyChanged(change);
         if (change.Property == CheckedProperty) SyncState();
+        if (change.Property == DescriptionProperty) SyncDescription();
     }
 
     protected override void OnApplyTemplate(TemplateAppliedEventArgs e)
     {
         base.OnApplyTemplate(e);
+        _descriptionText = e.NameScope.Find<TextBlock>("PART_LabDesc");
         SyncState();
+        SyncDescription();
     }
 
     private void SyncState() => PseudoClasses.Set(":checked", Checked);
+
+    private void SyncDescription()
+    {
+        if (_descriptionText is null) return;
+        _descriptionText.Text = Description;
+        _descriptionText.IsVisible = !string.IsNullOrEmpty(Description);
+    }
 
     protected override void OnPointerPressed(PointerPressedEventArgs e)
     {
@@ -1005,6 +1026,96 @@ public class MyIconButton : TemplatedControl
         PseudoClasses.Set(":pressed", false);
         if (!IsEnabled || !CanClick) return;
         if (e.InitialPressMouseButton != MouseButton.Left) return;
+        Click?.Invoke(this, EventArgs.Empty);
+    }
+}
+
+/// <summary>
+/// 带图标与文字的胶囊按钮，1:1 对齐 `pcl-next/Controls/MyIconTextButton.xaml(.vb)`：
+/// 圆角 13.5、`MinHeight/MaxHeight 27`、底 `ColorBrushSemiTransparent`；
+/// 图标上限 16（`Margin 12,0,0,0`）、文案 `Margin 7,0,12,1`。
+/// `ColorType=Black` 常态 `ColorBrush1`、`Highlight` 常态 `ColorBrush3`；
+/// 悬停 → 底 `ColorBrushBg1` + 图标/文字 `ColorBrush3`；按下 → 底 `ColorBrush6`；
+/// 禁用 → `ColorBrushGray5`（WPF 的 100/150/70ms 颜色过渡改为即时切换，并入 R10）。
+/// </summary>
+public class MyIconTextButton : TemplatedControl
+{
+    public static readonly StyledProperty<string?> TextProperty =
+        AvaloniaProperty.Register<MyIconTextButton, string?>(nameof(Text));
+
+    public static readonly StyledProperty<string?> LogoProperty =
+        AvaloniaProperty.Register<MyIconTextButton, string?>(nameof(Logo));
+
+    public static readonly StyledProperty<double> LogoScaleProperty =
+        AvaloniaProperty.Register<MyIconTextButton, double>(nameof(LogoScale), 1d);
+
+    public static readonly StyledProperty<string?> ColorTypeProperty =
+        AvaloniaProperty.Register<MyIconTextButton, string?>(nameof(ColorType), "Black");
+
+    public string? Text
+    {
+        get => GetValue(TextProperty);
+        set => SetValue(TextProperty, value);
+    }
+
+    public string? Logo
+    {
+        get => GetValue(LogoProperty);
+        set => SetValue(LogoProperty, value);
+    }
+
+    public double LogoScale
+    {
+        get => GetValue(LogoScaleProperty);
+        set => SetValue(LogoScaleProperty, value);
+    }
+
+    /// <summary>Black（默认）或 Highlight。</summary>
+    public string? ColorType
+    {
+        get => GetValue(ColorTypeProperty);
+        set => SetValue(ColorTypeProperty, value);
+    }
+
+    public event EventHandler? Click;
+
+    private Avalonia.Controls.Shapes.Path? _logo;
+
+    protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
+    {
+        base.OnPropertyChanged(change);
+        if (change.Property == LogoProperty || change.Property == LogoScaleProperty) SyncLogo();
+        if (change.Property == ColorTypeProperty)
+            PseudoClasses.Set(":highlight", string.Equals(ColorType, "Highlight", StringComparison.OrdinalIgnoreCase));
+    }
+
+    protected override void OnApplyTemplate(TemplateAppliedEventArgs e)
+    {
+        base.OnApplyTemplate(e);
+        _logo = e.NameScope.Find<Avalonia.Controls.Shapes.Path>("PART_Logo");
+        SyncLogo();
+    }
+
+    private void SyncLogo()
+    {
+        if (_logo is null) return;
+        _logo.Data = string.IsNullOrWhiteSpace(Logo) ? null : Geometry.Parse(Logo);
+        _logo.RenderTransformOrigin = new RelativePoint(0.5, 0.5, RelativeUnit.Relative);
+        _logo.RenderTransform = new ScaleTransform(LogoScale, LogoScale);
+    }
+
+    protected override void OnPointerPressed(PointerPressedEventArgs e)
+    {
+        base.OnPointerPressed(e);
+        if (!IsEnabled || !e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
+        PseudoClasses.Set(":pressed", true);
+    }
+
+    protected override void OnPointerReleased(PointerReleasedEventArgs e)
+    {
+        base.OnPointerReleased(e);
+        PseudoClasses.Set(":pressed", false);
+        if (!IsEnabled || e.InitialPressMouseButton != MouseButton.Left) return;
         Click?.Invoke(this, EventArgs.Empty);
     }
 }

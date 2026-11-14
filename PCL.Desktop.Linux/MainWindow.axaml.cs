@@ -55,6 +55,8 @@ public partial class MainWindow : Window
     private PageInstanceSetupView? _instanceSetupPage;
     private PageInstanceModView? _instanceModPage;
     private PageInstanceModDisabledView? _instanceModDisabledPage;
+    private PageDownloadInstallView? _instanceModifyPage;
+    private PageInstanceExportView? _instanceExportPage;
     private CancellationTokenSource? _leftWidthAnimation;
 
     public MainWindow()
@@ -277,7 +279,8 @@ public partial class MainWindow : Window
 
     /// <summary>
     /// 实例设置栈子页切换（对应 `PageInstanceLeft.xaml.vb` L39–L63 `PageGet`）：
-    /// 0 概览 / 1 设置 / 3 Mod / 4 ModDisabled 已移植；2 修改（PageDownloadModify）与 5 导出尚未移植（R50）。
+    /// 0 概览 / 1 设置 / 2 修改 / 3 Mod / 4 ModDisabled / 5 导出。
+    /// 「修改」页在 Windows 端继承 `PageDownloadInstall`，Linux 侧复用安装页视图（R52）。
     /// </summary>
     private void ShowInstancePage(int pageId)
     {
@@ -288,6 +291,9 @@ public partial class MainWindow : Window
                 break;
             case 1:
                 PageRight.Content = _instanceSetupPage ??= new PageInstanceSetupView();
+                break;
+            case 2:
+                PageRight.Content = _instanceModifyPage ??= new PageDownloadInstallView(isModify: true);
                 break;
             case 3:
                 PageRight.Content = _instanceModPage ??= new PageInstanceModView();
@@ -301,8 +307,10 @@ public partial class MainWindow : Window
                 }
                 PageRight.Content = _instanceModDisabledPage;
                 break;
+            case 5:
+                PageRight.Content = _instanceExportPage ??= new PageInstanceExportView();
+                break;
             default:
-                // 2 修改 / 5 导出：页面未移植（R50），宿主置空
                 PageRight.Content = null;
                 break;
         }
