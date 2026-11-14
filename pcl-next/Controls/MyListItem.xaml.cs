@@ -72,14 +72,6 @@ namespace PCL
         // 图标
         public FrameworkElement PathLogo;
 
-        // 图标圆角方形底板（LogoBox 开启时生效）
-        private Border _LogoBox;
-
-        /// <summary>
-    /// 是否为图标绘制圆角方形底板。用于侧边栏导航等需要“圆角方块图标”外观的场景。
-    /// </summary>
-        public bool LogoBox { get; set; } = false;
-
         // 勾选条
         public Border RectCheck;
 
@@ -298,12 +290,7 @@ namespace PCL
                     return;
                 _Logo = value;
                 // 删除旧 Logo
-                if (_LogoBox is not null)
-                {
-                    this.Children.Remove(_LogoBox);
-                    _LogoBox = null;
-                }
-                else if (!(PathLogo == null))
+                if (!(PathLogo == null))
                 {
                     this.Children.Remove(PathLogo);
                 }
@@ -342,6 +329,19 @@ namespace PCL
                         };
                         RenderOptions.SetBitmapScalingMode(PathLogo, BitmapScalingMode.Linear);
                     }
+                    else if (_Logo.StartsWithF("lucide:", true))
+                    {
+                        // lucide 风格描边线稿（圆头端点、圆角连接、24×24 网格）
+                        var foreground = new Binding("Foreground") { Source = this };
+                        PathLogo = LucideIcon.Build(_Logo.Substring("lucide:".Length), foreground);
+                        if (PathLogo is not null)
+                        {
+                            PathLogo.Tag = this;
+                            PathLogo.IsHitTestVisible = LogoClickable;
+                            PathLogo.RenderTransformOrigin = new Point(0.5d, 0.5d);
+                            PathLogo.RenderTransform = new ScaleTransform() { ScaleX = LogoScale, ScaleY = LogoScale };
+                        }
+                    }
                     else
                     {
                         // 矢量图
@@ -360,26 +360,7 @@ namespace PCL
                         };
                         PathLogo.SetBinding(System.Windows.Shapes.Shape.FillProperty, new Binding("Foreground") { Source = this });
                     }
-                    if (LogoBox)
-                    {
-                        // 圆角方形底板：图标居中衬在浅色圆角方块内
-                        _LogoBox = new Border()
-                        {
-                            Width = 26d,
-                            Height = 26d,
-                            CornerRadius = new CornerRadius(6d),
-                            Padding = new Thickness(3d),
-                            HorizontalAlignment = HorizontalAlignment.Center,
-                            VerticalAlignment = VerticalAlignment.Center,
-                            IsHitTestVisible = false,
-                            Child = PathLogo
-                        };
-                        _LogoBox.SetResourceReference(Border.BackgroundProperty, "ColorBrush7");
-                        Grid.SetColumn(_LogoBox, 2);
-                        Grid.SetRowSpan(_LogoBox, 4);
-                        this.Children.Add(_LogoBox);
-                    }
-                    else
+                    if (PathLogo is not null)
                     {
                         Grid.SetColumn(PathLogo, 2);
                         Grid.SetRowSpan(PathLogo, 4);
@@ -496,12 +477,7 @@ namespace PCL
             this.ColumnLogo.Width = new GridLength((double)((string.IsNullOrEmpty(_Logo) ? 0 : 34) + (this.Height < 40d ? 0 : 4)));
             if (PathLogo is not null)
             {
-                if (LogoBox)
-                {
-                    // 图标在圆角底板内，外边距由底板 Padding 控制
-                    PathLogo.Margin = new Thickness(0d);
-                }
-                else if (_Logo.EndsWithF(".png", true) || _Logo.EndsWithF(".jpg", true) || _Logo.EndsWithF(".webp", true))
+                if (_Logo.EndsWithF(".png", true) || _Logo.EndsWithF(".jpg", true) || _Logo.EndsWithF(".webp", true))
                 {
                     PathLogo.Margin = new Thickness(4d, 5d, 3d, 5d);
                 }
