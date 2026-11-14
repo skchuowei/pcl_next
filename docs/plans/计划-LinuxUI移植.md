@@ -123,6 +123,9 @@
 | **R30** | 设置·个性化页主题解锁交互未接入：`LabLauncherTheme5Unlock` 连点解锁玄素黑（`PageSetupUI.xaml.vb` L354–L366）、`LabLauncherTheme8/9/11` 的右键跳转（赞助 / 反馈 / 解密游戏，L367–L385）、`RadioLauncherTheme14` 选中后显示色相/饱和度/亮度/色调渐变四条滑条（L388–L411）均未实现；解锁提示层（`Background=ColorBrushSemiTransparent` 的四个 TextBlock）与解锁 ToolTip 按原布局保留，滑条按原 XAML 保持隐藏 | 仅解锁状态机与右键菜单 | 主题 15 项的 6 列 × 3 行排布、`PanLauncherTheme Height 90`、各 `IsEnabled`（仅 0–4 可用）与 `Opacity`（玄素黑 0/1 双层）不得改；滑条 `MaxValue 360/180/100/40`、`ValueByKey 10/5/5/5` 不得改 |
 | **R31** | 设置·个性化页文件操作未接入：背景图片（打开文件夹 / 刷新 / 清空，`PageSetupUI.xaml.vb` L75–L154）、背景音乐（打开文件夹 / 刷新 / 清空，L226–L273）、标题栏图片（更改 / 清空，L157–L223）与「生成教学文件」「打开主页文件夹」均只保留按钮形态与 ToolTip；三组区域在无文件时保持原 XAML 的隐藏态（`PanBackground*`、`BtnBackgroundClear`、`PanMusicVolume/Detail`、`BtnMusicClear`），卡片标题不加「（N 张）/（N 首）」后缀 | 仅文件系统动作与数量后缀 | 隐藏态的卡片间距、`StackPanel Margin 25,40,25,20 / 25,42,25,20`、按钮 `MinWidth 140 / Padding 13,0 / 间距 20` 不得改；接入文件服务后按 `BackgroundRefreshUI` / `MusicRefreshUI` 补齐 |
 | **R32** | 设置·个性化页「功能隐藏」联动未接入：父子项联动（`HiddenSetupMain` / `HiddenSetupSub` / `HiddenOtherMain` / `HiddenOtherSub` / `HiddenOtherNet`，L513–L587）、警告提示（`HiddenHint`）、F12 强制显示（`HiddenForceShow`）与 `HiddenRefresh` 对标题栏 Tab / 设置左导航 / 更多子页的显隐影响均未实现；复选框仅为静态形态，`UiHidden*` 默认全部不勾，「联机」「设置 子页面-联机」两项按原 XAML 保持 `IsEnabled=False` | 仅联动规则 | `CardSwitch` 的 7 列（Auto/18/0.8*/0.9*/0.8*/0.8*/1.0*）与 6 行（4/30/30/30/30/Auto）、复选框高 22、文案与 ToolTip 逐字不得改 |
+| **R33** | 设置·其他页静态态：Linux 侧尚无设置服务，`SettingService.Key` 绑定与 `Reload` / `Reset` 未接入，页面按 `Settings.vb` 默认值呈现（`ToolDownloadSource/Version=1`、`ToolDownloadThread=63`、`ToolDownloadSpeed=42`、`ToolDownloadMod=2`、`ToolDownloadTranslateV2=1`、`ToolModLocalNameStyle=0`、`ToolUpdateRelease/Snapshot=False`、`ToolHelpChinese=True`、`SystemSystemUpdate/Activity=0`、`SystemSystemCache=""`、`SystemDebugAnim=9`）；`ChannelIsOfficial=False`（Dev）→ `PanDonate` 可见、`ItemSystemUpdateDownload` 文案为带土豆码后缀的版本 | 仅数据绑定 | 四张卡片的行列高（28/7/27、28/7、22/8/22、28/9/5）、`Margin 25,37,25,15 / 25,37,25,12 / 25,40,25,17 / 25,40,25,20`、按钮 `MinWidth 140 / Padding 13,0 / 间距 20`、调试卡 `IsSwapped=True` 不得改 |
+| **R34** | 设置·其他页交互未接入：「检查更新」`UpdateCheckByButton`、「导出设置 / 导入设置」（原为「该功能尚在开发中」提示）、「复制识别码」`PageOtherAbout.CopyIdentify`、「输入土豆码」`InputPotatoCode` 均为空操作；`SliderDownloadThread` ≥100 的警告弹窗、`ComboSystemActivity` 选末项与 `ComboSystemUpdate` 选末项的确认回滚、`CheckDebugMode` 切换提示均未实现 | 仅交互动作 | 控件顺序、`ComboSystemUpdate` 四项文案、公告三项 ToolTip、`PanDonate` 双按钮布局不得改 |
+| **R35** | 设置·其他页输入框校验未接入：`TextSystemCache` 的 `ValidateRules`（`ValidateNullable` + `ValidateFolderPath UseMinecraftCharCheck=False`）在 Linux 无对应校验管线，仅保留 `HintText="默认"` 与 ToolTip；输入内容不落盘 | 仅校验与持久化 | `Grid.Row=4 / ColumnSpan=2 / Column=1`、`HintText`、ToolTip 三行文案不得改 |
 
 ---
 
@@ -812,6 +815,29 @@ dotnet build PCL.Desktop.Linux/PCL.Desktop.Linux.csproj -c Release -r linux-x64
 （产物 `bin-net10/Dev/2.100.0.4-0.93/linux-x64/`）。
 **未验证项**：主题区 15 项在 6 列 × 3 行内的实际排布与解锁遮罩层叠、下拉弹出层、复选框三态、卡片滚动 —— 需统一验收目视（V13）。
 
+### 13.14 设置栈「其他」页（LU6.3，2026-11-14，只做编译验证、不弹窗）
+
+**对照来源**：`pcl-next/Pages/PageSetup/PageSetupSystem.xaml`（全文 205 行）+ `PageSetupSystem.xaml.vb`
+（L4–L26 加载/刷新、L42–L58 滑块提示文案、L59–L65 线程数警告、L69–L79 识别码/土豆码、L82–L101 下拉末项确认、L124–L129 导出/导入占位）；
+默认值取自 `pcl-next/Pages/PageSetup/Settings.vb` L43–L49、L125–L136；
+`ChannelIsOfficial=False`（Dev 渠道）→ `PanDonate` 可见、`ItemSystemUpdateDownload` 文案带「（更新非正式版前需要先输入土豆码）」后缀。
+
+**Linux 实现**：`Views/PageSetupSystemView.axaml(.cs)`；
+`MainWindow.axaml.cs`（`ShowSetupPage`：新增 `3 => PageSetupSystemView`，设置栈四个子页全部接入）。
+
+| 卡片 / 区域 | Windows 取值 | Linux 实现 | 结论 |
+|---|---|---|---|
+| 下载卡 | 内容 `Margin 25,37,25,15`；Grid 两列（Auto[Name]/*）、七行（28/7/28/7/27/27/Auto）；两个下拉 + 两条滑块 + 目标文件夹双栏说明 | 同；下拉 `SelectedIndex=1`、线程滑块 `MaxValue 255 / Value 63`、限速滑块 `MaxValue 42 / Value 42`；说明文字 `Opacity 0.5`、两行原文 | 一致（R33 / R27） |
+| 社区资源卡 | 内容 `Margin 25,37,25,12`；两列、六行（28/7/28/7/28/7）；三个下拉 | 同；来源 `SelectedIndex=2`、文件名格式 `1`、Mod 管理样式 `0`；ToolTip 逐字保留 | 一致（R33） |
+| 辅助功能卡 | `Margin 25,40,25,17`；三列（Auto/160/Auto）、三行（22/8/22）；两个更新提示复选框 + 自动中文 | 同；`ToolUpdateRelease/Snapshot=False` 不勾、`ToolHelpChinese=True` 勾选；测试版复选框 `Height=22` | 一致（R33） |
+| 启动器卡 | `Margin 25,40,25,20`；两列（Auto[Name]/1*）、九行（28/9/28/9/28/5/Auto/Auto/Auto）；三个下拉/输入 + 两排按钮（`Height 35`、`Margin 0,12,0,0`） | 同；两个下拉 `SelectedIndex=0`、缓存框空 + `HintText「默认」`；按钮 `MinWidth 140 / Padding 13,0 / 间距 20`；`PanDonate` 两按钮按 Dev 渠道可见 | 一致（R33 / R34 / R35） |
+| 全局设置卡（被注释） | 原 XAML L165–L180 整卡被注释，不参与渲染 | 不移植 | 一致 |
+| 调试选项卡 | `CanSwap=True IsSwapped=True`（折叠高 40）；动画滑条 `MaxValue 30` + 三个复选框（1.5*/1*/1） | 同；`SystemDebugAnim=9`、三项不勾；ToolTip 逐字保留 | 一致（R5 / R33） |
+
+**验证**：`dotnet build PCL.Desktop.Linux/PCL.Desktop.Linux.csproj -c Release -r linux-x64` → **0 警告 / 0 错误**
+（产物 `bin-net10/Dev/2.100.0.4-0.94/linux-x64/`）。
+**未验证项**：五个下拉弹出层、调试卡折叠/展开、线程数滑块拖动与数值提示、卡片滚动 —— 需统一验收目视（V14）。
+
 ## 14. 待统一验收清单（UI 全部成型后一次性执行）
 
 | 编号 | 待验收项 | 为什么必须靠运行判断 | 当前已知线索 |
@@ -829,3 +855,4 @@ dotnet build PCL.Desktop.Linux/PCL.Desktop.Linux.csproj -c Release -r linux-x64
 | **V11** | 设置页前置控件（13.11） | 圆点/圆环尺寸、滑块宽度算法、拖动与键盘步进、胶囊按钮配色均需运行观察 | 需目视：`MyRadioBox` 18 圆环 + 9 圆点（选中 `ColorBrush2`、悬停 `ColorBrush3`）、`MySlider` 底轨 1px/前轨 2px/滑块 10、拖动与 ←/→ 生效、`MyExtraTextButton` 52 高 + 内层下移 10 + 悬停 `ColorBrush4` |
 | **V12** | 设置·启动页（13.12） | 折叠交互、下拉弹出层、长文本滚动、内存条比例、卡片阴影均需运行观察 | 需目视：标题栏进「设置」后左导航选中「启动」且右页出现五张卡片；「离线皮肤」「高级选项」初始为 40 高折叠条、点击标题区展开/收起且箭头旋转；启动选项 5 行 28 高、内存条三段比例、JVM 框 100 高、底部胶囊按钮居中 |
 | **V13** | 设置·个性化页（13.13） | 主题区 15 项排布、解锁遮罩层叠、下拉弹出层、复选框禁用态、整页滚动均需运行观察 | 需目视：左导航点「个性化」后右页出现六张卡片；基础卡标题下不透明度滑条满格（600/600）、龙猫蓝选中、其余主题灰色且玄素黑双层叠字；标题栏卡「默认」选中；主页卡「空白」选中且无提示条/按钮；功能隐藏卡 22 行复选框仅「联机」两项禁用；背景图片/音乐卡仅标题、无隐藏控件露出 |
+| **V14** | 设置·其他页（13.14） | 五个下拉弹出层、调试卡折叠、滑块拖动、按钮排布均需运行观察 | 需目视：左导航点「其他」后右页出现「下载 / 社区资源 / 辅助功能 / 启动器」四张卡片 + 40 高「调试选项」折叠条；下载卡两条滑块分别停在 63/255 与 42/42；缓存框显示灰色「默认」占位；启动器卡两排按钮（3 + 2）左对齐、间距 20；展开调试卡后动画滑条停在 9/30；`PanDonate` 在 Dev 渠道可见 |

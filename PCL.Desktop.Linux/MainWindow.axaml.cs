@@ -38,6 +38,7 @@ public partial class MainWindow : Window
     private PageSetupLeftView? _setupLeftPage;
     private PageSetupLaunchView? _setupLaunchPage;
     private PageSetupUIView? _setupUiPage;
+    private PageSetupSystemView? _setupSystemPage;
     private CancellationTokenSource? _leftWidthAnimation;
 
     public MainWindow()
@@ -157,7 +158,7 @@ public partial class MainWindow : Window
 
     /// <summary>
     /// 设置栈子页切换（对应 `PageSetupLeft.xaml.vb` L93–L122 `PageChange`）：
-    /// 0 启动 / 1 联机 / 2 个性化（已移植）/ 3 其他待补（宿主置空，R20）。
+    /// 0 启动 / 1 联机 / 2 个性化 / 3 其他（均已移植）。
     /// </summary>
     private void ShowSetupPage(int pageId)
     {
@@ -166,6 +167,7 @@ public partial class MainWindow : Window
             0 => _setupLaunchPage ??= new PageSetupLaunchView(),
             1 => _linkPage,
             2 => _setupUiPage ??= new PageSetupUIView(),
+            3 => _setupSystemPage ??= new PageSetupSystemView(),
             _ => null
         };
     }
