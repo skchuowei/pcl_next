@@ -314,7 +314,15 @@ MSBuild 的属性求值发生在所有 Target 之前，那个阶段只能调用�
   `PCL-Next-<版本名>-<代号>-<构建号>-arm64.exe`（win-arm64），两者同 tag / 同 commit / 同一次 CI 运行。
   各用各的 profile（`win-x64-single` / `win-arm64-single`），**禁止共用 PublishDir**；
   arm64 构建失败不得降级为只发 x64。是否发对以 **PE Machine** 判定（x64 `0x8664` / arm64 `0xAA64`），
-  不看体积。arm64 未真机冒烟前只准走 `dev` / `slush`，不得进 `alpha` 及以后。
+  不看体积。arm64 未真机冒烟前只准走 `dev` / `slush`，不得进 `alpha` 及以后；
+  **唯一例外**是用户明确裁决随高通道发布，且必须按规范 §5.3.1「真机门槛的例外路径」在发布说明
+  首条已知问题标注「实验性支持」。
+- **同一工程连续编多个 RID 时，中间产物目录必须按 RID 隔离**（2026-11-14 事故）：
+  工程一旦关了 `AppendRuntimeIdentifierToOutputPath`，`IntermediateOutputPath` 会退化成一个共用目录，
+  两个 RID 共享中间程序集与 `R2R\` 镜像，arm64 会直接复用 x64 的已编译结果——**publish 成功、
+  体积也变小，但 PE 头仍是 `0x8664`**。必须显式写
+  `<IntermediateOutputPath Condition="'$(RuntimeIdentifier)' != ''">$(BaseIntermediateOutputPath)$(Configuration)\$(RuntimeIdentifier)\</IntermediateOutputPath>`，
+  并在每次 publish 后**立即**断言 PE Machine，而不是等到上传附件前才查。
 
 ### 0.5 产物迁移 / 复制的硬规则
 
@@ -596,3 +604,7 @@ ReleaseArtifacts/<开发代号>/<版本名>/<运行环境>/
   （违反 §0.4 / 规范 §5.3.1；共用目录会让后编的覆盖先编的，同名附件会被 GitHub 直接拒绝）。
 - **以「arm64 编不过就先只发 x64」收场**（违反规范 §5.3.1 第 5 条：要么修好，要么整次发布作废）。
 - **靠文件体积判断 arm64 制品对不对**（体积差异属正常，只认 PE Machine 字段）。
+- **以为 `dotnet publish -r win-arm64` 成功就等于 arm64 编对了**（2026-11-14 实际踩到：publish 全绿、
+  体积也对，PE 头却是 `0x8664`，根因是两个 RID 共用 `obj\`；违反 §0.4 的 RID 隔离与 PE 断言要求）。
+- **发布 workflow 引用仓库里已删除 / 改名的源文件**（`slush.1` 的 Release 就是这样在第一步骤失败的：
+  密钥注入步骤还指向已删的 `ModSecret.vb`；违反规范 §5.3.2 第 2 条）。
