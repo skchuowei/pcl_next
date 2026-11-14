@@ -509,6 +509,10 @@ namespace PCL
             Loaders.Add(new ModLoader.LoaderCombo<string>("游戏安装", MergeLoaders) { Show = false, ProgressWeight = MergeLoaders.Sum(l => l.ProgressWeight) });
             Loaders.Add(new ModLoader.LoaderTask<string, string>("最终整理文件", (Task) =>
         {
+            // 留存整合包来源信息（实例设置概览页在线工程卡的数据来源）
+            ModBase.WriteIni(VersionFolder + @"PCL\Setup.ini", "VersionModpackId", (Json["projectID"] ?? "").ToString());
+            ModBase.WriteIni(VersionFolder + @"PCL\Setup.ini", "VersionModpackVersion", (Json["version"] ?? "").ToString());
+            ModBase.WriteIni(VersionFolder + @"PCL\Setup.ini", "VersionModpackSource", "CurseForge");
             // 设置图标
             if (Logo is not null && FileUtils.Exists(Logo))
             {
@@ -697,6 +701,10 @@ namespace PCL
             Loaders.Add(new ModLoader.LoaderCombo<string>("游戏安装", MergeLoaders) { Show = false, ProgressWeight = MergeLoaders.Sum(l => l.ProgressWeight) });
             Loaders.Add(new ModLoader.LoaderTask<string, string>("最终整理文件", (Task) =>
         {
+            // 留存整合包来源信息（实例设置概览页在线工程卡的数据来源）
+            ModBase.WriteIni(VersionFolder + @"PCL\Setup.ini", "VersionModpackId", (Json["projectId"] ?? "").ToString());
+            ModBase.WriteIni(VersionFolder + @"PCL\Setup.ini", "VersionModpackVersion", (Json["versionNumber"] ?? "").ToString());
+            ModBase.WriteIni(VersionFolder + @"PCL\Setup.ini", "VersionModpackSource", "Modrinth");
             // 设置图标
             if (Logo is not null && FileUtils.Exists(Logo))
             {

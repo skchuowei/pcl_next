@@ -10,6 +10,12 @@
             <local:MyCard Margin="0,15" Title="">
                 <Grid Margin="10,7" Name="PanDisplayItem" />
             </local:MyCard>
+            <local:MyCard Margin="0,0,0,15" Title="实例信息" x:Name="PanInfoCard">
+                <StackPanel Margin="25,30,25,15">
+                    <ContentControl x:Name="PanModpack" Margin="0,0,0,10" Visibility="Collapsed" />
+                    <WrapPanel x:Name="PanInfo" />
+                </StackPanel>
+            </local:MyCard>
             <local:MyCard Margin="0,0,0,15" Title="个性化" x:Name="PanDisplay">
                 <StackPanel Margin="25,40,25,15">
                     <Grid x:Name="PanDisplayIcon" HorizontalAlignment="Stretch">

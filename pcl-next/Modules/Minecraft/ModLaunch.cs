@@ -2869,6 +2869,22 @@ namespace PCL
             // 启动计数
             Settings.Set("SystemLaunchCount", Settings.Get<int>("SystemLaunchCount") + 1);
 
+            // 实例级启动计数（实例设置概览页「启动次数」行的数据来源）
+            try
+            {
+                var SelectedInstance = ModMinecraft.McInstanceSelected;
+                if (SelectedInstance is not null)
+                {
+                    string InstanceIni = SelectedInstance.PathVersion + @"PCL\Setup.ini";
+                    int InstanceLaunchCount = Conversions.ToInteger(ModBase.ReadIni(InstanceIni, "VersionLaunchCount", "0"));
+                    ModBase.WriteIni(InstanceIni, "VersionLaunchCount", (InstanceLaunchCount + 1).ToString());
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn(ex, "实例启动次数写入失败");
+            }
+
         }
 
         #endregion

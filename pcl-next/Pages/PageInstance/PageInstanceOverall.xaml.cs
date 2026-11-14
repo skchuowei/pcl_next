@@ -11,6 +11,7 @@ using MeloongCore.Wpf.Extensions;
 using Microsoft.VisualBasic;
 using Microsoft.VisualBasic.CompilerServices;
 using Newtonsoft.Json.Linq;
+using PCLCS;
 
 namespace PCL
 {
@@ -94,7 +95,112 @@ namespace PCL
             }
 
             ModAnimation.AniControlEnabled -= 1;
+
+            RefreshInstanceInfo();
         }
+
+        #region 卡片：实例信息
+
+        /// <summary>
+    /// 装配概览页「实例信息」卡：本地信息行（启动次数 / 整合包版本 / MC 版本 / 加载器）+ 后台拉取的在线整合包卡。
+    /// </summary>
+        private void RefreshInstanceInfo()
+        {
+            var Instance = PageInstanceLeft.Instance;
+            if (Instance is null)
+            {
+                Logger.Warn("刷新实例信息时尚未选择 Minecraft 实例");
+                return;
+            }
+            string InstanceIni = Instance.PathVersion + @"PCL\Setup.ini";
+            PanInfo.Children.Clear();
+
+            // 启动次数
+            int LaunchCount = Conversions.ToInteger(ModBase.ReadIni(InstanceIni, "VersionLaunchCount", "0"));
+            AddInfoRow("启动次数",
+                LaunchCount > 0 ? $"已启动 {LaunchCount} 次" : "从未启动",
+                LaunchCount > 0
+                    ? "pack://application:,,,/images/Blocks/RedstoneLampOn.png"
+                    : "pack://application:,,,/images/Blocks/RedstoneLampOff.png");
+
+            // 整合包版本（仅在安装时留存了版本号时显示）
+            string PackVersion = ModBase.ReadIni(InstanceIni, "VersionModpackVersion", "");
+            if (!string.IsNullOrEmpty(PackVersion))
+                AddInfoRow("整合包版本", PackVersion, "pack://application:,,,/images/Blocks/CommandBlock.png");
+
+            // Minecraft 版本
+            var McVer = Instance.Version;
+            AddInfoRow("Minecraft", McVer.VanillaName, "pack://application:,,,/images/Blocks/Grass.png");
+
+            // 已安装的 Mod 加载器及版本
+            AddLoaderRow(ModLoaders.Forge, McVer, "pack://application:,,,/images/Blocks/GoldBlock.png");
+            AddLoaderRow(ModLoaders.NeoForge, McVer, "pack://application:,,,/images/Blocks/NeoForge.png");
+            AddLoaderRow(ModLoaders.Fabric, McVer, "pack://application:,,,/images/Blocks/Fabric.png");
+            AddLoaderRow(ModLoaders.LiteLoader, McVer, "pack://application:,,,/images/Blocks/Egg.png");
+            if (!string.IsNullOrEmpty(McVer.OptiFine))
+                AddInfoRow("OptiFine", McVer.OptiFine, "pack://application:,,,/images/Blocks/OptiFabric.png");
+
+            // 在线整合包卡：仅 CF / Modrinth 留存了工程 ID 时后台拉取
+            string PackId = ModBase.ReadIni(InstanceIni, "VersionModpackId", "");
+            string PackSource = ModBase.ReadIni(InstanceIni, "VersionModpackSource", "");
+            PanModpack.Content = null;
+            PanModpack.Visibility = Visibility.Collapsed;
+            if (string.IsNullOrEmpty(PackId) || PackSource != "CurseForge" && PackSource != "Modrinth")
+                return;
+            var Platform = (ResourcePlatforms)Enum.Parse(typeof(ResourcePlatforms), PackSource);
+            string InstancePath = Instance.PathVersion;
+            ModBase.RunInNewThread(() =>
+            {
+                try
+                {
+                    var Project = ResourceProject.FromProjectIds(new[] { PackId }, Platform).FirstOrDefault();
+                    if (Project is null)
+                    {
+                        Logger.Info($"未从 {PackSource} 获取到整合包工程：{PackId}");
+                        return;
+                    }
+                    ModBase.RunInUi(() =>
+                    {
+                        // 页面已切换到其他实例时，丢弃过期结果
+                        if (PageInstanceLeft.Instance is null || !PathUtils.IsSame(PageInstanceLeft.Instance.PathVersion, InstancePath))
+                            return;
+                        var Item = Project.ToResourceItem(false, false).Init();
+                        Item.IsHitTestVisible = false; // 实例页仅展示，不跳转资源详情
+                        PanModpack.Content = Item;
+                        PanModpack.Visibility = Visibility.Visible;
+                    });
+                }
+                catch (Exception ex)
+                {
+                    Logger.Warn(ex, $"获取整合包在线信息失败（{PackId}）");
+                }
+            }, "实例整合包信息");
+        }
+
+        private void AddInfoRow(string Title, string Info, string Logo)
+        {
+            var Row = new MyListItem
+            {
+                Title = Title,
+                Info = Info,
+                Logo = Logo,
+                Height = 36d,
+                IsHitTestVisible = false
+            };
+            PanInfo.Children.Add(Row);
+        }
+
+        private void AddLoaderRow(ModLoaders Loader, McVersion Version, string Logo)
+        {
+            if (!Version.ModLoaders.HasFlagF(Loader))
+                return;
+            string LoaderVersion = Version.ModLoaderVersions.TryGetValue(Loader, out var VersionText) ? VersionText : "未知版本";
+            AddInfoRow(Loader.ToString(),
+                string.IsNullOrEmpty(LoaderVersion) || LoaderVersion == "未知版本" ? "未知版本" : LoaderVersion,
+                Logo);
+        }
+
+        #endregion
 
         #region 卡片：个性化
 
