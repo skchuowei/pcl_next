@@ -77,10 +77,24 @@ jobs:
         # 版本名与版本号一律由标签推导（《分支与发布规范》§5.1、§5.2）
         & "${{ GITHUB.WORKSPACE }}\scripts\Set-VersionInfo.ps1" -Tag "${{ github.ref_name }}" -CommitHash "${{ github.sha }}"
 
-    - name: Replace
+    - name: Inject API keys
+      shell: pwsh
+      env:
+        PCL_MS_CLIENT_ID: ${{ secrets.CLIENT_ID }}
+        PCL_CURSEFORGE_API_KEY: ${{ secrets.CURSEFORGE_API_KEY }}
       run: |
-        (gc "pcl-next\Modules\ModSecret.vb") -replace 'Public OAuthClientId As String = If(Environment.GetEnvironmentVariable("PCL_MS_CLIENT_ID"), "")', 'Public OAuthClientId As String = If(Environment.GetEnvironmentVariable("PCL_MS_CLIENT_ID"), "${{ secrets.CLIENT_ID }}")' | Out-File "pcl-next\Modules\ModSecret.vb"
-        (gc "pcl-next\Modules\ModSecret.vb") -replace 'Public CurseForgeAPIKey As String = If(Environment.GetEnvironmentVariable("PCL_CURSEFORGE_API_KEY"), "")', 'Public CurseForgeAPIKey As String = If(Environment.GetEnvironmentVariable("PCL_CURSEFORGE_API_KEY"), "${{ secrets.CURSEFORGE_API_KEY }}")' | Out-File "pcl-next\Modules\ModSecret.vb"
+        # 2026-11-14：VB 源文件自 slush.1 起已全量退出编译链，原步骤仍指向 ModSecret.vb，
+        # 导致 v2.100.0.7-slush.1 的 Release 在第一步就失败（run 43398844717）。
+        # 改为对唯一编译入口 ModSecret.cs 注入；secret 未配置时保留源码里的环境变量回退。
+        $path = "pcl-next\Modules\ModSecret.cs"
+        $text = Get-Content -LiteralPath $path -Raw -Encoding utf8
+        if ($env:PCL_MS_CLIENT_ID) {
+          $text = $text -replace 'public static string OAuthClientId = .*?;', "public static string OAuthClientId = `"$env:PCL_MS_CLIENT_ID`";"
+        }
+        if ($env:PCL_CURSEFORGE_API_KEY) {
+          $text = $text -replace 'public static string CurseForgeAPIKey = .*?;', "public static string CurseForgeAPIKey = `"$env:PCL_CURSEFORGE_API_KEY`";"
+        }
+        [IO.File]::WriteAllText((Resolve-Path -LiteralPath $path).ProviderPath, $text, (New-Object Text.UTF8Encoding $false))
 
     - name: Refresh build number cache
       shell: pwsh

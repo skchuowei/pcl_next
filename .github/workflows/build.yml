@@ -117,10 +117,22 @@ jobs:
         # 版本常量由发布流程写入（《分支与发布规范》§2、§5.1、§5.2）
         & "${{ GITHUB.WORKSPACE }}\scripts\Set-VersionInfo.ps1" -Channel "${{ steps.channel.outputs.channel }}" -CommitHash "${{ github.sha }}"
 
-    - name: Replace
+    - name: Inject API keys
+      shell: pwsh
+      env:
+        PCL_MS_CLIENT_ID: ${{ secrets.CLIENT_ID }}
+        PCL_CURSEFORGE_API_KEY: ${{ secrets.CURSEFORGE_API_KEY }}
       run: |
-        (gc "pcl-next\Modules\ModSecret.vb") -replace 'Public OAuthClientId As String = If(Environment.GetEnvironmentVariable("PCL_MS_CLIENT_ID"), "")', 'Public OAuthClientId As String = If(Environment.GetEnvironmentVariable("PCL_MS_CLIENT_ID"), "${{ secrets.CLIENT_ID }}")' | Out-File "pcl-next\Modules\ModSecret.vb"
-        (gc "pcl-next\Modules\ModSecret.vb") -replace 'Public CurseForgeAPIKey As String = If(Environment.GetEnvironmentVariable("PCL_CURSEFORGE_API_KEY"), "")', 'Public CurseForgeAPIKey As String = If(Environment.GetEnvironmentVariable("PCL_CURSEFORGE_API_KEY"), "${{ secrets.CURSEFORGE_API_KEY }}")' | Out-File "pcl-next\Modules\ModSecret.vb"
+        # 2026-11-14：同 release.yml——VB 源已移除，改向唯一编译入口 ModSecret.cs 注入。
+        $path = "pcl-next\Modules\ModSecret.cs"
+        $text = Get-Content -LiteralPath $path -Raw -Encoding utf8
+        if ($env:PCL_MS_CLIENT_ID) {
+          $text = $text -replace 'public static string OAuthClientId = .*?;', "public static string OAuthClientId = `"$env:PCL_MS_CLIENT_ID`";"
+        }
+        if ($env:PCL_CURSEFORGE_API_KEY) {
+          $text = $text -replace 'public static string CurseForgeAPIKey = .*?;', "public static string CurseForgeAPIKey = `"$env:PCL_CURSEFORGE_API_KEY`";"
+        }
+        [IO.File]::WriteAllText((Resolve-Path -LiteralPath $path).ProviderPath, $text, (New-Object Text.UTF8Encoding $false))
 
     - name: Refresh build number cache
       shell: pwsh
