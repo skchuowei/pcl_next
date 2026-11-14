@@ -43,6 +43,15 @@
     <!-- 必须关掉：否则 SDK 会在已是 ...\<版本>\<RID>\ 的路径后再追加一层同名 RID -->
     <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <!--
+      RID 隔离（2026-11-14）：上面两条关掉后，IntermediateOutputPath 退化成 obj\<配置>\，
+      两个 RID 共用同一份中间程序集与 R2R 镜像目录（obj\<配置>\R2R\）。
+      PublishReadyToRun 生成的 R2R 镜像是**架构相关**的：先编 x64 再编 arm64 时，
+      arm64 发布会复用 x64 的 R2R 结果，产物 PE Machine 仍是 0x8664
+      （§5.3.1 要求 arm64 必须是 0xAA64，机械校验会直接失败，但若不校验就会发出错包）。
+      这里按 RID 分目录隔离，两个架构各编各的。
+    -->
+    <IntermediateOutputPath Condition="'$(RuntimeIdentifier)' != ''">$(BaseIntermediateOutputPath)$(Configuration)\$(RuntimeIdentifier)\</IntermediateOutputPath>
     <!-- 启用 Directory.Build.props 的 PclTreePathGuard（OutputPath 必须含代号与版本两段） -->
     <PclUseTreePath>true</PclUseTreePath>
     <ProduceReferenceAssembly>false</ProduceReferenceAssembly>
