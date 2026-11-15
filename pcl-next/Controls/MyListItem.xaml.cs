@@ -755,7 +755,13 @@ namespace PCL
         private bool IsMouseDown = false;
         private void Button_MouseDown(object sender, MouseButtonEventArgs e)
         {
-            if (!this.IsMouseDirectlyOver || Type == CheckType.None)
+            if (Type == CheckType.None)
+                return;
+            // 标题文字 / 图标 / 勾选条都是本项自己的装饰，命中它们等同于命中整行。
+            // 原本只用 IsMouseDirectlyOver 判定：鼠标落在标题文字上时它返回 False
+            // （命中源是 TextBlock，不再是本行 Grid），整行点击会被否决，
+            // 表现为「点文字没反应，必须点图标」。这里补一条按命中源的判定。
+            if (!this.IsMouseDirectlyOver && !IsPointerOnOwnDecoration(e.OriginalSource))
                 return;
             // 右侧图标按钮所在区域不能当成整行点击：以前这里会把 ButtonStack 直接
             // 设成 IsHitTestVisible = false，导致图标永远收不到 MouseUp，编辑/复制/删除
@@ -773,6 +779,26 @@ namespace PCL
             IsMouseDown = false;
             if (ButtonStack is not null)
                 ButtonStack.IsHitTestVisible = true;
+        }
+
+        /// <summary>
+        /// 判断本次命中的元素是否属于本项自己的装饰（标题 / 副标题 / 图标 / 勾选条）。
+        /// 这些元素不承担交互，点到它们就应当等同于点到整行。
+        /// </summary>
+        private bool IsPointerOnOwnDecoration(object source)
+        {
+            DependencyObject cur = source as DependencyObject;
+            while (cur is not null && !ReferenceEquals(cur, this))
+            {
+                if (ReferenceEquals(cur, this.LabTitle) || ReferenceEquals(cur, this._LabInfo) || ReferenceEquals(cur, this.RectCheck))
+                    return true;
+                if (ReferenceEquals(cur, this.PathLogo))
+                    return !LogoClickable; // 图标自身可点击时，把这次点击留给 LogoClick
+                if (ReferenceEquals(cur, this.ButtonStack))
+                    return false; // 右侧按钮区域交给按钮自己处理
+                cur = VisualTreeHelper.GetParent(cur);
+            }
+            return false;
         }
 
         #endregion

@@ -8,122 +8,216 @@
     d:DesignWidth="800" d:DesignHeight="800"
     PanScroll="PanBack">
     <local:MyScrollViewer x:Name="PanBack" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-        <StackPanel x:Name="PanMain" Margin="16,10">
+        <Grid x:Name="PanMain">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="152" />
+                <ColumnDefinition Width="1*" />
+            </Grid.ColumnDefinitions>
 
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" Margin="0,15,0,15">
-                <local:MyButton x:Name="TabCreate" MinWidth="170" Height="40" Padding="13,0" Text="创建大厅" ColorType="Highlight" />
-                <local:MyButton x:Name="TabJoin" MinWidth="170" Height="40" Margin="10,0,0,0" Padding="13,0" Text="加入大厅" />
+            <!-- 左侧导航栏（与设置页左栏同款 MyListItem 单选） -->
+            <StackPanel x:Name="PanNav" Grid.Column="0" Margin="0,10,0,8">
+                <TextBlock Text="联机大厅" FontSize="12" Opacity="0.6" Margin="16,6,5,3" />
+                <local:MyListItem x:Name="ItemCreate" IsScaleAnimationEnabled="False" Tag="0" MinPaddingRight="10"
+                                  Height="36" VerticalAlignment="Top" Title="创建大厅" Type="RadioBox" FontSize="13"
+                                  LogoScale="1" Logo="lucide:play" Checked="True" />
+                <local:MyListItem x:Name="ItemJoin" IsScaleAnimationEnabled="False" Tag="1" MinPaddingRight="10"
+                                  Height="36" VerticalAlignment="Top" Title="加入大厅" Type="RadioBox" FontSize="13"
+                                  LogoScale="1" Logo="lucide:bubbles" />
+                <local:MyListItem x:Name="ItemStatus" IsScaleAnimationEnabled="False" Tag="2" MinPaddingRight="10"
+                                  Height="36" VerticalAlignment="Top" Title="连接状态" Type="RadioBox" FontSize="13"
+                                  LogoScale="1" Logo="lucide:message-circle" />
+                <local:MyListItem x:Name="ItemAbout" IsScaleAnimationEnabled="False" Tag="3" MinPaddingRight="10"
+                                  Height="36" VerticalAlignment="Top" Title="关于联机" Type="RadioBox" FontSize="13"
+                                  LogoScale="1" Logo="lucide:user" />
             </StackPanel>
 
-            <StackPanel x:Name="PanCreate">
-                <local:MyCard x:Name="CardCreate" Margin="0,0,0,15" Title="创建大厅">
-                    <StackPanel Margin="25,38,25,20">
-                        <TextBlock FontSize="13" TextWrapping="Wrap" Margin="0,0,0,6"
-                                   Text="1、进入世界后，在游戏菜单中选择【对局域网开放】，记下聊天栏里的端口号" />
-                        <TextBlock FontSize="13" TextWrapping="Wrap" Margin="0,0,0,6"
-                                   Text="2、在下方填写该端口，单击【创建】" />
-                        <TextBlock FontSize="13" TextWrapping="Wrap" Margin="0,0,0,14"
-                                   Text="3、创建成功后，复制邀请码发送给你的朋友" />
-                        <Grid Height="35">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="1*" />
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <local:MyTextBox x:Name="TextHostPort" FontFamily="Consolas" VerticalAlignment="Center" MaxHeight="28" Text="25565"
-                                             HintText="房主本机 Minecraft 服务器的端口，默认 25565" />
-                            <local:MyButton x:Name="BtnResetPort" Grid.Column="1" MinWidth="70" Margin="10,0,0,0" Padding="13,0" Text="默认" />
-                            <local:MyButton x:Name="BtnCreate" Grid.Column="2" MinWidth="80" Margin="8,0,0,0" Padding="13,0"
-                                            Text="创建" ColorType="Highlight" />
-                        </Grid>
-                        <Grid x:Name="PanCode" Visibility="Collapsed" Height="35" Margin="0,10,0,0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="1*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <local:MyTextBox x:Name="TextCode" FontFamily="Consolas" VerticalAlignment="Center" MaxHeight="28" IsReadOnly="True" />
-                            <local:MyButton x:Name="BtnCopyCode" Grid.Column="1" MinWidth="90" Margin="10,0,0,0" Padding="13,0" Text="复制邀请码" />
-                        </Grid>
-                        <Grid x:Name="PanDirect" Visibility="Collapsed" Height="35" Margin="0,10,0,0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="1*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <local:MyTextBox x:Name="TextDirectShow" FontFamily="Consolas" VerticalAlignment="Center" MaxHeight="28" IsReadOnly="True"
-                                             ToolTip="公共中转节点不可用时，好友可凭这条地址直连你" />
-                            <local:MyButton x:Name="BtnCopyDirect" Grid.Column="1" MinWidth="90" Margin="10,0,0,0" Padding="13,0" Text="复制地址" />
-                        </Grid>
-                    </StackPanel>
-                </local:MyCard>
-            </StackPanel>
+            <!-- 右侧内容区：四个面板随导航切换 -->
+            <Grid Grid.Column="1" Margin="14,10,16,10">
 
-            <StackPanel x:Name="PanJoin" Visibility="Collapsed">
-                <local:MyCard x:Name="CardJoin" Margin="0,0,0,15" Title="加入大厅">
-                    <StackPanel Margin="25,38,25,20">
-                        <TextBlock FontSize="13" TextWrapping="Wrap" Margin="0,0,0,6"
-                                   Text="1、在下方输入朋友发送给你的邀请码，单击【加入】" />
-                        <TextBlock FontSize="13" TextWrapping="Wrap" Margin="0,0,0,14"
-                                   Text="2、启动游戏，选择【多人游戏】，在局域网游戏中加入大厅" />
-                        <Grid Height="35">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="1*" />
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <local:MyTextBox x:Name="TextJoinCode" FontFamily="Consolas" VerticalAlignment="Center" MaxHeight="28"
-                                             HintText="邀请码应该长得像这样：K7M3Q9XZB-3HTRA-63C5" />
-                            <local:MyButton x:Name="BtnClear" Grid.Column="1" MinWidth="70" Margin="10,0,0,0" Padding="13,0" Text="清除" />
-                            <local:MyButton x:Name="BtnPaste" Grid.Column="2" MinWidth="70" Margin="8,0,0,0" Padding="13,0" Text="粘贴" />
-                            <local:MyButton x:Name="BtnJoin" Grid.Column="3" MinWidth="80" Margin="8,0,0,0" Padding="13,0"
-                                            Text="加入" ColorType="Highlight" />
-                        </Grid>
-                        <Grid Margin="0,10,0,0" Height="35">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto" SharedSizeGroup="LinkName" />
-                                <ColumnDefinition Width="1*" />
-                            </Grid.ColumnDefinitions>
-                            <TextBlock VerticalAlignment="Center" HorizontalAlignment="Left" Text="直连地址" Margin="0,0,15,0" Opacity="0.85"
-                                       ToolTip="可选。公共中转节点连不上时，填房主给出的 IP:端口" />
-                            <local:MyTextBox x:Name="TextDirect" Grid.Column="1" FontFamily="Consolas" VerticalAlignment="Center" MaxHeight="28"
-                                             HintText="可选，公共节点连不上时填房主的 IP:端口" />
-                        </Grid>
-                        <TextBlock x:Name="LabJoinTip" Margin="0,12,0,0" FontSize="12" TextWrapping="Wrap" Visibility="Collapsed" />
-                    </StackPanel>
-                </local:MyCard>
-            </StackPanel>
+                <!-- 创建大厅 -->
+                <StackPanel x:Name="PanCreate">
+                    <local:MyCard x:Name="CardCreate" Margin="0,0,0,15" Title="创建大厅">
+                        <StackPanel Margin="25,38,25,20">
 
-            <local:MyCard x:Name="CardStatus" Margin="0,0,0,15">
-                <Grid Margin="25,14,25,14">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="1*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <Ellipse x:Name="DotStatus" Width="8" Height="8" VerticalAlignment="Center" Margin="2,0,12,0"
-                             Fill="{DynamicResource ColorBrush1}" />
-                    <TextBlock x:Name="LabStatus" Grid.Column="1" FontSize="13" TextWrapping="Wrap" VerticalAlignment="Center"
-                               Text="未连接" />
-                    <local:MyButton x:Name="BtnLeave" Grid.Column="2" MinWidth="90" Margin="12,0,0,0" Padding="13,0"
-                                    Text="退出房间" Visibility="Collapsed" />
-                </Grid>
-            </local:MyCard>
+                            <Grid Margin="0,0,0,10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="1*" />
+                                </Grid.ColumnDefinitions>
+                                <Border Width="24" Height="24" CornerRadius="12" VerticalAlignment="Center"
+                                        Background="{DynamicResource ColorBrush7}">
+                                    <TextBlock Text="1" FontSize="12" FontWeight="Bold" HorizontalAlignment="Center"
+                                               VerticalAlignment="Center" Foreground="{DynamicResource ColorBrush2}" />
+                                </Border>
+                                <TextBlock Grid.Column="1" FontSize="13" TextWrapping="Wrap" VerticalAlignment="Center" Margin="10,0,0,0"
+                                           Text="进入世界后，在游戏菜单中选择【对局域网开放】，记下聊天栏里的端口号" />
+                            </Grid>
 
-            <local:MyCard Margin="0,0,0,10">
-                <StackPanel Margin="25,16,25,16">
-                    <TextBlock FontSize="12" Opacity="0.7" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap"
-                               Text="本功能由 pcl-next 自行实现，网络层使用 EasyTier 公共节点，不依赖第三方账号或大厅服务。" />
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,8,0,0">
-                        <TextBlock FontSize="12" Opacity="0.7" Text="友情链接：" />
-                        <TextBlock x:Name="LinkEasyTier" FontSize="12" Text="EasyTier 工具官网" Cursor="Hand"
-                                   Foreground="{DynamicResource ColorBrush1}" />
-                        <TextBlock FontSize="12" Opacity="0.7" Text=" | " />
-                        <TextBlock x:Name="LinkDocs" FontSize="12" Text="联机方案说明" Cursor="Hand"
-                                   Foreground="{DynamicResource ColorBrush1}" />
-                    </StackPanel>
+                            <Grid Margin="0,0,0,10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="1*" />
+                                </Grid.ColumnDefinitions>
+                                <Border Width="24" Height="24" CornerRadius="12" VerticalAlignment="Center"
+                                        Background="{DynamicResource ColorBrush7}">
+                                    <TextBlock Text="2" FontSize="12" FontWeight="Bold" HorizontalAlignment="Center"
+                                               VerticalAlignment="Center" Foreground="{DynamicResource ColorBrush2}" />
+                                </Border>
+                                <TextBlock Grid.Column="1" FontSize="13" TextWrapping="Wrap" VerticalAlignment="Center" Margin="10,0,0,0"
+                                           Text="在下方填写该端口，单击【创建】" />
+                            </Grid>
+
+                            <Grid Margin="0,0,0,14">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="1*" />
+                                </Grid.ColumnDefinitions>
+                                <Border Width="24" Height="24" CornerRadius="12" VerticalAlignment="Center"
+                                        Background="{DynamicResource ColorBrush7}">
+                                    <TextBlock Text="3" FontSize="12" FontWeight="Bold" HorizontalAlignment="Center"
+                                               VerticalAlignment="Center" Foreground="{DynamicResource ColorBrush2}" />
+                                </Border>
+                                <TextBlock Grid.Column="1" FontSize="13" TextWrapping="Wrap" VerticalAlignment="Center" Margin="10,0,0,0"
+                                           Text="创建成功后，复制邀请码发送给你的朋友" />
+                            </Grid>
+
+                            <Grid Height="35">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="1*" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <local:MyTextBox x:Name="TextHostPort" FontFamily="Consolas" VerticalAlignment="Center" MaxHeight="28" Text="25565"
+                                                 HintText="房主本机 Minecraft 服务器的端口，默认 25565" />
+                                <local:MyButton x:Name="BtnResetPort" Grid.Column="1" MinWidth="70" Margin="10,0,0,0" Padding="13,0" Text="默认" />
+                                <local:MyButton x:Name="BtnCreate" Grid.Column="2" MinWidth="80" Margin="8,0,0,0" Padding="13,0"
+                                                Text="创建" ColorType="Highlight" />
+                            </Grid>
+                            <Grid x:Name="PanCode" Visibility="Collapsed" Height="35" Margin="0,10,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="1*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <local:MyTextBox x:Name="TextCode" FontFamily="Consolas" VerticalAlignment="Center" MaxHeight="28" IsReadOnly="True" />
+                                <local:MyButton x:Name="BtnCopyCode" Grid.Column="1" MinWidth="90" Margin="10,0,0,0" Padding="13,0" Text="复制邀请码" />
+                            </Grid>
+                            <Grid x:Name="PanDirect" Visibility="Collapsed" Height="35" Margin="0,10,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="1*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <local:MyTextBox x:Name="TextDirectShow" FontFamily="Consolas" VerticalAlignment="Center" MaxHeight="28" IsReadOnly="True"
+                                                 ToolTip="公共中转节点不可用时，好友可凭这条地址直连你" />
+                                <local:MyButton x:Name="BtnCopyDirect" Grid.Column="1" MinWidth="90" Margin="10,0,0,0" Padding="13,0" Text="复制地址" />
+                            </Grid>
+                        </StackPanel>
+                    </local:MyCard>
                 </StackPanel>
-            </local:MyCard>
 
-        </StackPanel>
+                <!-- 加入大厅 -->
+                <StackPanel x:Name="PanJoin" Visibility="Collapsed">
+                    <local:MyCard x:Name="CardJoin" Margin="0,0,0,15" Title="加入大厅">
+                        <StackPanel Margin="25,38,25,20">
+
+                            <Grid Margin="0,0,0,10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="1*" />
+                                </Grid.ColumnDefinitions>
+                                <Border Width="24" Height="24" CornerRadius="12" VerticalAlignment="Center"
+                                        Background="{DynamicResource ColorBrush7}">
+                                    <TextBlock Text="1" FontSize="12" FontWeight="Bold" HorizontalAlignment="Center"
+                                               VerticalAlignment="Center" Foreground="{DynamicResource ColorBrush2}" />
+                                </Border>
+                                <TextBlock Grid.Column="1" FontSize="13" TextWrapping="Wrap" VerticalAlignment="Center" Margin="10,0,0,0"
+                                           Text="在下方输入朋友发送给你的邀请码，单击【加入】" />
+                            </Grid>
+
+                            <Grid Margin="0,0,0,14">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="1*" />
+                                </Grid.ColumnDefinitions>
+                                <Border Width="24" Height="24" CornerRadius="12" VerticalAlignment="Center"
+                                        Background="{DynamicResource ColorBrush7}">
+                                    <TextBlock Text="2" FontSize="12" FontWeight="Bold" HorizontalAlignment="Center"
+                                               VerticalAlignment="Center" Foreground="{DynamicResource ColorBrush2}" />
+                                </Border>
+                                <TextBlock Grid.Column="1" FontSize="13" TextWrapping="Wrap" VerticalAlignment="Center" Margin="10,0,0,0"
+                                           Text="启动游戏，选择【多人游戏】，在局域网游戏中加入大厅" />
+                            </Grid>
+
+                            <Grid Height="35">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="1*" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <local:MyTextBox x:Name="TextJoinCode" FontFamily="Consolas" VerticalAlignment="Center" MaxHeight="28"
+                                                 HintText="邀请码应该长得像这样：K7M3Q9XZB-3HTRA-63C5" />
+                                <local:MyButton x:Name="BtnClear" Grid.Column="1" MinWidth="70" Margin="10,0,0,0" Padding="13,0" Text="清除" />
+                                <local:MyButton x:Name="BtnPaste" Grid.Column="2" MinWidth="70" Margin="8,0,0,0" Padding="13,0" Text="粘贴" />
+                                <local:MyButton x:Name="BtnJoin" Grid.Column="3" MinWidth="80" Margin="8,0,0,0" Padding="13,0"
+                                                Text="加入" ColorType="Highlight" />
+                            </Grid>
+                            <Grid Margin="0,10,0,0" Height="35">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" SharedSizeGroup="LinkName" />
+                                    <ColumnDefinition Width="1*" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock VerticalAlignment="Center" HorizontalAlignment="Left" Text="直连地址" Margin="0,0,15,0" Opacity="0.85"
+                                           ToolTip="可选。公共中转节点连不上时，填房主给出的 IP:端口" />
+                                <local:MyTextBox x:Name="TextDirect" Grid.Column="1" FontFamily="Consolas" VerticalAlignment="Center" MaxHeight="28"
+                                                 HintText="可选，公共节点连不上时填房主的 IP:端口" />
+                            </Grid>
+                            <TextBlock x:Name="LabJoinTip" Margin="0,12,0,0" FontSize="12" TextWrapping="Wrap" Visibility="Collapsed" />
+                        </StackPanel>
+                    </local:MyCard>
+                </StackPanel>
+
+                <!-- 连接状态 -->
+                <StackPanel x:Name="PanStatus" Visibility="Collapsed">
+                    <local:MyCard x:Name="CardStatus" Margin="0,0,0,15" Title="当前连接">
+                        <Border Margin="25,30,25,22" CornerRadius="8" Background="{DynamicResource ColorBrush8}">
+                            <Grid Margin="16,12,16,12">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="1*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <Ellipse x:Name="DotStatus" Width="9" Height="9" VerticalAlignment="Center" Margin="2,0,12,0"
+                                         Fill="{DynamicResource ColorBrush1}" />
+                                <TextBlock x:Name="LabStatus" Grid.Column="1" FontSize="13" FontWeight="SemiBold" TextWrapping="Wrap"
+                                           VerticalAlignment="Center" Text="未连接" />
+                                <local:MyButton x:Name="BtnLeave" Grid.Column="2" MinWidth="90" Margin="12,0,0,0" Padding="13,0"
+                                                Text="退出房间" Visibility="Collapsed" />
+                            </Grid>
+                        </Border>
+                    </local:MyCard>
+                </StackPanel>
+
+                <!-- 关于联机 -->
+                <StackPanel x:Name="PanAbout" Visibility="Collapsed">
+                    <local:MyCard Margin="0,0,0,10" Title="关于联机">
+                        <Border Margin="25,30,25,22" CornerRadius="8" Background="{DynamicResource ColorBrush7}">
+                            <StackPanel Margin="16,14,16,14">
+                                <TextBlock FontSize="12" Opacity="0.7" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap"
+                                           Text="本功能由 pcl-next 自行实现，网络层使用 EasyTier 公共节点，不依赖第三方账号或大厅服务。" />
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,8,0,0">
+                                    <TextBlock FontSize="12" Opacity="0.7" Text="友情链接：" />
+                                    <TextBlock x:Name="LinkEasyTier" FontSize="12" Text="EasyTier 工具官网" Cursor="Hand"
+                                               Foreground="{DynamicResource ColorBrush1}" />
+                                    <TextBlock FontSize="12" Opacity="0.7" Text=" | " />
+                                    <TextBlock x:Name="LinkDocs" FontSize="12" Text="联机方案说明" Cursor="Hand"
+                                               Foreground="{DynamicResource ColorBrush1}" />
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+                    </local:MyCard>
+                </StackPanel>
+
+            </Grid>
+        </Grid>
     </local:MyScrollViewer>
 </local:MyPageRight>

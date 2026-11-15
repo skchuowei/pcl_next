@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Media;
 using MeloongCore;
 using MeloongCore.Extensions;
@@ -12,7 +14,7 @@ namespace PCL
     /// <para>
     /// 与上游旧联机页的区别：不再依赖「下载联机模块」加载器链路，也不再读
     /// <c>ModSecret.ServerConfig</c>；所有联机逻辑收敛到 <see cref="ModLinkSession"/>。
-    /// 界面按「加入大厅 / 创建大厅」两段式排布，步骤写在卡片里。
+    /// 界面为「左侧导航 + 右侧面板」双栏布局，导航项与设置页左栏共用同款 MyListItem。
     /// </para>
     /// </summary>
     public partial class PageLinkMain
@@ -28,8 +30,10 @@ namespace PCL
         public PageLinkMain()
         {
             InitializeComponent();
-            this.TabCreate.Click += (_, __) => SelectTab(true);
-            this.TabJoin.Click += (_, __) => SelectTab(false);
+            this.ItemCreate.Check += (p1, p2) => NavCheck((MyListItem)p1);
+            this.ItemJoin.Check += (p1, p2) => NavCheck((MyListItem)p1);
+            this.ItemStatus.Check += (p1, p2) => NavCheck((MyListItem)p1);
+            this.ItemAbout.Check += (p1, p2) => NavCheck((MyListItem)p1);
             this.BtnCreate.Click += (_, __) => CreateRoom();
             this.BtnJoin.Click += (_, __) => JoinFromInput();
             this.BtnLeave.Click += (_, __) => ModLinkSession.Leave();
@@ -106,16 +110,181 @@ namespace PCL
 
         #endregion
 
-        #region 交互
+        #region 导航与面板切换
 
-        /// <summary>切换「创建大厅 / 加入大厅」两个大选项卡。</summary>
-        private void SelectTab(bool isCreate)
+        /// <summary>面板切换动画的分组名，连续点击时用它终止上一轮动画。</summary>
+        private const string PanelAniName = "PageLinkMain PanelChange";
+
+        /// <summary>当前显示的面板序号（0 创建 / 1 加入 / 2 状态 / 3 关于）。</summary>
+        private int _shownPanel = 0;
+
+        // 防重入：SetChecked(true) 对已选中项也会无条件重发 Check 事件，
+        // 若在 Check 回调里再次同步选中态会形成自激递归，导致界面卡死。
+        private bool _updatingPanel;
+
+        private void NavCheck(MyListItem sender)
         {
-            this.PanCreate.Visibility = isCreate ? Visibility.Visible : Visibility.Collapsed;
-            this.PanJoin.Visibility = isCreate ? Visibility.Collapsed : Visibility.Visible;
-            this.TabCreate.ColorType = isCreate ? MyButton.ColorState.Highlight : MyButton.ColorState.Normal;
-            this.TabJoin.ColorType = isCreate ? MyButton.ColorState.Normal : MyButton.ColorState.Highlight;
+            if (_updatingPanel)
+                return;
+            if (sender.Tag is null)
+                return;
+            ShowPanel((int)ModBase.Val(sender.Tag));
         }
+
+        /// <summary>按序号取左侧导航项。</summary>
+        private MyListItem ItemAt(int index)
+        {
+            return index switch
+            {
+                0 => this.ItemCreate,
+                1 => this.ItemJoin,
+                2 => this.ItemStatus,
+                3 => this.ItemAbout,
+                _ => null
+            };
+        }
+
+        /// <summary>按序号取右侧面板。</summary>
+        private FrameworkElement PaneAt(int index)
+        {
+            return index switch
+            {
+                0 => this.PanCreate,
+                1 => this.PanJoin,
+                2 => this.PanStatus,
+                3 => this.PanAbout,
+                _ => null
+            };
+        }
+
+        /// <summary>切换右侧面板：0 创建 / 1 加入 / 2 状态 / 3 关于。</summary>
+        private void ShowPanel(int index)
+        {
+            FrameworkElement target = PaneAt(index);
+            if (target is null)
+                return;
+            // 同步左侧导航选中态（RadioBox 联动会自动取消其余项）。
+            // 仅对未选中项调用 SetChecked：已是选中态时重复 SetChecked(true)
+            // 会无条件再次触发 Check 事件，经 NavCheck 回到本方法造成递归。
+            if (!_updatingPanel)
+            {
+                MyListItem item = ItemAt(index);
+                if (item is not null && !item.Checked)
+                {
+                    _updatingPanel = true;
+                    try
+                    {
+                        item.SetChecked(true, false, false);
+                    }
+                    finally
+                    {
+                        _updatingPanel = false;
+                    }
+                }
+            }
+            if (index == _shownPanel && target.Visibility == Visibility.Visible)
+                return;
+            int oldIndex = _shownPanel;
+            _shownPanel = index;
+            // 未加载完成或用户关闭了动画时直接切换，避免动画起点取到空布局
+            if (!this.IsLoaded || ModAnimation.AniControlEnabled != 0)
+            {
+                HardSwitch(index);
+                return;
+            }
+            AniSwitch(oldIndex, index);
+        }
+
+        /// <summary>不做动画，直接切换。</summary>
+        private void HardSwitch(int index)
+        {
+            ModAnimation.AniStop(PanelAniName);
+            for (int i = 0; i < 4; i++)
+            {
+                FrameworkElement pane = PaneAt(i);
+                if (pane is null)
+                    continue;
+                pane.Visibility = i == index ? Visibility.Visible : Visibility.Collapsed;
+                pane.Opacity = 1d;
+                ResetAnimState(pane);
+            }
+        }
+
+        /// <summary>
+        /// 面板切换动画：旧面板淡出并上移，新面板错峰淡入回位，
+        /// 与主页面切换（MyPageRight.TriggerEnterAnimation）保持一致的手感。
+        /// </summary>
+        private void AniSwitch(int oldIndex, int newIndex)
+        {
+            FrameworkElement newPane = PaneAt(newIndex);
+            FrameworkElement oldPane = PaneAt(oldIndex);
+            if (newPane is null)
+                return;
+            ModAnimation.AniStop(PanelAniName);
+            // 除新旧两个面板外的其余面板直接收起，免得残留上一轮动画状态
+            for (int i = 0; i < 4; i++)
+            {
+                FrameworkElement pane = PaneAt(i);
+                if (pane is null || i == newIndex || i == oldIndex)
+                    continue;
+                pane.Visibility = Visibility.Collapsed;
+                pane.Opacity = 1d;
+                ResetAnimState(pane);
+            }
+            newPane.Visibility = Visibility.Visible;
+            newPane.Opacity = 1d;
+            var ani = new List<ModAnimation.AniData>();
+            int delay = 0;
+            // 旧面板退出
+            if (oldPane is not null && oldPane != newPane && oldPane.Visibility == Visibility.Visible)
+            {
+                foreach (FrameworkElement control in this.GetAllAnimControls(oldPane))
+                {
+                    control.IsHitTestVisible = false;
+                    ani.Add(ModAnimation.AaOpacity(control, -1d, 70, delay));
+                    ani.Add(ModAnimation.AaTranslateY(control, -6d, 70, delay));
+                    delay += 15;
+                }
+                FrameworkElement fading = oldPane;
+                ani.Add(ModAnimation.AaCode(() =>
+                {
+                    fading.Visibility = Visibility.Collapsed;
+                    ResetAnimState(fading);
+                }, 70, true));
+                delay = Math.Max(delay, 40);
+            }
+            // 新面板进入：先把控件归位到 0，再淡入 + 回弹（16 → 0）
+            int enterDelay = delay;
+            foreach (FrameworkElement control in this.GetAllAnimControls(newPane))
+            {
+                control.IsHitTestVisible = true;
+                control.Opacity = 0d;
+                control.RenderTransform = new TranslateTransform(0d, -16d);
+                ani.Add(ModAnimation.AaOpacity(control, 1d, 100, enterDelay, new ModAnimation.AniEaseOutFluent(ModAnimation.AniEasePower.Weak)));
+                ani.Add(ModAnimation.AaTranslateY(control, 5d, 250, enterDelay, new ModAnimation.AniEaseOutFluent()));
+                ani.Add(ModAnimation.AaTranslateY(control, 11d, 350, enterDelay, new ModAnimation.AniEaseOutBack()));
+                enterDelay += 25;
+            }
+            ModAnimation.AniStart(ani, PanelAniName, true);
+        }
+
+        /// <summary>把面板内控件的透明度与位移复位，避免残留上一轮动画状态。</summary>
+        private void ResetAnimState(FrameworkElement pane)
+        {
+            if (pane is null)
+                return;
+            foreach (FrameworkElement control in this.GetAllAnimControls(pane, true))
+            {
+                control.Opacity = 1d;
+                control.IsHitTestVisible = true;
+                if (control.RenderTransform is TranslateTransform)
+                    control.RenderTransform = null;
+            }
+        }
+
+        #endregion
+
+        #region 交互
 
         private void CreateRoom()
         {
@@ -156,7 +325,7 @@ namespace PCL
             }
             _lastCode = cleaned;
             this.TextJoinCode.Text = cleaned;
-            SelectTab(false);
+            ShowPanel(1);
             _ = ModLinkSession.JoinAsync(cleaned, this.TextDirect?.Text);
         }
 
@@ -232,11 +401,11 @@ namespace PCL
             this.BtnJoin.IsEnabled = !active;
             this.BtnLeave.Visibility = active ? Visibility.Visible : Visibility.Collapsed;
 
-            // 有房间时把选项卡切到对应的那一侧
+            // 有房间时把面板切到对应的那一侧
             if (ModLinkSession.CurrentRole == ModLinkSession.Role.Host)
-                SelectTab(true);
+                ShowPanel(0);
             else if (ModLinkSession.CurrentRole == ModLinkSession.Role.Joiner)
-                SelectTab(false);
+                ShowPanel(1);
 
             bool hasCode = ModLinkSession.CurrentRole == ModLinkSession.Role.Host &&
                            stage == ModLinkSession.Stage.Ready &&
