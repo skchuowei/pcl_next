@@ -83,6 +83,11 @@ namespace PCL
         /// <summary>当前使用的大厅参数（建房时按互通设置生成，加入时按邀请码推导）。</summary>
         private static LobbyTarget _target;
 
+        /// <summary>PCL2-CE 协议（Scaffolding）：房主侧服务实例。</summary>
+        private static ModLinkScaffold.Server _scaffoldServer;
+        /// <summary>PCL2-CE 协议（Scaffolding）：加入侧客户端实例。</summary>
+        private static ModLinkScaffold.Client _scaffoldClient;
+
         #endregion
 
         #region 对外操作
@@ -107,6 +112,7 @@ namespace PCL
         {
             try { _cts?.Cancel(); } catch { /* 忽略 */ }
             _cts = null;
+            StopScaffold();
             ModLinkEasyTier.Stop();
             CurrentRole = Role.None;
             CurrentStage = Stage.Idle;
@@ -166,42 +172,67 @@ namespace PCL
         private static async Task StartHostAsync(ushort serverPort, CancellationToken ct)
         {
             HostServerPort = serverPort;
-            // 按「互通目标」生成邀请码与大厅参数（仅 pcl-next / PCL2-CE / 陶瓦）
+            // 按「互通目标」生成邀请码与大厅参数（pcl-next / PCL2-CE（U/ 码）/ 陶瓦）
             (_target, InviteCode) = ModLinkInterop.BuildHost(ModLinkInterop.GetHostKind(), serverPort);
             _networkName = _target.FullNetworkName;
             _networkSecret = _target.NetworkSecret;
             Logger.Info($"联机大厅：{_target.KindName}，网络名 {_target.FullNetworkName}，邀请码 {_target.OriginalCode}");
+            bool scaffold = _target.Kind == LobbyKind.PclCeScaffold;
+            int scaffoldPort = scaffold ? ModLinkEasyTier.FindFreePort() : 0;
             _rpcPort = ModLinkEasyTier.FindFreePort();
             int listenPort = ModLinkEasyTier.FindFreePort();
             List<string> args = BuildBaseArguments(_target, _rpcPort, listenPort);
             args.Add("-i");
             args.Add(_target.OverlayIp);
             args.Add("--hostname");
-            args.Add(GetHostname("Server"));
+            // 对方靠 scaffolding-mc-server-<端口> 认出房主，这个主机名不能换成自定义名
+            args.Add(scaffold ? ModLinkScaffold.HostnamePrefix + scaffoldPort : GetHostname("Server"));
+            if (scaffold)
+            {
+                // 协议端口与 MC 端口都要在对方那份白名单语义里放行
+                args.Add("--tcp-whitelist");
+                args.Add(scaffoldPort.ToString());
+                args.Add("--udp-whitelist");
+                args.Add(scaffoldPort.ToString());
+            }
             args.Add("--tcp-whitelist");
             args.Add(serverPort.ToString());
             args.Add("--udp-whitelist");
             args.Add(serverPort.ToString());
             SetStatus("正在启动联机模块…");
             ModLinkEasyTier.Launch(args);
+            if (scaffold)
+            {
+                // 协议服务先起来，对方一连进来就能查到 MC 端口
+                _scaffoldServer = new ModLinkScaffold.Server(scaffoldPort, serverPort, GetDisplayName());
+                _scaffoldServer.Start();
+            }
             SetStatus("正在等待联机网络就绪…");
             bool alive = await WaitAsync(() => ModLinkEasyTier.IsNodeAliveAsync(_rpcPort, ct), 30, ct).ConfigureAwait(false);
             if (!alive)
                 throw new Exception("联机模块启动超时，可能是端口被占用或本机网络受限");
             HostDirectAddress = GetLanAddress() + ":" + listenPort;
             CurrentStage = Stage.Ready;
-            SetStatus($"房间已创建（{_target.KindName}，服务器端口 {serverPort}）。把邀请码发给好友即可加入。");
+            if (scaffold)
+                SetStatus($"房间已创建（{_target.KindName}，U/ 码，MC 端口 {serverPort}）。把这张 U/ 码发给 PCL2-CE 好友即可加入，端口由双方协议自动协商。");
+            else
+                SetStatus($"房间已创建（{_target.KindName}，服务器端口 {serverPort}）。把邀请码发给好友即可加入。");
             // 公共节点不可用时给一句提示，避免误以为好友一定能连进来
             await Task.Delay(6000, ct).ConfigureAwait(false);
             int peers = await ModLinkEasyTier.GetPeerCountAsync(_rpcPort, ct).ConfigureAwait(false);
-            if (CurrentStage == Stage.Ready && peers == 0)
+            if (CurrentStage == Stage.Ready && peers == 0 && !scaffold)
                 SetStatus($"房间已创建（{_target.KindName}，服务器端口 {serverPort}）。当前尚未连上任何公共节点，若好友加不进来，请改用直连地址 {HostDirectAddress}。");
         }
 
         private static async Task StartJoinerAsync(string code, CancellationToken ct)
         {
-            // 码内可能不带端口（PCL2-CE 的 U/ 码），此时借用「直连地址」里填的端口
             _target = ModLinkInterop.Parse(code, GetDirectPort());
+            if (_target.Kind == LobbyKind.PclCeScaffold)
+            {
+                await StartScaffoldJoinerAsync(ct).ConfigureAwait(false);
+                return;
+            }
+            // 其余几类码都把端口写在码里
             if (_target.Port == 0)
                 throw new Exception("这张邀请码不含服务器端口，请在「直连地址」里填 房主IP:端口 后再加入");
             _networkName = _target.FullNetworkName;
@@ -230,6 +261,106 @@ namespace PCL
                 throw new Exception("45 秒内没有连上房主，请确认邀请码是否最新，以及双方网络能否访问 EasyTier 公共节点");
             CurrentStage = Stage.Ready;
             SetStatus($"已加入房间（{_target.KindName}）。在游戏里连接 127.0.0.1:{LocalJoinPort} 即可进入房主的服务器。");
+        }
+
+        /// <summary>
+        /// 用 PCL2-CE 的 U/ 码加入：U/ 码里没有端口，端口要向房主的 Scaffolding 服务问。
+        /// 流程：先连进对方网络 → 从对方主机名拿到协议端口 → 问出 MC 端口 → 再把 MC 端口转发到本地。
+        /// </summary>
+        private static async Task StartScaffoldJoinerAsync(CancellationToken ct)
+        {
+            _networkName = _target.FullNetworkName;
+            _networkSecret = _target.NetworkSecret;
+            Logger.Info($"联机大厅：{_target.KindName}，网络名 {_target.FullNetworkName}，邀请码 {_target.OriginalCode}");
+            _rpcPort = ModLinkEasyTier.FindFreePort();
+            int listenPort = ModLinkEasyTier.FindFreePort();
+            LocalJoinPort = ModLinkEasyTier.FindFreePort();
+            int localScaffoldPort = ModLinkEasyTier.FindFreePort();
+            List<string> args = BuildBaseArguments(_target, _rpcPort, listenPort);
+            args.Add("-d");
+            args.Add("--hostname");
+            args.Add(GetHostname("Client"));
+            args.Add("--tcp-whitelist");
+            args.Add("0");
+            args.Add("--udp-whitelist");
+            args.Add("0");
+            SetStatus($"正在启动联机模块并连接房主（{_target.KindName}）…");
+            ModLinkEasyTier.Launch(args);
+            SetStatus("正在等待房主进入网络…");
+            (string Ip, int ScaffoldPort)? host = await WaitForHostAsync(45, ct).ConfigureAwait(false);
+            if (host is null)
+                throw new Exception("45 秒内没有找到房主，请确认这张 U/ 码是否最新，以及双方网络能否访问 EasyTier 公共节点");
+            SetStatus("已找到房主，正在查询服务器端口…");
+            try
+            {
+                await ModLinkEasyTier.AddPortForwardAsync(_rpcPort, "tcp", localScaffoldPort, host.Value.Ip, host.Value.ScaffoldPort, ct).ConfigureAwait(false);
+                _scaffoldClient = new ModLinkScaffold.Client();
+                _scaffoldClient.Connect("127.0.0.1", localScaffoldPort, GetDisplayName());
+                ushort mcPort = _scaffoldClient.GetServerPort();
+                if (mcPort == 0)
+                    throw new Exception("房主没有给出有效的服务器端口");
+                HostServerPort = mcPort;
+                SetStatus($"房主服务器端口为 {mcPort}，正在建立游戏端口转发…");
+                await ModLinkEasyTier.AddPortForwardAsync(_rpcPort, "tcp", LocalJoinPort, host.Value.Ip, mcPort, ct).ConfigureAwait(false);
+                await ModLinkEasyTier.AddPortForwardAnyAsync(_rpcPort, "udp", LocalJoinPort, host.Value.Ip, mcPort, ct).ConfigureAwait(false);
+            }
+            catch
+            {
+                StopScaffold();
+                throw;
+            }
+            CurrentStage = Stage.Ready;
+            SetStatus($"已加入房间（{_target.KindName}，房主 MC 端口 {HostServerPort}）。在游戏里连接 127.0.0.1:{LocalJoinPort} 即可进入房主的服务器。");
+        }
+
+        private static async Task<(string Ip, int ScaffoldPort)?> WaitForHostAsync(int timeoutSeconds, CancellationToken ct)
+        {
+            DateTime deadline = DateTime.UtcNow.AddSeconds(timeoutSeconds);
+            while (DateTime.UtcNow < deadline)
+            {
+                ct.ThrowIfCancellationRequested();
+                try
+                {
+                    (string Ip, int ScaffoldPort)? host = await ModLinkEasyTier.FindScaffoldHostAsync(_rpcPort, ct).ConfigureAwait(false);
+                    if (host is not null)
+                        return host;
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch
+                {
+                    // 查询失败继续等
+                }
+                await Task.Delay(1000, ct).ConfigureAwait(false);
+            }
+            return null;
+        }
+
+        private static void StopScaffold()
+        {
+            ModLinkScaffold.Server server = _scaffoldServer;
+            _scaffoldServer = null;
+            if (server is not null)
+            {
+                try { server.Dispose(); } catch { /* 忽略 */ }
+            }
+            ModLinkScaffold.Client client = _scaffoldClient;
+            _scaffoldClient = null;
+            if (client is not null)
+            {
+                try { client.Dispose(); } catch { /* 忽略 */ }
+            }
+        }
+
+        /// <summary>联机大厅里显示给对方的玩家名（沿用「显示名」设置）。</summary>
+        private static string GetDisplayName()
+        {
+            string custom = (Settings.Get<string>("LinkUsername") ?? "").Trim();
+            if (!string.IsNullOrEmpty(custom))
+                return custom;
+            return "pcl-next-" + ModBase.Identify;
         }
 
         /// <summary>从「直连地址」（可带 tcp:// 前缀）里取端口，取不到返回 0。</summary>
@@ -277,9 +408,15 @@ namespace PCL
             {
                 args.Add("--enable-quic-proxy");
                 args.Add("--enable-kcp-proxy");
-                args.Add("--use-smoltcp");
+                // PCL2-CE 的 Scaffolding 大厅走 no-tun + 端口白名单 + 端口转发，
+                // 不用用户态协议栈；加了 --use-smoltcp 反而会让 127.0.0.1 的转发建不起来
+                if (target.Kind != LobbyKind.PclCeScaffold)
+                    args.Add("--use-smoltcp");
                 args.Add("--multi-thread");
             }
+            // Scaffolding 大厅只走 P2P 数据通道（与对方一致）
+            if (target.Kind == LobbyKind.PclCeScaffold)
+                args.Add("--p2p-only");
             if (Settings.Get<int>("LinkLatencyMode") == 1)
                 args.Add("--latency-first");
             // 联机设置：允许系统打洞 / 启用 IPv6（不勾选时才加对应的禁用开关）

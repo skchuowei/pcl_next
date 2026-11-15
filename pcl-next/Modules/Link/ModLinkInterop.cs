@@ -84,6 +84,11 @@ namespace PCL
         public const string TerracottaNetworkPrefix = "terracotta-mc-";
         /// <summary>PCL2-CE Scaffolding 大厅的网络名前缀。</summary>
         public const string ScaffoldNetworkPrefix = "scaffolding-mc-";
+        /// <summary>
+        /// PCL2-CE Scaffolding 房主的 EasyTier 主机名前缀。对方靠这个前缀认出房主，
+        /// 并把前缀之后的数字当作 Scaffolding 服务端口（`hostname[22..]`）。
+        /// </summary>
+        public const string ScaffoldHostnamePrefix = "scaffolding-mc-server-";
 
         /// <summary>PCL2-CE 数字码用的 Base32 字符表（无 0/1/I/O）。</summary>
         private const string Base32Chars = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
@@ -115,15 +120,20 @@ namespace PCL
             }
             return value switch
             {
-                1 => LobbyKind.PclCe,
+                // 设置项 1 仍是「PCL2-CE 大厅」，但 PCL2-CE 现行建房码是 Scaffolding 的 U/ 码，
+                // 旧数字码只保留解析能力（历史上的码仍能被认出），不再生成。
+                1 => LobbyKind.PclCeScaffold,
                 2 => LobbyKind.Terracotta,
                 _ => LobbyKind.PclNext
             };
         }
 
         /// <summary>
-        /// 生成房主侧的大厅参数与邀请码（只支持 PclNext / PclCe / Terracotta；
-        /// Scaffolding 码要配对方中心服务才有意义，故不生成）。
+        /// 生成房主侧的大厅参数与邀请码（支持 PclNext / PclCeScaffold / Terracotta）。
+        /// <para>
+        /// PCL2-CE 的现行建房码是 Scaffolding 的 U/ 码（网名与密钥都从码里切出来，码内不含端口），
+        /// 所以这里也生成同构的 U/ 码；旧数字码只在解析侧保留。
+        /// </para>
         /// </summary>
         /// <param name="kind">互通目标。</param>
         /// <param name="serverPort">房主本机的 MC 服务器端口。</param>
@@ -134,23 +144,22 @@ namespace PCL
             if (kind == LobbyKind.Terracotta && serverPort < 100)
                 throw new ArgumentException("陶瓦大厅要求服务器端口不小于 100");
 
-            if (kind == LobbyKind.PclCe)
+            if (kind == LobbyKind.PclCeScaffold)
             {
-                string name = RandomDigits(8, true);
-                string secret = RandomDigits(2, false);
-                string ceCode = Base32Encode(BigInteger.Parse(name + secret + serverPort.ToString()));
+                string code = BuildScaffoldCode();
+                string payload = code.Substring(2); // "XXXX-XXXX-XXXX-XXXX"，19 位
                 return (new LobbyTarget
                 {
-                    Kind = LobbyKind.PclCe,
-                    FullNetworkName = CeNetworkNamePrefix + name,
-                    NetworkSecret = CeNetworkSecretPrefix + secret,
+                    Kind = LobbyKind.PclCeScaffold,
+                    FullNetworkName = ScaffoldNetworkPrefix + payload.Substring(0, 9),
+                    NetworkSecret = payload.Substring(10),
                     OverlayIp = CeOverlayIp,
                     Port = serverPort,
-                    EncryptionAlgorithm = "chacha20",
+                    EncryptionAlgorithm = "aes-gcm",
                     Compression = "zstd",
                     CompatFlags = true,
-                    OriginalCode = ceCode
-                }, ceCode);
+                    OriginalCode = code
+                }, code);
             }
 
             if (kind == LobbyKind.Terracotta)
@@ -232,6 +241,9 @@ namespace PCL
 
             return ParseCeLegacy(text);
         }
+
+        /// <summary>从用户输入（可能夹着分享文案）里抽出邀请码本身，四类码都支持。</summary>
+        public static string ExtractCode(string raw) => Normalize(raw);
 
         /// <summary>把邀请码清洗成只剩码本身（从分享文案里挑出候选片段）。</summary>
         private static string Normalize(string raw)
@@ -385,6 +397,42 @@ namespace PCL
         #endregion
 
         #region 编码工具
+
+        /// <summary>
+        /// 生成 PCL2-CE 的 U 码（Scaffolding）：16 位 Base34 小端数值，整体对 7 取模为 0，
+        /// 展示成 <c>U/XXXX-XXXX-XXXX-XXXX</c>。码内不含端口（端口由对方的 Scaffolding 协议索取）。
+        /// </summary>
+        private static string BuildScaffoldCode()
+        {
+            BigInteger max = BigInteger.Pow(Base34Chars.Length, ScaffoldPayloadLength);
+            byte[] buffer = new byte[16];
+            Rng.NextBytes(buffer);
+            BigInteger value = new BigInteger(buffer, true, false) % max;
+            value -= value % 7;
+            if (value <= 0)
+                value = 7;
+
+            int[] values = new int[ScaffoldPayloadLength];
+            BigInteger current = value;
+            for (int i = 0; i < ScaffoldPayloadLength; i++)
+            {
+                values[i] = (int)(current % Base34Chars.Length);
+                current /= Base34Chars.Length;
+            }
+            StringBuilder compact = new StringBuilder(ScaffoldPayloadLength);
+            foreach (int digit in values)
+                compact.Append(Base34Chars[digit]);
+
+            StringBuilder display = new StringBuilder(ScaffoldCodeLength);
+            display.Append("U/");
+            for (int i = 0; i < compact.Length; i++)
+            {
+                if (i > 0 && i % 4 == 0)
+                    display.Append('-');
+                display.Append(compact[i]);
+            }
+            return display.ToString();
+        }
 
         /// <summary>把十进制数编码成 PCL2-CE 的 Base32 邀请码。</summary>
         private static string Base32Encode(BigInteger value)

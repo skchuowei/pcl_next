@@ -159,7 +159,7 @@
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
                                 <local:MyTextBox x:Name="TextJoinCode" FontFamily="Consolas" VerticalAlignment="Center" MaxHeight="28"
-                                                 HintText="pcl-next 短码，或 PCL2-CE / 陶瓦大厅码，自动识别" />
+                                                 HintText="pcl-next 短码、PCL2-CE 的 U/XXXX-XXXX-XXXX-XXXX、陶瓦码，自动识别" />
                                 <local:MyButton x:Name="BtnClear" Grid.Column="1" MinWidth="70" Margin="10,0,0,0" Padding="13,0" Text="清除" />
                                 <local:MyButton x:Name="BtnPaste" Grid.Column="2" MinWidth="70" Margin="8,0,0,0" Padding="13,0" Text="粘贴" />
                                 <local:MyButton x:Name="BtnJoin" Grid.Column="3" MinWidth="80" Margin="8,0,0,0" Padding="13,0"
@@ -173,7 +173,7 @@
                                 <TextBlock VerticalAlignment="Center" HorizontalAlignment="Left" Text="直连地址" Margin="0,0,15,0" Opacity="0.85"
                                            ToolTip="可选。公共中转节点连不上时，填房主给出的 IP:端口" />
                                 <local:MyTextBox x:Name="TextDirect" Grid.Column="1" FontFamily="Consolas" VerticalAlignment="Center" MaxHeight="28"
-                                                 HintText="可选，公共节点连不上时填房主的 IP:端口" />
+                                                 HintText="可选，公共节点连不上时填房主的 IP:端口（U/ 码不用填）" />
                             </Grid>
                             <TextBlock x:Name="LabJoinTip" Margin="0,12,0,0" FontSize="12" TextWrapping="Wrap" Visibility="Collapsed" />
                         </StackPanel>
@@ -238,7 +238,7 @@
                                            ToolTip="在联机网络中标识本机，便于在连接列表里认出自己" />
                                 <local:MyTextBox x:Name="TextNick" Grid.Column="1" VerticalAlignment="Center" MaxHeight="28"
                                                  HintText="留空则使用默认名"
-                                                 ToolTip="留空时自动使用 Server-xxxx / Client-xxxx，其中 xxxx 由本机标识推导" />
+                                                 ToolTip="留空时自动使用 Server-xxxx / Client-xxxx，其中 xxxx 由本机标识推导。互通目标为 PCL2-CE 时，房主的网络主机名固定为 scaffolding-mc-server-端口（对方靠它取端口），这里填的名字只作用于大厅玩家列表" />
                             </Grid>
 
                             <Grid Margin="0,0,0,10" Height="35">
@@ -249,15 +249,15 @@
                                 <TextBlock VerticalAlignment="Center" Text="互通目标" Opacity="0.85"
                                            ToolTip="决定建房时生成的邀请码格式，以及按哪套参数与其它启动器建立联机网络" />
                                 <local:MyComboBox x:Name="ComboInterop" Grid.Column="1" VerticalAlignment="Center" MaxHeight="28"
-                                                  ToolTip="选 PCL2-CE / 陶瓦 时，加密算法、压缩与覆盖地址会自动换成对方那一套">
+                                                  ToolTip="选 PCL2-CE / 陶瓦 时，邀请码格式、加密算法、压缩与覆盖地址都会自动换成对方那一套">
                                     <local:MyComboBoxItem Content="仅 pcl-next（不与其他启动器互通）" />
-                                    <local:MyComboBoxItem Content="PCL2-CE 大厅" />
+                                    <local:MyComboBoxItem Content="PCL2-CE 大厅（U/ 码）" />
                                     <local:MyComboBoxItem Content="陶瓦（Terracotta）" />
                                 </local:MyComboBox>
                             </Grid>
 
                             <local:MyHint Theme="Yellow" Margin="0,0,0,14"
-                                          Text="加入时四种邀请码都会自动识别（pcl-next 短码、PCL2-CE 大厅码、陶瓦码、PCL2-CE 的 U/ 码）；选 PCL2-CE 或陶瓦后，本机建房生成的码与加密参数会一起换成对方那一套，同一张码我们也能加入。对方启动器建房/加入走它自己的大厅服务，所以「对方主动加入我们」仍受其服务限制。" />
+                                          Text="加入时各类邀请码都会自动识别（pcl-next 短码、PCL2-CE 的 U/XXXX-XXXX-XXXX-XXXX、陶瓦码、PCL2-CE 旧数字码）。选 PCL2-CE 后，本机建房生成的也是同构的 U/ 码：码里只有网名与密钥，服务器端口由双方的 Scaffolding 协议自动协商，所以加入的一方不用再手填端口。对方大厅是自托管协议、没有中心服务，同一张 U/ 码我们建房、对方加入，或对方建房、我们加入，都能走通。" />
 
                             <Grid Margin="0,0,0,10" Height="35">
                                 <Grid.ColumnDefinitions>

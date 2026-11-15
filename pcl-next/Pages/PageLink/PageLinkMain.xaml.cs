@@ -423,10 +423,11 @@ namespace PCL
                 ModMain.Hint("请先退出当前房间", ModMain.HintType.Blue);
                 return;
             }
-            string cleaned = ModLinkCodec.ExtractCode(code);
+            // 四类码都要能进（pcl-next 短码 / PCL2-CE 的 U/ 码 / 陶瓦码 / PCL2-CE 旧数字码）
+            string cleaned = ModLinkInterop.ExtractCode(code);
             try
             {
-                ModLinkCodec.Parse(cleaned);
+                ModLinkInterop.Parse(cleaned);
             }
             catch (ArgumentException ex)
             {
@@ -449,7 +450,7 @@ namespace PCL
                     ModMain.Hint("剪贴板里没有文字", ModMain.HintType.Blue);
                     return;
                 }
-                this.TextJoinCode.Text = ModLinkCodec.ExtractCode(clip);
+                this.TextJoinCode.Text = ModLinkInterop.ExtractCode(clip);
             }
             catch (Exception ex)
             {
