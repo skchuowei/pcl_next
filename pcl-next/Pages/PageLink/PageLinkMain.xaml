@@ -159,7 +159,7 @@
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
                                 <local:MyTextBox x:Name="TextJoinCode" FontFamily="Consolas" VerticalAlignment="Center" MaxHeight="28"
-                                                 HintText="邀请码应该长得像这样：K7M3Q9XZB-3HTRA-63C5" />
+                                                 HintText="pcl-next 短码，或 PCL2-CE / 陶瓦大厅码，自动识别" />
                                 <local:MyButton x:Name="BtnClear" Grid.Column="1" MinWidth="70" Margin="10,0,0,0" Padding="13,0" Text="清除" />
                                 <local:MyButton x:Name="BtnPaste" Grid.Column="2" MinWidth="70" Margin="8,0,0,0" Padding="13,0" Text="粘贴" />
                                 <local:MyButton x:Name="BtnJoin" Grid.Column="3" MinWidth="80" Margin="8,0,0,0" Padding="13,0"
@@ -240,6 +240,24 @@
                                                  HintText="留空则使用默认名"
                                                  ToolTip="留空时自动使用 Server-xxxx / Client-xxxx，其中 xxxx 由本机标识推导" />
                             </Grid>
+
+                            <Grid Margin="0,0,0,10" Height="35">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="76" />
+                                    <ColumnDefinition Width="1*" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock VerticalAlignment="Center" Text="互通目标" Opacity="0.85"
+                                           ToolTip="决定建房时生成的邀请码格式，以及按哪套参数与其它启动器建立联机网络" />
+                                <local:MyComboBox x:Name="ComboInterop" Grid.Column="1" VerticalAlignment="Center" MaxHeight="28"
+                                                  ToolTip="选 PCL2-CE / 陶瓦 时，加密算法、压缩与覆盖地址会自动换成对方那一套">
+                                    <local:MyComboBoxItem Content="仅 pcl-next（不与其他启动器互通）" />
+                                    <local:MyComboBoxItem Content="PCL2-CE 大厅" />
+                                    <local:MyComboBoxItem Content="陶瓦（Terracotta）" />
+                                </local:MyComboBox>
+                            </Grid>
+
+                            <local:MyHint Theme="Yellow" Margin="0,0,0,14"
+                                          Text="加入时四种邀请码都会自动识别（pcl-next 短码、PCL2-CE 大厅码、陶瓦码、PCL2-CE 的 U/ 码）；选 PCL2-CE 或陶瓦后，本机建房生成的码与加密参数会一起换成对方那一套，同一张码我们也能加入。对方启动器建房/加入走它自己的大厅服务，所以「对方主动加入我们」仍受其服务限制。" />
 
                             <Grid Margin="0,0,0,10" Height="35">
                                 <Grid.ColumnDefinitions>

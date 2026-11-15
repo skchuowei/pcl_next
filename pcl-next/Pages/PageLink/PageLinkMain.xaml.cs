@@ -44,6 +44,7 @@ namespace PCL
             this.CheckIPv6.Change += (_, __) => SaveLinkSettings();
             this.CheckCliOutput.Change += (_, __) => SaveLinkSettings();
             this.ComboProtocol.SelectionChanged += (_, __) => SaveLinkSettings();
+            this.ComboInterop.SelectionChanged += (_, __) => SaveLinkSettings();
             this.TextNick.LostFocus += (_, __) => SaveLinkSettings();
             this.TextCustomPeer.LostFocus += (_, __) => SaveLinkSettings();
             this.BtnCreate.Click += (_, __) => CreateRoom();
@@ -317,6 +318,7 @@ namespace PCL
             try
             {
                 this.TextNick.Text = Settings.Get<string>("LinkUsername");
+                this.ComboInterop.SelectedIndex = Math.Clamp(Settings.Get<int>("LinkInteropTarget"), 0, 2);
                 this.ComboProtocol.SelectedIndex = Settings.Get<int>("LinkProtocolPreference") >= 1 ? 1 : 0;
                 this.CheckLatency.Checked = Settings.Get<int>("LinkLatencyMode") == 1;
                 this.CheckPunch.Checked = Settings.Get<bool>("LinkTryPunchSym");
@@ -346,6 +348,9 @@ namespace PCL
                 int protocol = this.ComboProtocol.SelectedIndex >= 1 ? 1 : 0;
                 if (Settings.Get<int>("LinkProtocolPreference") != protocol)
                     Settings.Set("LinkProtocolPreference", protocol);
+                int interop = this.ComboInterop.SelectedIndex < 0 ? 0 : this.ComboInterop.SelectedIndex;
+                if (Settings.Get<int>("LinkInteropTarget") != interop)
+                    Settings.Set("LinkInteropTarget", interop);
                 int latency = this.CheckLatency.Checked ? 1 : 0;
                 if (Settings.Get<int>("LinkLatencyMode") != latency)
                     Settings.Set("LinkLatencyMode", latency);
@@ -370,7 +375,8 @@ namespace PCL
             foreach (string key in new[]
                      {
                          "LinkUsername", "LinkProtocolPreference", "LinkLatencyMode",
-                         "LinkTryPunchSym", "LinkEnableIPv6", "LinkEnableCliOutput", "LinkCustomPeer"
+                         "LinkTryPunchSym", "LinkEnableIPv6", "LinkEnableCliOutput", "LinkCustomPeer",
+                         "LinkInteropTarget"
                      })
             {
                 try

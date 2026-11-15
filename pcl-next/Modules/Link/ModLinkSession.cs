@@ -40,8 +40,8 @@ namespace PCL
             Failed
         }
 
-        /// <summary>房主在 overlay 里的固定地址（与启动参数 -i 保持一致）。</summary>
-        private const string HostOverlayIp = "10.114.114.114";
+        // 房主在 overlay 里的固定地址不再写死：由 LobbyTarget.OverlayIp 提供
+        // （pcl-next 大厅 10.114.114.114 / PCL2-CE 10.114.51.41 / 陶瓦 10.144.144.1）。
 
         /// <summary>联机是否处于活动状态（准备中、连接中或已就绪）。</summary>
         public static bool IsActive =>
@@ -80,6 +80,8 @@ namespace PCL
         private static string _networkName;
         private static string _networkSecret;
         private static string _directPeer = "";
+        /// <summary>当前使用的大厅参数（建房时按互通设置生成，加入时按邀请码推导）。</summary>
+        private static LobbyTarget _target;
 
         #endregion
 
@@ -115,6 +117,7 @@ namespace PCL
             _directPeer = "";
             _networkName = null;
             _networkSecret = null;
+            _target = null;
             StatusText = "未连接";
             RaiseChanged();
         }
@@ -163,13 +166,16 @@ namespace PCL
         private static async Task StartHostAsync(ushort serverPort, CancellationToken ct)
         {
             HostServerPort = serverPort;
-            (_networkName, _networkSecret) = ModLinkCodec.NewIdentity();
+            // 按「互通目标」生成邀请码与大厅参数（仅 pcl-next / PCL2-CE / 陶瓦）
+            (_target, InviteCode) = ModLinkInterop.BuildHost(ModLinkInterop.GetHostKind(), serverPort);
+            _networkName = _target.FullNetworkName;
+            _networkSecret = _target.NetworkSecret;
+            Logger.Info($"联机大厅：{_target.KindName}，网络名 {_target.FullNetworkName}，邀请码 {_target.OriginalCode}");
             _rpcPort = ModLinkEasyTier.FindFreePort();
             int listenPort = ModLinkEasyTier.FindFreePort();
-            string fullName = ModLinkCodec.NetworkPrefix + _networkName;
-            List<string> args = BuildBaseArguments(fullName, _networkSecret, _rpcPort, listenPort);
+            List<string> args = BuildBaseArguments(_target, _rpcPort, listenPort);
             args.Add("-i");
-            args.Add(HostOverlayIp);
+            args.Add(_target.OverlayIp);
             args.Add("--hostname");
             args.Add(GetHostname("Server"));
             args.Add("--tcp-whitelist");
@@ -182,28 +188,30 @@ namespace PCL
             bool alive = await WaitAsync(() => ModLinkEasyTier.IsNodeAliveAsync(_rpcPort, ct), 30, ct).ConfigureAwait(false);
             if (!alive)
                 throw new Exception("联机模块启动超时，可能是端口被占用或本机网络受限");
-            InviteCode = ModLinkCodec.Build(_networkName, _networkSecret, serverPort);
             HostDirectAddress = GetLanAddress() + ":" + listenPort;
             CurrentStage = Stage.Ready;
-            SetStatus($"房间已创建（服务器端口 {serverPort}）。把邀请码发给好友即可加入。");
+            SetStatus($"房间已创建（{_target.KindName}，服务器端口 {serverPort}）。把邀请码发给好友即可加入。");
             // 公共节点不可用时给一句提示，避免误以为好友一定能连进来
             await Task.Delay(6000, ct).ConfigureAwait(false);
             int peers = await ModLinkEasyTier.GetPeerCountAsync(_rpcPort, ct).ConfigureAwait(false);
             if (CurrentStage == Stage.Ready && peers == 0)
-                SetStatus($"房间已创建（服务器端口 {serverPort}）。当前尚未连上任何公共节点，若好友加不进来，请改用直连地址 {HostDirectAddress}。");
+                SetStatus($"房间已创建（{_target.KindName}，服务器端口 {serverPort}）。当前尚未连上任何公共节点，若好友加不进来，请改用直连地址 {HostDirectAddress}。");
         }
 
         private static async Task StartJoinerAsync(string code, CancellationToken ct)
         {
-            ModLinkCodec.CodeInfo info = ModLinkCodec.Parse(code);
-            _networkName = info.Name;
-            _networkSecret = info.Secret;
-            HostServerPort = info.Port;
+            // 码内可能不带端口（PCL2-CE 的 U/ 码），此时借用「直连地址」里填的端口
+            _target = ModLinkInterop.Parse(code, GetDirectPort());
+            if (_target.Port == 0)
+                throw new Exception("这张邀请码不含服务器端口，请在「直连地址」里填 房主IP:端口 后再加入");
+            _networkName = _target.FullNetworkName;
+            _networkSecret = _target.NetworkSecret;
+            HostServerPort = _target.Port;
+            Logger.Info($"联机大厅：{_target.KindName}，网络名 {_target.FullNetworkName}，房主端口 {_target.Port}");
             _rpcPort = ModLinkEasyTier.FindFreePort();
             int listenPort = ModLinkEasyTier.FindFreePort();
             LocalJoinPort = ModLinkEasyTier.FindFreePort();
-            string fullName = ModLinkCodec.NetworkPrefix + _networkName;
-            List<string> args = BuildBaseArguments(fullName, _networkSecret, _rpcPort, listenPort);
+            List<string> args = BuildBaseArguments(_target, _rpcPort, listenPort);
             args.Add("-d");
             args.Add("--hostname");
             args.Add(GetHostname("Client"));
@@ -212,26 +220,39 @@ namespace PCL
             args.Add("--udp-whitelist");
             args.Add("0");
             args.Add("--port-forward");
-            args.Add($"tcp://127.0.0.1:{LocalJoinPort}/{HostOverlayIp}:{HostServerPort}");
+            args.Add($"tcp://127.0.0.1:{LocalJoinPort}/{_target.OverlayIp}:{_target.Port}");
             args.Add("--port-forward");
-            args.Add($"udp://127.0.0.1:{LocalJoinPort}/{HostOverlayIp}:{HostServerPort}");
-            SetStatus("正在启动联机模块并连接房主…");
+            args.Add($"udp://127.0.0.1:{LocalJoinPort}/{_target.OverlayIp}:{_target.Port}");
+            SetStatus($"正在启动联机模块并连接房主（{_target.KindName}）…");
             ModLinkEasyTier.Launch(args);
             bool connected = await WaitAsync(async () => await ModLinkEasyTier.GetPeerCountAsync(_rpcPort, ct).ConfigureAwait(false) >= 1, 45, ct).ConfigureAwait(false);
             if (!connected)
                 throw new Exception("45 秒内没有连上房主，请确认邀请码是否最新，以及双方网络能否访问 EasyTier 公共节点");
             CurrentStage = Stage.Ready;
-            SetStatus($"已加入房间。在游戏里连接 127.0.0.1:{LocalJoinPort} 即可进入房主的服务器。");
+            SetStatus($"已加入房间（{_target.KindName}）。在游戏里连接 127.0.0.1:{LocalJoinPort} 即可进入房主的服务器。");
         }
 
-        private static List<string> BuildBaseArguments(string fullNetworkName, string secret, int rpcPort, int listenPort)
+        /// <summary>从「直连地址」（可带 tcp:// 前缀）里取端口，取不到返回 0。</summary>
+        private static ushort GetDirectPort()
+        {
+            string direct = _directPeer ?? "";
+            int scheme = direct.IndexOf("://", StringComparison.Ordinal);
+            if (scheme >= 0)
+                direct = direct.Substring(scheme + 3);
+            int colon = direct.LastIndexOf(':');
+            if (colon <= 0)
+                return 0;
+            return ushort.TryParse(direct.Substring(colon + 1), out ushort port) ? port : (ushort)0;
+        }
+
+        private static List<string> BuildBaseArguments(LobbyTarget target, int rpcPort, int listenPort)
         {
             List<string> args = new List<string>
             {
                 "--no-tun",
-                "--network-name", fullNetworkName,
-                "--network-secret", secret,
-                "--relay-network-whitelist", fullNetworkName,
+                "--network-name", target.FullNetworkName,
+                "--network-secret", target.NetworkSecret,
+                "--relay-network-whitelist", target.FullNetworkName,
                 // 连接对等节点时优先使用的传输协议（联机设置 → 协议偏好）
                 "--default-protocol", Settings.Get<int>("LinkProtocolPreference") >= 1 ? "udp" : "tcp",
                 // 显式只监听 tcp/udp：直接给端口号会让 EasyTier 顺带占用 +1/+2/+3 端口，容易撞车
@@ -240,6 +261,25 @@ namespace PCL
                 "--rpc-portal", "127.0.0.1:" + rpcPort,
                 "--private-mode", "true"
             };
+            // 加密与压缩必须与对等节点一致，否则握手直接失败：由大厅档案决定
+            if (!string.IsNullOrEmpty(target.EncryptionAlgorithm))
+            {
+                args.Add("--encryption-algorithm");
+                args.Add(target.EncryptionAlgorithm);
+            }
+            if (!string.IsNullOrEmpty(target.Compression))
+            {
+                args.Add("--compression");
+                args.Add(target.Compression);
+            }
+            // 兼容其它启动器时补上对方固定的数据流代理开关
+            if (target.CompatFlags)
+            {
+                args.Add("--enable-quic-proxy");
+                args.Add("--enable-kcp-proxy");
+                args.Add("--use-smoltcp");
+                args.Add("--multi-thread");
+            }
             if (Settings.Get<int>("LinkLatencyMode") == 1)
                 args.Add("--latency-first");
             // 联机设置：允许系统打洞 / 启用 IPv6（不勾选时才加对应的禁用开关）
