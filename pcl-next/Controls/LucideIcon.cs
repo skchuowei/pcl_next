@@ -90,6 +90,19 @@ namespace PCL
                 new Element { Kind = Kind.Path, Data = "M12 3v18" },
                 new Element { Kind = Kind.Path, Data = "M3 12h18" },
                 new Element { Kind = Kind.Rect, X = 3, Y = 3, Width = 18, Height = 18, Radius = 2 }
+            },
+            // lucide: sliders —— 三联滑杆，用于「设置」类导航项
+            ["sliders"] = new List<Element>
+            {
+                new Element { Kind = Kind.Path, Data = "M4 21v-7" },
+                new Element { Kind = Kind.Path, Data = "M4 10V3" },
+                new Element { Kind = Kind.Path, Data = "M12 21v-9" },
+                new Element { Kind = Kind.Path, Data = "M12 8V3" },
+                new Element { Kind = Kind.Path, Data = "M20 21v-5" },
+                new Element { Kind = Kind.Path, Data = "M20 12V3" },
+                new Element { Kind = Kind.Path, Data = "M2 14h4" },
+                new Element { Kind = Kind.Path, Data = "M10 8h4" },
+                new Element { Kind = Kind.Path, Data = "M18 16h4" }
             }
         };
 

@@ -29,9 +29,13 @@
                 <local:MyListItem x:Name="ItemAbout" IsScaleAnimationEnabled="False" Tag="3" MinPaddingRight="10"
                                   Height="36" VerticalAlignment="Top" Title="关于联机" Type="RadioBox" FontSize="13"
                                   LogoScale="1" Logo="lucide:user" />
+                <TextBlock Text="高级" FontSize="12" Opacity="0.6" Margin="16,12,5,3" />
+                <local:MyListItem x:Name="ItemSettings" IsScaleAnimationEnabled="False" Tag="4" MinPaddingRight="10"
+                                  Height="36" VerticalAlignment="Top" Title="联机设置" Type="RadioBox" FontSize="13"
+                                  LogoScale="1" Logo="lucide:sliders" />
             </StackPanel>
 
-            <!-- 右侧内容区：四个面板随导航切换 -->
+            <!-- 右侧内容区：五个面板随导航切换 -->
             <Grid Grid.Column="1" Margin="14,10,16,10">
 
                 <!-- 创建大厅 -->
@@ -214,6 +218,68 @@
                                 </StackPanel>
                             </StackPanel>
                         </Border>
+                    </local:MyCard>
+                </StackPanel>
+
+                <!-- 联机设置（设置项对齐 PCL2-CE 的 EasyTier 卡片） -->
+                <StackPanel x:Name="PanSettings" Visibility="Collapsed">
+                    <local:MyCard Margin="0,0,0,15" Title="联机设置">
+                        <StackPanel Margin="25,38,25,20">
+
+                            <local:MyHint Theme="Blue" Margin="0,0,0,14"
+                                          Text="以下设置会在下一次创建或加入大厅时生效；正在联机时修改不会影响当前房间。" />
+
+                            <Grid Margin="0,0,0,10" Height="35">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="76" />
+                                    <ColumnDefinition Width="1*" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock VerticalAlignment="Center" Text="显示名" Opacity="0.85"
+                                           ToolTip="在联机网络中标识本机，便于在连接列表里认出自己" />
+                                <local:MyTextBox x:Name="TextNick" Grid.Column="1" VerticalAlignment="Center" MaxHeight="28"
+                                                 HintText="留空则使用默认名"
+                                                 ToolTip="留空时自动使用 Server-xxxx / Client-xxxx，其中 xxxx 由本机标识推导" />
+                            </Grid>
+
+                            <Grid Margin="0,0,0,10" Height="35">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="76" />
+                                    <ColumnDefinition Width="1*" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock VerticalAlignment="Center" Text="协议偏好" Opacity="0.85"
+                                           ToolTip="连接对等节点时优先使用的传输协议" />
+                                <local:MyComboBox x:Name="ComboProtocol" Grid.Column="1" VerticalAlignment="Center" MaxHeight="28"
+                                                  ToolTip="TCP 更稳定；UDP 在部分 NAT 环境下穿透更积极">
+                                    <local:MyComboBoxItem Content="TCP（更稳定）" />
+                                    <local:MyComboBoxItem Content="UDP（穿透更积极）" />
+                                </local:MyComboBox>
+                            </Grid>
+
+                            <local:MyCheckBox x:Name="CheckLatency" Height="22" Margin="-1,0,0,8" Text="低延迟优先"
+                                              ToolTip="优先选择延迟最低的路径，而不是带宽最大的路径（latency-first）" />
+                            <local:MyCheckBox x:Name="CheckPunch" Height="22" Margin="-1,0,0,8" Text="允许系统进行端口打洞"
+                                              ToolTip="取消勾选后统一走中继（disable-sys-hole-punching）。对称 NAT 下打洞容易失败时，可以试着关掉" />
+                            <local:MyCheckBox x:Name="CheckIPv6" Height="22" Margin="-1,0,0,8" Text="启用 IPv6"
+                                              ToolTip="取消勾选后只使用 IPv4 连接对等节点（disable-ipv6）" />
+                            <local:MyCheckBox x:Name="CheckCliOutput" Height="22" Margin="-1,0,0,14" Text="在日志中记录联机模块输出"
+                                              ToolTip="排查联机问题时建议保持勾选；关闭后只记录错误行" />
+
+                            <Grid Height="35">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="76" />
+                                    <ColumnDefinition Width="1*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock VerticalAlignment="Center" Text="自定义节点" Opacity="0.85"
+                                           ToolTip="自建或第三方的 EasyTier 公共中转节点" />
+                                <local:MyTextBox x:Name="TextCustomPeer" Grid.Column="1" VerticalAlignment="Center" MaxHeight="28"
+                                                 HintText="留空则使用内置公共节点" />
+                                <local:MyButton x:Name="BtnResetLink" Grid.Column="2" MinWidth="90" Margin="10,0,0,0" Padding="13,0"
+                                                Text="恢复默认" />
+                            </Grid>
+                            <TextBlock Margin="76,8,0,0" FontSize="12" Opacity="0.7" TextWrapping="Wrap"
+                                       Text="多个节点用英文分号分隔，例如 tcp://my-node.example.com:11010。填了就只连这些节点，不再使用内置公共节点。" />
+                        </StackPanel>
                     </local:MyCard>
                 </StackPanel>
 

@@ -22,6 +22,9 @@ namespace PCL
 
         private static string _lastCode = "";
 
+        /// <summary>上一次刷新时看到的联机会话角色，用于判断是否需要自动切面板。</summary>
+        private ModLinkSession.Role _lastRole = ModLinkSession.Role.None;
+
         private static readonly SolidColorBrush BrushOk = new SolidColorBrush(Color.FromRgb(0x35, 0xA1, 0x73));
         private static readonly SolidColorBrush BrushFail = new SolidColorBrush(Color.FromRgb(0xE0, 0x5A, 0x5A));
         private static readonly SolidColorBrush BrushBusy = new SolidColorBrush(Color.FromRgb(0x2E, 0x7C, 0xD7));
@@ -34,6 +37,15 @@ namespace PCL
             this.ItemJoin.Check += (p1, p2) => NavCheck((MyListItem)p1);
             this.ItemStatus.Check += (p1, p2) => NavCheck((MyListItem)p1);
             this.ItemAbout.Check += (p1, p2) => NavCheck((MyListItem)p1);
+            this.ItemSettings.Check += (p1, p2) => NavCheck((MyListItem)p1);
+            this.BtnResetLink.Click += (_, __) => ResetLinkSettings();
+            this.CheckLatency.Change += (_, __) => SaveLinkSettings();
+            this.CheckPunch.Change += (_, __) => SaveLinkSettings();
+            this.CheckIPv6.Change += (_, __) => SaveLinkSettings();
+            this.CheckCliOutput.Change += (_, __) => SaveLinkSettings();
+            this.ComboProtocol.SelectionChanged += (_, __) => SaveLinkSettings();
+            this.TextNick.LostFocus += (_, __) => SaveLinkSettings();
+            this.TextCustomPeer.LostFocus += (_, __) => SaveLinkSettings();
             this.BtnCreate.Click += (_, __) => CreateRoom();
             this.BtnJoin.Click += (_, __) => JoinFromInput();
             this.BtnLeave.Click += (_, __) => ModLinkSession.Leave();
@@ -55,7 +67,11 @@ namespace PCL
                     CreateRoom();
             };
             ModLinkSession.Changed += RefreshUi;
-            this.Loaded += (_, __) => RefreshUi();
+            this.Loaded += (_, __) =>
+            {
+                LoadLinkSettings();
+                RefreshUi();
+            };
             this.Unloaded += (_, __) => ModLinkSession.Changed -= RefreshUi;
         }
 
@@ -115,7 +131,10 @@ namespace PCL
         /// <summary>面板切换动画的分组名，连续点击时用它终止上一轮动画。</summary>
         private const string PanelAniName = "PageLinkMain PanelChange";
 
-        /// <summary>当前显示的面板序号（0 创建 / 1 加入 / 2 状态 / 3 关于）。</summary>
+        /// <summary>面板总数（0 创建 / 1 加入 / 2 状态 / 3 关于 / 4 设置）。</summary>
+        private const int PanelCount = 5;
+
+        /// <summary>当前显示的面板序号。</summary>
         private int _shownPanel = 0;
 
         // 防重入：SetChecked(true) 对已选中项也会无条件重发 Check 事件，
@@ -140,6 +159,7 @@ namespace PCL
                 1 => this.ItemJoin,
                 2 => this.ItemStatus,
                 3 => this.ItemAbout,
+                4 => this.ItemSettings,
                 _ => null
             };
         }
@@ -153,11 +173,12 @@ namespace PCL
                 1 => this.PanJoin,
                 2 => this.PanStatus,
                 3 => this.PanAbout,
+                4 => this.PanSettings,
                 _ => null
             };
         }
 
-        /// <summary>切换右侧面板：0 创建 / 1 加入 / 2 状态 / 3 关于。</summary>
+        /// <summary>切换右侧面板：0 创建 / 1 加入 / 2 状态 / 3 关于 / 4 设置。</summary>
         private void ShowPanel(int index)
         {
             FrameworkElement target = PaneAt(index);
@@ -199,7 +220,7 @@ namespace PCL
         private void HardSwitch(int index)
         {
             ModAnimation.AniStop(PanelAniName);
-            for (int i = 0; i < 4; i++)
+            for (int i = 0; i < PanelCount; i++)
             {
                 FrameworkElement pane = PaneAt(i);
                 if (pane is null)
@@ -222,7 +243,7 @@ namespace PCL
                 return;
             ModAnimation.AniStop(PanelAniName);
             // 除新旧两个面板外的其余面板直接收起，免得残留上一轮动画状态
-            for (int i = 0; i < 4; i++)
+            for (int i = 0; i < PanelCount; i++)
             {
                 FrameworkElement pane = PaneAt(i);
                 if (pane is null || i == newIndex || i == oldIndex)
@@ -280,6 +301,89 @@ namespace PCL
                 if (control.RenderTransform is TranslateTransform)
                     control.RenderTransform = null;
             }
+        }
+
+        #endregion
+
+        #region 联机设置
+
+        // 加载设置时置位，避免把「读取」误当成用户改动又写回去
+        private bool _loadingSettings;
+
+        /// <summary>把 Settings 里的联机设置值填进各控件。</summary>
+        private void LoadLinkSettings()
+        {
+            _loadingSettings = true;
+            try
+            {
+                this.TextNick.Text = Settings.Get<string>("LinkUsername");
+                this.ComboProtocol.SelectedIndex = Settings.Get<int>("LinkProtocolPreference") >= 1 ? 1 : 0;
+                this.CheckLatency.Checked = Settings.Get<int>("LinkLatencyMode") == 1;
+                this.CheckPunch.Checked = Settings.Get<bool>("LinkTryPunchSym");
+                this.CheckIPv6.Checked = Settings.Get<bool>("LinkEnableIPv6");
+                this.CheckCliOutput.Checked = Settings.Get<bool>("LinkEnableCliOutput");
+                this.TextCustomPeer.Text = Settings.Get<string>("LinkCustomPeer");
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn(ex, "读取联机设置失败");
+            }
+            finally
+            {
+                _loadingSettings = false;
+            }
+        }
+
+        /// <summary>把控件当前值写回 Settings（下一次建连时生效）。</summary>
+        private void SaveLinkSettings()
+        {
+            if (_loadingSettings || !this.IsLoaded)
+                return;
+            try
+            {
+                if (Settings.Get<string>("LinkUsername") != this.TextNick.Text.Trim())
+                    Settings.Set("LinkUsername", this.TextNick.Text.Trim());
+                int protocol = this.ComboProtocol.SelectedIndex >= 1 ? 1 : 0;
+                if (Settings.Get<int>("LinkProtocolPreference") != protocol)
+                    Settings.Set("LinkProtocolPreference", protocol);
+                int latency = this.CheckLatency.Checked ? 1 : 0;
+                if (Settings.Get<int>("LinkLatencyMode") != latency)
+                    Settings.Set("LinkLatencyMode", latency);
+                if (Settings.Get<bool>("LinkTryPunchSym") != this.CheckPunch.Checked)
+                    Settings.Set("LinkTryPunchSym", this.CheckPunch.Checked);
+                if (Settings.Get<bool>("LinkEnableIPv6") != this.CheckIPv6.Checked)
+                    Settings.Set("LinkEnableIPv6", this.CheckIPv6.Checked);
+                if (Settings.Get<bool>("LinkEnableCliOutput") != this.CheckCliOutput.Checked)
+                    Settings.Set("LinkEnableCliOutput", this.CheckCliOutput.Checked);
+                if (Settings.Get<string>("LinkCustomPeer") != this.TextCustomPeer.Text.Trim())
+                    Settings.Set("LinkCustomPeer", this.TextCustomPeer.Text.Trim());
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn(ex, "保存联机设置失败");
+            }
+        }
+
+        /// <summary>把联机设置恢复成默认值，并刷新控件显示。</summary>
+        private void ResetLinkSettings()
+        {
+            foreach (string key in new[]
+                     {
+                         "LinkUsername", "LinkProtocolPreference", "LinkLatencyMode",
+                         "LinkTryPunchSym", "LinkEnableIPv6", "LinkEnableCliOutput", "LinkCustomPeer"
+                     })
+            {
+                try
+                {
+                    Settings.Reset(key);
+                }
+                catch (Exception ex)
+                {
+                    Logger.Warn(ex, "重置联机设置失败（" + key + "）");
+                }
+            }
+            LoadLinkSettings();
+            ModMain.Hint("联机设置已恢复默认", ModMain.HintType.Green);
         }
 
         #endregion
@@ -401,11 +505,17 @@ namespace PCL
             this.BtnJoin.IsEnabled = !active;
             this.BtnLeave.Visibility = active ? Visibility.Visible : Visibility.Collapsed;
 
-            // 有房间时把面板切到对应的那一侧
-            if (ModLinkSession.CurrentRole == ModLinkSession.Role.Host)
-                ShowPanel(0);
-            else if (ModLinkSession.CurrentRole == ModLinkSession.Role.Joiner)
-                ShowPanel(1);
+            // 有房间时把面板切到对应的那一侧：只在角色发生变化时切，
+            // 否则用户停留在「连接状态 / 关于联机 / 联机设置」时会被每次状态刷新拽回创建或加入面板
+            ModLinkSession.Role role = ModLinkSession.CurrentRole;
+            if (role != _lastRole)
+            {
+                _lastRole = role;
+                if (role == ModLinkSession.Role.Host)
+                    ShowPanel(0);
+                else if (role == ModLinkSession.Role.Joiner)
+                    ShowPanel(1);
+            }
 
             bool hasCode = ModLinkSession.CurrentRole == ModLinkSession.Role.Host &&
                            stage == ModLinkSession.Stage.Ready &&

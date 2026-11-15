@@ -214,9 +214,11 @@ namespace PCL
             foreach (string arg in arguments)
                 info.ArgumentList.Add(arg);
             Process process = new Process { StartInfo = info, EnableRaisingEvents = true };
+            // 联机设置 → 是否把联机模块的普通输出写进启动器日志（错误行始终记录）
+            bool logOutput = Settings.Get<bool>("LinkEnableCliOutput");
             process.OutputDataReceived += (_, e) =>
             {
-                if (!string.IsNullOrWhiteSpace(e.Data))
+                if (logOutput && !string.IsNullOrWhiteSpace(e.Data))
                     Logger.Info("[联机] " + e.Data.Trim());
             };
             process.ErrorDataReceived += (_, e) =>

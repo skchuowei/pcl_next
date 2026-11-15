@@ -171,7 +171,7 @@ namespace PCL
             args.Add("-i");
             args.Add(HostOverlayIp);
             args.Add("--hostname");
-            args.Add("Server-" + ModBase.Identify.GetStableHashCode().ToString("X").TrimStart('-'));
+            args.Add(GetHostname("Server"));
             args.Add("--tcp-whitelist");
             args.Add(serverPort.ToString());
             args.Add("--udp-whitelist");
@@ -206,7 +206,7 @@ namespace PCL
             List<string> args = BuildBaseArguments(fullName, _networkSecret, _rpcPort, listenPort);
             args.Add("-d");
             args.Add("--hostname");
-            args.Add("Client-" + ModBase.Identify.GetStableHashCode().ToString("X").TrimStart('-'));
+            args.Add(GetHostname("Client"));
             args.Add("--tcp-whitelist");
             args.Add("0");
             args.Add("--udp-whitelist");
@@ -232,6 +232,8 @@ namespace PCL
                 "--network-name", fullNetworkName,
                 "--network-secret", secret,
                 "--relay-network-whitelist", fullNetworkName,
+                // 连接对等节点时优先使用的传输协议（联机设置 → 协议偏好）
+                "--default-protocol", Settings.Get<int>("LinkProtocolPreference") >= 1 ? "udp" : "tcp",
                 // 显式只监听 tcp/udp：直接给端口号会让 EasyTier 顺带占用 +1/+2/+3 端口，容易撞车
                 "--listeners", "tcp://0.0.0.0:" + listenPort,
                 "--listeners", "udp://0.0.0.0:" + listenPort,
@@ -240,6 +242,11 @@ namespace PCL
             };
             if (Settings.Get<int>("LinkLatencyMode") == 1)
                 args.Add("--latency-first");
+            // 联机设置：允许系统打洞 / 启用 IPv6（不勾选时才加对应的禁用开关）
+            if (!Settings.Get<bool>("LinkTryPunchSym"))
+                args.Add("--disable-sys-hole-punching");
+            if (!Settings.Get<bool>("LinkEnableIPv6"))
+                args.Add("--disable-ipv6");
             string direct = _directPeer;
             if (!string.IsNullOrWhiteSpace(direct))
             {
@@ -254,6 +261,17 @@ namespace PCL
                 args.Add(peer);
             }
             return args;
+        }
+
+        /// <summary>
+        /// 联机节点显示名：优先用设置里的「显示名」，留空则按角色 + 本机标识生成。
+        /// </summary>
+        private static string GetHostname(string role)
+        {
+            string custom = (Settings.Get<string>("LinkUsername") ?? "").Trim();
+            if (!string.IsNullOrEmpty(custom))
+                return custom.Length > 63 ? custom.Substring(0, 63) : custom;
+            return role + "-" + ModBase.Identify.GetStableHashCode().ToString("X").TrimStart('-');
         }
 
         private static string GetLanAddress()
