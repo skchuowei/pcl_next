@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -181,15 +182,69 @@ namespace PCL
         /// <summary>本机在联机大厅里的机器识别码（踢人、去重都靠它）。</summary>
         public static string GetMachineId()
         {
+            string id;
             try
             {
-                string id = ModBase.Identify;
-                return string.IsNullOrWhiteSpace(id) ? "pcl-next-unknown" : id;
+                id = ModBase.Identify;
             }
             catch
             {
-                return "pcl-next-unknown";
+                id = "";
             }
+
+            // 上游 Account 侧的 Identify 在本构建里还是桩，固定返回 0000-0000-0000-0000；
+            // 直接拿它当机器码会让所有人撞成同一个 ID（踢人、去重全失效），所以落盘自造一个。
+            if (string.IsNullOrWhiteSpace(id) || id.Replace("-", "").Trim('0').Length == 0) id = LoadOrCreateLocalMachineId();
+            return string.IsNullOrWhiteSpace(id) ? "pcl-next-unknown" : id;
+        }
+
+        /// <summary>持久化的本机识别码：首取生成、之后复用，形如 ABCD-EFGH-JKLM-NPQR。</summary>
+        private static string LoadOrCreateLocalMachineId()
+        {
+            const string Chars = "0123456789ABCDEFGHJKMNPQRSTUVWXYZ";
+            string file = Paths.AppDataThenName + @"Link\machine-id";
+            try
+            {
+                if (File.Exists(file))
+                {
+                    string cached = File.ReadAllText(file).Trim();
+                    if (!string.IsNullOrEmpty(cached) && cached.Replace("-", "").Trim('0').Length > 0) return cached;
+                }
+            }
+            catch
+            {
+                // 读不出来就当场造一个，不因为缓存文件坏了把整个建房流程卡死
+            }
+
+            var raw = new byte[16];
+            try
+            {
+                using var rng = RandomNumberGenerator.Create();
+                rng.GetBytes(raw);
+            }
+            catch
+            {
+                for (int i = 0; i < raw.Length; i++) raw[i] = (byte)(i * 37 + 11);
+            }
+
+            var mid = new StringBuilder(19);
+            for (int i = 0; i < 16; i++)
+            {
+                if (i > 0 && i % 4 == 0) mid.Append('-');
+                mid.Append(Chars[raw[i] % Chars.Length]);
+            }
+
+            string id = mid.ToString();
+            try
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(file));
+                File.WriteAllText(file, id);
+            }
+            catch
+            {
+                // 存不下就只在本进程内有效，不影响建房
+            }
+            return id;
         }
 
         /// <summary>大厅里的一名成员（协议档案 + 本地观测到的远端地址与延迟）。</summary>

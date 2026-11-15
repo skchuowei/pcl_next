@@ -219,7 +219,11 @@ namespace PCL
             Process process = _process;
             _process = null;
             if (process is null)
+            {
+                // 手上没进程也要扫一遍：启动器上次被强杀时 Stop 根本没跑，残留进程还在占端口
+                KillOrphanCores();
                 return;
+            }
             try
             {
                 if (!process.HasExited)
@@ -233,6 +237,33 @@ namespace PCL
                 Logger.Warn(ex, "停止联机模块失败");
             }
             Logger.Info("联机模块已停止");
+            KillOrphanCores();
+        }
+
+        /// <summary>
+        /// 清理本启动器自己留下的联机模块残留进程。
+        /// 启动器被强制结束（任务管理器、崩溃、调试器停止）时 Stop 来不及跑，
+        /// 残留的 easytier-core 会一直占着 listeners / rpc-portal / 协议端口，
+        /// 下次建房一启动就 failed to listen（os error 10048）。
+        /// </summary>
+        private static void KillOrphanCores()
+        {
+            foreach (Process process in Process.GetProcessesByName("easytier-core"))
+            {
+                try
+                {
+                    string path = process.MainModule?.FileName;
+                    if (string.IsNullOrEmpty(path)) continue;
+                    if (!string.Equals(Path.GetFullPath(path), Path.GetFullPath(CorePath), StringComparison.OrdinalIgnoreCase)) continue;
+                    process.Kill(true);
+                    process.WaitForExit(2000);
+                    Logger.Info($"已清理残留联机模块进程 PID {process.Id}");
+                }
+                catch (Exception ex)
+                {
+                    Logger.Warn(ex, "清理残留联机模块进程失败");
+                }
+            }
         }
 
         #endregion
@@ -286,6 +317,18 @@ namespace PCL
                 {
                     // 仅探测能否绑定
                 }
+            }
+            catch
+            {
+                return false;
+            }
+            // 别人可能只占着 127.0.0.1（EasyTier 的 --rpc-portal 就是这样），
+            // 它带 SO_REUSEADDR 时 0.0.0.0 仍能绑上，所以回环地址要单独再探一次。
+            try
+            {
+                using System.Net.Sockets.TcpListener loopback = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, port);
+                loopback.Start();
+                loopback.Stop();
             }
             catch
             {

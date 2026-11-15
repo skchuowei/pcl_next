@@ -550,7 +550,7 @@ namespace PCL
             string custom = (Settings.Get<string>("LinkUsername") ?? "").Trim();
             if (!string.IsNullOrEmpty(custom))
                 return custom;
-            return "pcl-next-" + ModBase.Identify;
+            return "pcl-next-" + ModLinkScaffold.GetMachineId();
         }
 
         /// <summary>从「直连地址」（可带 tcp:// 前缀）里取端口，取不到返回 0。</summary>
@@ -638,7 +638,7 @@ namespace PCL
             string custom = (Settings.Get<string>("LinkUsername") ?? "").Trim();
             if (!string.IsNullOrEmpty(custom))
                 return custom.Length > 63 ? custom.Substring(0, 63) : custom;
-            return role + "-" + ModBase.Identify.GetStableHashCode().ToString("X").TrimStart('-');
+            return role + "-" + ModLinkScaffold.GetMachineId().GetStableHashCode().ToString("X").TrimStart('-');
         }
 
         private static string GetLanAddress()
