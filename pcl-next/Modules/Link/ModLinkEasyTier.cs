@@ -239,24 +239,59 @@ namespace PCL
 
         #region 状态查询
 
-        /// <summary>获取一个本地空闲 TCP 端口。</summary>
+        /// <summary>下一次 <see cref="FindFreePort"/> 从哪里开始找（避免连续多次调用都返回同一个端口）。</summary>
+        private static int _nextPortCandidate = 30000;
+
+        /// <summary>
+        /// 获取一个本地空闲端口。
+        /// <para>
+        /// 一次建房要占三个端口（Scaffolding 协议服务、EasyTier 的 <c>--rpc-portal</c>、<c>--listeners</c>），
+        /// 三次连续调用必须拿到三个不同的号码：探测时绑一下就立刻释放，不记住上次结果的话
+        /// 每次都会返回同一个「当前最小空闲端口」，EasyTier 起来就会撞 10048（套接字地址只允许使用一次）。
+        /// </para>
+        /// </summary>
         public static int FindFreePort(int start = 30000)
         {
-            for (int port = Math.Max(1024, start); port < 65000; port++)
+            int candidate = Math.Max(Math.Max(1024, start), _nextPortCandidate);
+            for (int attempt = 0; attempt < 30000; attempt++)
             {
-                try
+                if (candidate >= 65000)
+                    candidate = 30000;
+                if (IsPortFree(candidate))
                 {
-                    using System.Net.Sockets.TcpListener listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, port);
-                    listener.Start();
-                    listener.Stop();
-                    return port;
+                    _nextPortCandidate = candidate + 1;
+                    return candidate;
                 }
-                catch
+                candidate++;
+            }
+            throw new Exception("找不到空闲的 TCP/UDP 端口");
+        }
+
+        /// <summary>端口是否同时可绑 TCP 与 UDP（EasyTier 的 listeners 两条都用）。</summary>
+        private static bool IsPortFree(int port)
+        {
+            try
+            {
+                using System.Net.Sockets.TcpListener listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Any, port);
+                listener.Start();
+                listener.Stop();
+            }
+            catch
+            {
+                return false;
+            }
+            try
+            {
+                using (System.Net.Sockets.UdpClient udp = new System.Net.Sockets.UdpClient(new System.Net.IPEndPoint(System.Net.IPAddress.Any, port)))
                 {
-                    // 端口被占用，继续尝试下一个
+                    // 仅探测能否绑定
                 }
             }
-            throw new Exception("找不到空闲端口");
+            catch
+            {
+                return false;
+            }
+            return true;
         }
 
         /// <summary>
