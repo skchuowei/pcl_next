@@ -1,6 +1,8 @@
 using System;
 using System.Numerics;
+using System.Security.Cryptography;
 using System.Text;
+using MeloongCore.Extensions;
 
 namespace PCL
 {
@@ -34,6 +36,10 @@ namespace PCL
         public string OverlayIp { get; init; } = "";
         /// <summary>房主的 MC 服务器端口；0 表示邀请码里没带，需要用户另填。</summary>
         public ushort Port { get; init; }
+        /// <summary>
+        /// 端口是否要靠网内发布的 Scaffolding 服务告知加入者（pcl-next 新码与 PCL2-CE 的 U/ 码都是这种）。
+        /// </summary>
+        public bool PublishPort { get; init; }
         /// <summary>加密算法；空串表示不显式指定（沿用 EasyTier 默认）。</summary>
         public string EncryptionAlgorithm { get; init; } = "";
         /// <summary>压缩算法；空串表示不显式指定。</summary>
@@ -90,6 +96,12 @@ namespace PCL
         /// </summary>
         public const string ScaffoldHostnamePrefix = "scaffolding-mc-server-";
 
+        /// <summary>
+        /// pcl-next 自研大厅房主的 EasyTier 主机名前缀（后缀是房主发布的 Scaffolding 端口）。
+        /// 与 PCL2-CE 的前缀故意不同：两边网络本来就不互通，混用会让加入者认错房主。
+        /// </summary>
+        public const string PclNextHostnamePrefix = "pclnext-mc-server-";
+
         /// <summary>PCL2-CE 数字码用的 Base32 字符表（无 0/1/I/O）。</summary>
         private const string Base32Chars = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
         /// <summary>陶瓦码与 U 码用的 Base34 字符表（无 I/O）。</summary>
@@ -99,8 +111,6 @@ namespace PCL
         private const int TerracottaLength = TerracottaDigits + 1;
         private const int ScaffoldPayloadLength = 16;
         private const int ScaffoldCodeLength = ScaffoldPayloadLength + 3 + 2;
-
-        private static readonly Random Rng = new Random();
 
         #endregion
 
@@ -155,6 +165,7 @@ namespace PCL
                     NetworkSecret = payload.Substring(10),
                     OverlayIp = CeOverlayIp,
                     Port = serverPort,
+                    PublishPort = true,
                     EncryptionAlgorithm = "aes-gcm",
                     Compression = "zstd",
                     CompatFlags = true,
@@ -181,15 +192,18 @@ namespace PCL
                 }, tcCode);
             }
 
-            (string ownName, string ownSecret) = ModLinkCodec.NewIdentity();
-            string ownCode = ModLinkCodec.Build(ownName, ownSecret, serverPort);
+            (string ownName, string ownSecret, string ownPrefix) = ModLinkCodec.NewIdentity();
+            string ownCode = ModLinkCodec.Build(ownName, ownSecret, ownPrefix);
             return (new LobbyTarget
             {
                 Kind = LobbyKind.PclNext,
                 FullNetworkName = ModLinkCodec.NetworkPrefix + ownName,
-                NetworkSecret = ownSecret,
+                // 前缀并进密钥：熵从 5 位（24.8 bit）抬到 5 位 + 8 位十六进制（约 56.8 bit）
+                NetworkSecret = ownSecret + ownPrefix,
                 OverlayIp = PclNextOverlayIp,
+                // 端口不再写进码里，改由房主在网内发布
                 Port = serverPort,
+                PublishPort = true,
                 EncryptionAlgorithm = "aes-gcm",
                 OriginalCode = ownCode
             }, ownCode);
@@ -219,9 +233,11 @@ namespace PCL
                 {
                     Kind = LobbyKind.PclNext,
                     FullNetworkName = ModLinkCodec.NetworkPrefix + info.Name,
-                    NetworkSecret = info.Secret,
+                    NetworkSecret = info.FullSecret,
                     OverlayIp = PclNextOverlayIp,
                     Port = info.Port,
+                    // 新码不带端口：加入者要向房主的 Scaffolding 服务问端口
+                    PublishPort = info.Port == 0,
                     EncryptionAlgorithm = "aes-gcm",
                     OriginalCode = text
                 };
@@ -387,6 +403,7 @@ namespace PCL
                 NetworkSecret = payload.Substring(10),
                 OverlayIp = CeOverlayIp,
                 Port = portFallback,
+                PublishPort = true,
                 EncryptionAlgorithm = "aes-gcm",
                 Compression = "zstd",
                 CompatFlags = true,
@@ -405,8 +422,7 @@ namespace PCL
         private static string BuildScaffoldCode()
         {
             BigInteger max = BigInteger.Pow(Base34Chars.Length, ScaffoldPayloadLength);
-            byte[] buffer = new byte[16];
-            Rng.NextBytes(buffer);
+            byte[] buffer = RandomNumberGenerator.GetBytes(16);
             BigInteger value = new BigInteger(buffer, true, false) % max;
             value -= value % 7;
             if (value <= 0)
@@ -482,7 +498,7 @@ namespace PCL
         {
             StringBuilder builder = new StringBuilder(length);
             for (int i = 0; i < length; i++)
-                builder.Append(i == 0 && nonZeroFirst ? (char)('1' + Rng.Next(9)) : (char)('0' + Rng.Next(10)));
+                builder.Append(i == 0 && nonZeroFirst ? (char)('1' + RandomNumberGenerator.GetInt32(9)) : (char)('0' + RandomNumberGenerator.GetInt32(10)));
             return builder.ToString();
         }
 
@@ -490,8 +506,7 @@ namespace PCL
         private static string BuildTerracottaCode(ushort port, out string digits, out char check)
         {
             BigInteger max = BigInteger.Pow(Base34Chars.Length, TerracottaDigits);
-            byte[] buffer = new byte[16];
-            Rng.NextBytes(buffer);
+            byte[] buffer = RandomNumberGenerator.GetBytes(16);
             BigInteger value = new BigInteger(buffer, true, false) % max;
             long remainder = (long)(value % 65536);
             long delta = (((long)port - remainder) % 65536 + 65536) % 65536;
@@ -526,6 +541,23 @@ namespace PCL
                 display.Append(compact[i]);
             }
             return display.ToString();
+        }
+
+        #endregion
+
+        #region 房间号
+
+        /// <summary>
+        /// 由邀请码派生的 6 位房间号。码里没有房主信息与端口，双方拿同一张码就能算出同一个号码，
+        /// 只用于口头核对（不参与连接、也不写进协议）。
+        /// </summary>
+        public static string RoomNumber(string code)
+        {
+            string text = Normalize(code);
+            if (string.IsNullOrEmpty(text))
+                return "";
+            ulong hash = text.GetStableHashCode();
+            return (hash % 1000000).ToString("D6");
         }
 
         #endregion

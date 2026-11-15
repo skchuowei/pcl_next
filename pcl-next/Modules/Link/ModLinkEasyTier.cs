@@ -303,6 +303,49 @@ namespace PCL
         }
 
         /// <summary>
+        /// 读取 peer 列表里的延迟表（`IP → 毫秒`），用于房间卡片展示成员延迟。
+        /// 拿不到延迟的节点不会出现在表里（调用方按「未知」处理）。
+        /// </summary>
+        public static async Task<Dictionary<string, int>> GetPeerLatencyAsync(int rpcPort, CancellationToken ct)
+        {
+            JToken output = await RunCliAsync(rpcPort, new[] { "peer", "list" }, ct).ConfigureAwait(false);
+            JArray list = ExtractPeerArray(output);
+            Dictionary<string, int> table = new Dictionary<string, int>();
+            if (list is null)
+                return table;
+            foreach (JToken item in list)
+            {
+                string ip = item["ipv4"]?.ToString() ?? "";
+                if (string.IsNullOrWhiteSpace(ip))
+                    continue;
+                int ping = ParseLatency(item);
+                if (ping >= 0)
+                    table[ip] = ping;
+            }
+            return table;
+        }
+
+        /// <summary>从 peer 条目里取延迟（不同版本字段名略有差异，按优先级尝试）。</summary>
+        private static int ParseLatency(JToken item)
+        {
+            foreach (string key in new[] { "lat_ms", "latency_ms", "latency", "lat_ms_avg" })
+            {
+                JToken token = item[key];
+                if (token is null)
+                    continue;
+                try
+                {
+                    return (int)Math.Round(token.ToObject<double>());
+                }
+                catch
+                {
+                    // 字段格式不认识，继续试下一个
+                }
+            }
+            return -1;
+        }
+
+        /// <summary>
         /// 在已运行的实例上追加一条端口转发（联机模块启动后才知道目标端口时用）。
         /// </summary>
         /// <param name="rpcPort">本机 EasyTier 的 RPC 端口。</param>
@@ -337,11 +380,16 @@ namespace PCL
         }
 
         /// <summary>
-        /// 在 peer 列表里找 PCL2-CE 的房主（主机名以 <c>scaffolding-mc-server-</c> 开头），
-        /// 返回对端 overlay 地址和它主机名后缀里的 Scaffolding 端口。
+        /// 在 peer 列表里找房主（主机名以给定前缀开头，后缀就是它的 Scaffolding 端口），
+        /// 返回对端 overlay 地址和端口。pcl-next 自研大厅用 <c>pclnext-mc-server-</c>，
+        /// PCL2-CE 大厅用 <c>scaffolding-mc-server-</c>，两边互不误认。
         /// </summary>
-        public static async Task<(string Ip, int ScaffoldPort)?> FindScaffoldHostAsync(int rpcPort, CancellationToken ct)
+        /// <param name="rpcPort">本机 EasyTier 的 RPC 端口。</param>
+        /// <param name="hostnamePrefix">要匹配的主机名前缀；为空时默认按 PCL2-CE 的前缀找。</param>
+        /// <param name="ct">取消令牌。</param>
+        public static async Task<(string Ip, int ScaffoldPort)?> FindScaffoldHostAsync(int rpcPort, CancellationToken ct, string hostnamePrefix = null)
         {
+            string prefix = string.IsNullOrEmpty(hostnamePrefix) ? ModLinkScaffold.HostnamePrefix : hostnamePrefix;
             JToken output = await RunCliAsync(rpcPort, new[] { "peer", "list" }, ct).ConfigureAwait(false);
             JArray list = ExtractPeerArray(output);
             if (list is null)
@@ -349,19 +397,19 @@ namespace PCL
             foreach (JToken item in list)
             {
                 string hostname = item["hostname"]?.ToString() ?? "";
-                if (!hostname.StartsWith(ModLinkScaffold.HostnamePrefix, StringComparison.Ordinal))
+                if (!hostname.StartsWith(prefix, StringComparison.Ordinal))
                     continue;
                 string ip = item["ipv4"]?.ToString() ?? "";
                 if (string.IsNullOrWhiteSpace(ip))
                     continue;
-                string portText = hostname.Substring(ModLinkScaffold.HostnamePrefix.Length);
+                string portText = hostname.Substring(prefix.Length);
                 if (!int.TryParse(portText, out int scaffoldPort) || scaffoldPort <= 0 || scaffoldPort > 65535)
                     continue;
                 // 太早连上的节点可能是旧连接残留，ping 都没通就先不算
                 string cost = item["cost"]?.ToString() ?? "";
                 if (!cost.Equals("Local", StringComparison.OrdinalIgnoreCase) && cost.Length == 0)
                     continue;
-                Logger.Info($"联机：找到 PCL2-CE 房主 {ip}:{scaffoldPort}（主机名 {hostname}）");
+                Logger.Info($"联机：找到房主 {ip}:{scaffoldPort}（主机名 {hostname}）");
                 return (ip, scaffoldPort);
             }
             return null;

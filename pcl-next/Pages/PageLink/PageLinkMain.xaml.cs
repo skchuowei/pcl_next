@@ -35,7 +35,7 @@ namespace PCL
             InitializeComponent();
             this.ItemCreate.Check += (p1, p2) => NavCheck((MyListItem)p1);
             this.ItemJoin.Check += (p1, p2) => NavCheck((MyListItem)p1);
-            this.ItemStatus.Check += (p1, p2) => NavCheck((MyListItem)p1);
+            this.ItemRoom.Check += (p1, p2) => NavCheck((MyListItem)p1);
             this.ItemAbout.Check += (p1, p2) => NavCheck((MyListItem)p1);
             this.ItemSettings.Check += (p1, p2) => NavCheck((MyListItem)p1);
             this.BtnResetLink.Click += (_, __) => ResetLinkSettings();
@@ -51,6 +51,10 @@ namespace PCL
             this.BtnJoin.Click += (_, __) => JoinFromInput();
             this.BtnLeave.Click += (_, __) => ModLinkSession.Leave();
             this.BtnCopyCode.Click += (_, __) => CopyText(ModLinkSession.InviteCode, "邀请码");
+            this.BtnCopyRoomCode.Click += (_, __) => CopyText(ModLinkSession.InviteCode, "邀请码");
+            this.BtnCopyHostId.Click += (_, __) => CopyText(ModLinkSession.HostMachineId, "房主 ID");
+            this.BtnCopyRoomAddress.Click += (_, __) =>
+                CopyText(ModLinkSession.LocalJoinPort > 0 ? "127.0.0.1:" + ModLinkSession.LocalJoinPort : "", "游戏内地址");
             this.BtnCopyDirect.Click += (_, __) => CopyText(ModLinkSession.HostDirectAddress, "直连地址");
             this.BtnClear.Click += (_, __) => this.TextJoinCode.Text = "";
             this.BtnPaste.Click += (_, __) => PasteCode();
@@ -132,7 +136,7 @@ namespace PCL
         /// <summary>面板切换动画的分组名，连续点击时用它终止上一轮动画。</summary>
         private const string PanelAniName = "PageLinkMain PanelChange";
 
-        /// <summary>面板总数（0 创建 / 1 加入 / 2 状态 / 3 关于 / 4 设置）。</summary>
+        /// <summary>面板总数（0 创建 / 1 加入 / 2 当前房间 / 3 关于 / 4 设置）。</summary>
         private const int PanelCount = 5;
 
         /// <summary>当前显示的面板序号。</summary>
@@ -158,7 +162,7 @@ namespace PCL
             {
                 0 => this.ItemCreate,
                 1 => this.ItemJoin,
-                2 => this.ItemStatus,
+                2 => this.ItemRoom,
                 3 => this.ItemAbout,
                 4 => this.ItemSettings,
                 _ => null
@@ -172,14 +176,26 @@ namespace PCL
             {
                 0 => this.PanCreate,
                 1 => this.PanJoin,
-                2 => this.PanStatus,
+                2 => this.PanRoom,
                 3 => this.PanAbout,
                 4 => this.PanSettings,
                 _ => null
             };
         }
 
-        /// <summary>切换右侧面板：0 创建 / 1 加入 / 2 状态 / 3 关于 / 4 设置。</summary>
+        /// <summary>
+        /// 进房 / 退房时调整左侧导航：房间里把「创建」「加入」收起，换成「当前房间」，
+        /// 避免高亮还停在创建卡上（本轮反馈的"导航栏不对"）。
+        /// </summary>
+        private void UpdateNavForRoom(bool inRoom)
+        {
+            Visibility entryVisibility = inRoom ? Visibility.Collapsed : Visibility.Visible;
+            this.ItemCreate.Visibility = entryVisibility;
+            this.ItemJoin.Visibility = entryVisibility;
+            this.ItemRoom.Visibility = inRoom ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        /// <summary>切换右侧面板：0 创建 / 1 加入 / 2 当前房间 / 3 关于 / 4 设置。</summary>
         private void ShowPanel(int index)
         {
             FrameworkElement target = PaneAt(index);
@@ -496,6 +512,9 @@ namespace PCL
             if (this.LabStatus is null)
                 return;
             ModLinkSession.Stage stage = ModLinkSession.CurrentStage;
+            ModLinkSession.Role role = ModLinkSession.CurrentRole;
+            bool active = ModLinkSession.IsActive;
+            bool inRoom = role != ModLinkSession.Role.None;
             this.LabStatus.Text = ModLinkSession.StatusText;
 
             this.DotStatus.Fill = stage switch
@@ -507,21 +526,18 @@ namespace PCL
                 _ => BrushIdle
             };
 
-            bool active = ModLinkSession.IsActive;
             this.BtnCreate.IsEnabled = !active;
             this.BtnJoin.IsEnabled = !active;
             this.BtnLeave.Visibility = active ? Visibility.Visible : Visibility.Collapsed;
 
-            // 有房间时把面板切到对应的那一侧：只在角色发生变化时切，
-            // 否则用户停留在「连接状态 / 关于联机 / 联机设置」时会被每次状态刷新拽回创建或加入面板
-            ModLinkSession.Role role = ModLinkSession.CurrentRole;
+            // 进房 / 退房时换导航：房间里收起「创建 / 加入」，只留「当前房间」，
+            // 面板也切到房间卡片；退房后恢复。只在角色变化时切面板，
+            // 否则用户停在「关于联机 / 联机设置」时会被每次状态刷新拽回房间。
+            UpdateNavForRoom(inRoom);
             if (role != _lastRole)
             {
                 _lastRole = role;
-                if (role == ModLinkSession.Role.Host)
-                    ShowPanel(0);
-                else if (role == ModLinkSession.Role.Joiner)
-                    ShowPanel(1);
+                ShowPanel(inRoom ? 2 : 0);
             }
 
             bool hasCode = ModLinkSession.CurrentRole == ModLinkSession.Role.Host &&
@@ -542,9 +558,105 @@ namespace PCL
             this.LabJoinTip.Visibility = joined ? Visibility.Visible : Visibility.Collapsed;
             if (joined)
                 this.LabJoinTip.Text = $"在 Minecraft 里连接 127.0.0.1:{ModLinkSession.LocalJoinPort} 即可进入房主的服务器。";
+
+            if (inRoom)
+                RefreshRoomCard(stage, role);
+        }
+
+        /// <summary>填充房间卡片：房主、房主 ID、延迟、房间号、邀请码、游戏内地址与成员列表。</summary>
+        private void RefreshRoomCard(ModLinkSession.Stage stage, ModLinkSession.Role role)
+        {
+            bool ready = stage == ModLinkSession.Stage.Ready;
+            string hostName = ModLinkSession.HostDisplayName;
+            string hostId = ModLinkSession.HostMachineId;
+            int ping = ModLinkSession.HostPingMs;
+
+            this.LabRoomHost.Text = string.IsNullOrEmpty(hostName) ? "—" : hostName;
+            this.TextRoomHostId.Text = hostId;
+            this.BtnCopyHostId.IsEnabled = !string.IsNullOrEmpty(hostId);
+            this.LabRoomRole.Text = ModLinkSession.IsHost ? "本机是房主" : "本机是成员";
+            this.LabRoomPing.Text = ping >= 0 ? ping + " ms" : "—";
+            this.LabRoomNumber.Text = string.IsNullOrEmpty(ModLinkSession.RoomNumber) ? "—" : ModLinkSession.RoomNumber;
+            this.TextRoomCode.Text = string.IsNullOrEmpty(ModLinkSession.InviteCode) ? "（尚未生成）" : ModLinkSession.InviteCode;
+            this.BtnCopyRoomCode.IsEnabled = !string.IsNullOrEmpty(ModLinkSession.InviteCode);
+
+            bool showAddress = role == ModLinkSession.Role.Joiner && ready && ModLinkSession.LocalJoinPort > 0;
+            this.PanRoomAddress.Visibility = showAddress ? Visibility.Visible : Visibility.Collapsed;
+            if (showAddress)
+                this.TextRoomAddress.Text = "127.0.0.1:" + ModLinkSession.LocalJoinPort;
+
+            RefreshRoomPlayers();
+        }
+
+        /// <summary>重建成员列表（每 5 秒随会话刷新一次，数量很少，直接整体重建最省事）。</summary>
+        private void RefreshRoomPlayers()
+        {
+            bool isHost = ModLinkSession.IsHost;
+            List<RoomPlayerRow> rows = new List<RoomPlayerRow>();
+            foreach (ModLinkScaffold.PlayerInfo player in ModLinkSession.Players)
+            {
+                string name = string.IsNullOrWhiteSpace(player.Name) ? player.MachineId : player.Name;
+                if (string.IsNullOrWhiteSpace(name))
+                    name = "未知玩家";
+                string sub = player.IsHost ? "房主" : "成员";
+                if (!string.IsNullOrEmpty(player.MachineId))
+                    sub += " · " + player.MachineId;
+                rows.Add(new RoomPlayerRow
+                {
+                    Name = name,
+                    Sub = sub,
+                    Detail = sub + (string.IsNullOrEmpty(player.Vendor) ? "" : "\n" + player.Vendor),
+                    PingText = player.PingMs >= 0 ? player.PingMs + " ms" : "—",
+                    MachineId = player.MachineId,
+                    KickVisibility = isHost && !player.IsHost && !string.IsNullOrEmpty(player.MachineId)
+                        ? Visibility.Visible
+                        : Visibility.Collapsed
+                });
+            }
+            this.ListPlayers.ItemsSource = rows;
+            this.LabPlayersEmpty.Visibility = rows.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        /// <summary>成员行上的踢人按钮：房主把该成员移出房间。</summary>
+        private void BtnKick_Click(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            string machineId = (sender as FrameworkElement)?.Tag as string;
+            if (string.IsNullOrEmpty(machineId))
+                return;
+            string name = machineId;
+            foreach (ModLinkScaffold.PlayerInfo player in ModLinkSession.Players)
+            {
+                if (player.MachineId == machineId)
+                {
+                    name = string.IsNullOrWhiteSpace(player.Name) ? machineId : player.Name;
+                    break;
+                }
+            }
+            if (ModLinkSession.KickPlayer(machineId))
+            {
+                ModMain.Hint("已把 " + name + " 移出房间", ModMain.HintType.Green);
+                RefreshRoomPlayers();
+            }
+            else
+            {
+                ModMain.Hint("没能移出该成员（对方可能已经离开）", ModMain.HintType.Red);
+            }
         }
 
         #endregion
 
+    }
+
+    /// <summary>
+    /// 房间成员列表的一行（DataTemplate 直接绑这个类）。
+    /// </summary>
+    public sealed class RoomPlayerRow
+    {
+        public string Name { get; init; } = "";
+        public string Sub { get; init; } = "";
+        public string Detail { get; init; } = "";
+        public string PingText { get; init; } = "—";
+        public string MachineId { get; init; } = "";
+        public Visibility KickVisibility { get; init; } = Visibility.Collapsed;
     }
 }

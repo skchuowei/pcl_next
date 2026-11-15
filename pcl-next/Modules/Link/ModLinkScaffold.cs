@@ -35,6 +35,9 @@ namespace PCL
         /// <summary>房主 EasyTier 主机名前缀（对方靠它识别房主，后缀是 Scaffolding 端口）。</summary>
         public const string HostnamePrefix = ModLinkInterop.ScaffoldHostnamePrefix;
 
+        /// <summary>pcl-next 自研大厅房主的主机名前缀（与 PCL2-CE 区分，避免加入者认错）。</summary>
+        public const string PclNextHostnamePrefix = ModLinkInterop.PclNextHostnamePrefix;
+
         public const string TypePing = "c:ping";
         public const string TypeProtocols = "c:protocols";
         public const string TypeServerPort = "c:server_port";
@@ -43,6 +46,10 @@ namespace PCL
 
         private const byte StatusOk = 0;
         private const byte StatusBadRequest = 32;
+        /// <summary>失败状态：正文是给客户端看的错误文本（对方 Reader 也按这个口径取正文）。</summary>
+        private const byte StatusError = 255;
+        /// <summary>被房主移出房间时的错误文本前缀（pcl-next 加入端凭它自动退出）。</summary>
+        public const string KickedMarker = "KICKED";
         private const int MaxTypeLength = 128;
         private const int MaxBodyLength = 65536;
 
@@ -171,7 +178,8 @@ namespace PCL
         /// <summary>本启动器在联机大厅里的身份：名字 + 识别码 + 署名。</summary>
         public static string DefaultVendor => "pcl-next " + ModBase.VersionBaseName + ", EasyTier " + ModLinkEasyTier.Version;
 
-        private static string GetMachineId()
+        /// <summary>本机在联机大厅里的机器识别码（踢人、去重都靠它）。</summary>
+        public static string GetMachineId()
         {
             try
             {
@@ -181,6 +189,72 @@ namespace PCL
             catch
             {
                 return "pcl-next-unknown";
+            }
+        }
+
+        /// <summary>大厅里的一名成员（协议档案 + 本地观测到的远端地址与延迟）。</summary>
+        public sealed class PlayerInfo
+        {
+            public string Name { get; init; } = "";
+            public string MachineId { get; init; } = "";
+            public string Vendor { get; init; } = "";
+            /// <summary>HOST / GUEST（与对方枚举一致）。</summary>
+            public string Kind { get; init; } = "";
+            /// <summary>房主侧观测到的远端 overlay 地址，用于匹配 EasyTier 延迟表；加入侧为空。</summary>
+            public string RemoteIp { get; set; } = "";
+            /// <summary>延迟（毫秒）；-1 表示暂时拿不到。</summary>
+            public int PingMs { get; set; } = -1;
+
+            public bool IsHost => Kind.Equals("HOST", StringComparison.OrdinalIgnoreCase);
+
+            /// <summary>转成协议里的玩家档案（字段名与对方一致，额外的 ip / ping 对方会忽略）。</summary>
+            public JObject ToJson()
+            {
+                JObject profile = BuildProfile(Name, MachineId, Vendor, Kind);
+                if (!string.IsNullOrEmpty(RemoteIp))
+                    profile["ip"] = RemoteIp;
+                if (PingMs >= 0)
+                    profile["ping"] = PingMs;
+                return profile;
+            }
+        }
+
+        /// <summary>把协议里的玩家档案数组转成 <see cref="PlayerInfo"/> 列表。</summary>
+        public static List<PlayerInfo> ToPlayers(JArray array)
+        {
+            if (array is null)
+                return new List<PlayerInfo>();
+            List<PlayerInfo> list = new List<PlayerInfo>();
+            foreach (JToken item in array)
+            {
+                if (item is not JObject profile)
+                    continue;
+                PlayerInfo info = new PlayerInfo
+                {
+                    Name = profile["name"]?.ToString() ?? "",
+                    MachineId = profile["machine_id"]?.ToString() ?? "",
+                    Vendor = profile["vendor"]?.ToString() ?? "",
+                    Kind = profile["kind"]?.ToString() ?? "",
+                    RemoteIp = profile["ip"]?.ToString() ?? "",
+                    PingMs = ParsePingMs(profile["ping"])
+                };
+                list.Add(info);
+            }
+            return list;
+        }
+
+        /// <summary>解析档案里的 ping 字段；缺失或格式不对按「拿不到」处理。</summary>
+        private static int ParsePingMs(JToken token)
+        {
+            if (token is null)
+                return -1;
+            try
+            {
+                return (int)Math.Round(token.ToObject<double>());
+            }
+            catch
+            {
+                return -1;
             }
         }
 
@@ -195,13 +269,15 @@ namespace PCL
         {
             private readonly TcpListener _listener;
             private readonly CancellationTokenSource _cts = new CancellationTokenSource();
-            private readonly Dictionary<string, JObject> _players = new Dictionary<string, JObject>();
+            private readonly Dictionary<string, PlayerInfo> _players = new Dictionary<string, PlayerInfo>();
+            /// <summary>被房主移出房间的机器识别码；它们的心跳一律回 255。</summary>
+            private readonly HashSet<string> _kicked = new HashSet<string>();
             private readonly object _playersLock = new object();
             private readonly ushort _mcPort;
             private Task _acceptTask;
             private bool _disposed;
 
-            /// <summary>本机玩家列表变化时的通知（参数是玩家名）。</summary>
+            /// <summary>有玩家加入时的通知（参数是玩家名）。</summary>
             public event Action<string> PlayerJoined;
 
             public Server(int scaffoldPort, ushort mcPort, string hostName)
@@ -210,9 +286,73 @@ namespace PCL
                 string machineId = GetMachineId();
                 lock (_playersLock)
                 {
-                    _players[machineId] = BuildProfile(hostName, machineId, DefaultVendor, "HOST");
+                    _players[machineId] = new PlayerInfo
+                    {
+                        Name = hostName,
+                        MachineId = machineId,
+                        Vendor = DefaultVendor,
+                        Kind = "HOST"
+                    };
                 }
                 _listener = new TcpListener(IPAddress.Loopback, scaffoldPort);
+            }
+
+            /// <summary>当前大厅成员快照（含房主自己）。</summary>
+            public IReadOnlyList<PlayerInfo> Players
+            {
+                get
+                {
+                    lock (_playersLock)
+                    {
+                        return _players.Values.Select(p => new PlayerInfo
+                        {
+                            Name = p.Name,
+                            MachineId = p.MachineId,
+                            Vendor = p.Vendor,
+                            Kind = p.Kind,
+                            RemoteIp = p.RemoteIp,
+                            PingMs = p.PingMs
+                        }).ToList();
+                    }
+                }
+            }
+
+            /// <summary>
+            /// 把该机器识别码移出大厅：从成员列表删掉，并让它后续心跳一律收到 255。
+            /// 返回 false 表示这人本来就不在大厅里。
+            /// </summary>
+            public bool Kick(string machineId)
+            {
+                if (string.IsNullOrWhiteSpace(machineId))
+                    return false;
+                string name;
+                lock (_playersLock)
+                {
+                    PlayerInfo player = _players.TryGetValue(machineId, out PlayerInfo found) ? found : null;
+                    if (player is null || player.IsHost)
+                        return false;
+                    name = player.Name;
+                    _players.Remove(machineId);
+                    _kicked.Add(machineId);
+                }
+                Logger.Info("联机：房主把玩家移出房间（" + (string.IsNullOrEmpty(name) ? machineId : name) + "）");
+                return true;
+            }
+
+            /// <summary>按远端 IP 把 EasyTier 的延迟表灌进成员档案（拿不到的保持 -1）。</summary>
+            public void ApplyLatency(IReadOnlyDictionary<string, int> byIp)
+            {
+                if (byIp is null || byIp.Count == 0)
+                    return;
+                lock (_playersLock)
+                {
+                    foreach (PlayerInfo player in _players.Values)
+                    {
+                        if (player.IsHost || string.IsNullOrEmpty(player.RemoteIp))
+                            continue;
+                        player.PingMs = byIp.TryGetValue(player.RemoteIp, out int ping) ? ping : -1;
+                    }
+                }
             }
 
             /// <summary>启动监听；端口被占用等异常会抛出。</summary>
@@ -253,6 +393,7 @@ namespace PCL
                 {
                     client.NoDelay = true;
                     NetworkStream stream = client.GetStream();
+                    string remoteIp = GetRemoteIp(client);
                     try
                     {
                         while (!ct.IsCancellationRequested)
@@ -283,7 +424,9 @@ namespace PCL
                                     }
                                     break;
                                 case TypePlayerPing:
-                                    status = RegisterPlayer(frame.Value.Body);
+                                    status = RegisterPlayer(frame.Value.Body, remoteIp);
+                                    if (status == StatusError)
+                                        body = Encoding.UTF8.GetBytes(KickedMarker + " 你已被房主移出该房间");
                                     break;
                                 case TypePlayerList:
                                     body = Encoding.UTF8.GetBytes(SnapshotPlayers().ToString(Formatting.None));
@@ -293,6 +436,8 @@ namespace PCL
                                     break;
                             }
                             WriteResponse(stream, status, body);
+                            if (status == StatusError)
+                                break; // 被踢的这条连接不再服务
                         }
                     }
                     catch (IOException)
@@ -310,7 +455,7 @@ namespace PCL
                 }
             }
 
-            private byte RegisterPlayer(byte[] body)
+            private byte RegisterPlayer(byte[] body, string remoteIp)
             {
                 JObject profile;
                 try
@@ -325,13 +470,27 @@ namespace PCL
                 string machineId = profile["machine_id"]?.ToString() ?? "";
                 if (string.IsNullOrEmpty(machineId))
                     return StatusBadRequest;
-                profile["kind"] = "GUEST";
-                bool isNew;
-                string name = profile["name"]?.ToString() ?? "";
                 lock (_playersLock)
                 {
-                    isNew = !_players.ContainsKey(machineId);
-                    _players[machineId] = profile;
+                    if (_kicked.Contains(machineId))
+                        return StatusError;
+                }
+                string name = profile["name"]?.ToString() ?? "";
+                bool isNew;
+                lock (_playersLock)
+                {
+                    PlayerInfo old = _players.TryGetValue(machineId, out PlayerInfo found) ? found : null;
+                    isNew = old is null;
+                    _players[machineId] = new PlayerInfo
+                    {
+                        Name = string.IsNullOrEmpty(name) ? machineId : name,
+                        MachineId = machineId,
+                        Vendor = profile["vendor"]?.ToString() ?? "",
+                        Kind = "GUEST",
+                        RemoteIp = remoteIp,
+                        // 延迟由 peer 表刷新，先沿用上一轮的值，避免每次心跳都掉成「拿不到」
+                        PingMs = old is null ? -1 : old.PingMs
+                    };
                 }
                 if (isNew)
                 {
@@ -346,10 +505,22 @@ namespace PCL
                 JArray array = new JArray();
                 lock (_playersLock)
                 {
-                    foreach (KeyValuePair<string, JObject> pair in _players)
-                        array.Add(pair.Value.DeepClone());
+                    foreach (PlayerInfo player in _players.Values)
+                        array.Add(player.ToJson());
                 }
                 return array;
+            }
+
+            private static string GetRemoteIp(TcpClient client)
+            {
+                try
+                {
+                    return client.Client.RemoteEndPoint is IPEndPoint point ? point.Address.ToString() : "";
+                }
+                catch
+                {
+                    return "";
+                }
             }
 
             public void Dispose()
@@ -383,6 +554,12 @@ namespace PCL
             /// <summary>最近一次拿到的玩家列表（可为空）。</summary>
             public JArray LastPlayers { get; private set; }
 
+            /// <summary>最近一次 <c>c:ping</c> 往返（毫秒），-1 表示还没测到。</summary>
+            public int HostPingMs { get; private set; } = -1;
+
+            /// <summary>被房主移出房间时触发（参数是房主给的说明）。</summary>
+            public event Action<string> Kicked;
+
             /// <summary>连接并完成首次握手（对方要求先发一次 <c>c:player_ping</c>）。</summary>
             public void Connect(string host, int port, string playerName)
             {
@@ -403,6 +580,10 @@ namespace PCL
                     {
                         await Task.Delay(5000, ct).ConfigureAwait(false);
                         SendRequest(TypePlayerPing, Encoding.UTF8.GetBytes(_profile.ToString(Formatting.None)));
+                        // 心跳里顺便量一次到房主的往返，作为房间卡片上的「延迟」
+                        long begin = Environment.TickCount64;
+                        SendRequest(TypePing, Array.Empty<byte>());
+                        HostPingMs = (int)Math.Min(int.MaxValue, Environment.TickCount64 - begin);
                         byte[] body = SendRequest(TypePlayerList, Array.Empty<byte>());
                         try
                         {
@@ -417,9 +598,17 @@ namespace PCL
                     {
                         break;
                     }
+                    catch (LinkKickedException ex)
+                    {
+                        Logger.Warn("联机：已被房主移出房间（" + ex.Message + "）");
+                        try { Kicked?.Invoke(ex.Message); } catch { /* 忽略回调异常 */ }
+                        HostPingMs = -1;
+                        break;
+                    }
                     catch (Exception ex)
                     {
                         Logger.Warn(ex, "联机：Scaffolding 心跳失败，房主可能已关闭");
+                        HostPingMs = -1;
                         break;
                     }
                 }
@@ -442,6 +631,11 @@ namespace PCL
                         throw new IOException("Scaffolding 连接尚未建立");
                     WriteRequest(_stream, type, body);
                     (byte status, byte[] responseBody) = ReadResponse(_stream);
+                    if (status == StatusError)
+                    {
+                        string text = responseBody.Length > 0 ? Encoding.UTF8.GetString(responseBody) : "";
+                        throw new LinkKickedException(string.IsNullOrWhiteSpace(text) ? "你已被房主移出该房间" : text);
+                    }
                     if (status != StatusOk)
                     {
                         throw new IOException("房主拒绝了请求（" + type + "），状态码 " + status);
@@ -464,5 +658,11 @@ namespace PCL
 
         #endregion
 
+    }
+
+    /// <summary>被房主移出房间（Scaffolding 服务对心跳回 255）。</summary>
+    public sealed class LinkKickedException : Exception
+    {
+        public LinkKickedException(string message) : base(message) { }
     }
 }

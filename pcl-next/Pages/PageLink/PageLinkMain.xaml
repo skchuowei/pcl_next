@@ -23,9 +23,9 @@
                 <local:MyListItem x:Name="ItemJoin" IsScaleAnimationEnabled="False" Tag="1" MinPaddingRight="10"
                                   Height="36" VerticalAlignment="Top" Title="加入大厅" Type="RadioBox" FontSize="13"
                                   LogoScale="1" Logo="lucide:bubbles" />
-                <local:MyListItem x:Name="ItemStatus" IsScaleAnimationEnabled="False" Tag="2" MinPaddingRight="10"
-                                  Height="36" VerticalAlignment="Top" Title="连接状态" Type="RadioBox" FontSize="13"
-                                  LogoScale="1" Logo="lucide:message-circle" />
+                <local:MyListItem x:Name="ItemRoom" IsScaleAnimationEnabled="False" Tag="2" MinPaddingRight="10"
+                                  Height="36" VerticalAlignment="Top" Title="当前房间" Type="RadioBox" FontSize="13"
+                                  LogoScale="1" Logo="lucide:users" Visibility="Collapsed" />
                 <local:MyListItem x:Name="ItemAbout" IsScaleAnimationEnabled="False" Tag="3" MinPaddingRight="10"
                                   Height="36" VerticalAlignment="Top" Title="关于联机" Type="RadioBox" FontSize="13"
                                   LogoScale="1" Logo="lucide:user" />
@@ -180,25 +180,150 @@
                     </local:MyCard>
                 </StackPanel>
 
-                <!-- 连接状态 -->
-                <StackPanel x:Name="PanStatus" Visibility="Collapsed">
-                    <local:MyCard x:Name="CardStatus" Margin="0,0,0,15" Title="当前连接">
-                        <Border Margin="25,30,25,22" CornerRadius="8" Background="{DynamicResource ColorBrush8}">
-                            <Grid Margin="16,12,16,12">
+                <!-- 当前房间（进房后替代创建 / 加入卡片；结构对齐 PCL2-CE 的大厅信息 + 操作 + 成员） -->
+                <StackPanel x:Name="PanRoom" Visibility="Collapsed">
+
+                    <!-- 大厅信息卡：状态 + 房主 + 延迟 + 房间号 + 邀请码 -->
+                    <local:MyCard x:Name="CardRoom" Margin="0,0,0,15" Title="房间信息">
+                        <StackPanel Margin="25,38,25,20">
+
+                            <Border CornerRadius="8" Background="{DynamicResource ColorBrush8}" Margin="0,0,0,14">
+                                <Grid Margin="16,12,16,12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="1*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <Ellipse x:Name="DotStatus" Width="9" Height="9" VerticalAlignment="Center" Margin="2,0,12,0"
+                                             Fill="{DynamicResource ColorBrush1}" />
+                                    <TextBlock x:Name="LabStatus" Grid.Column="1" FontSize="13" FontWeight="SemiBold" TextWrapping="Wrap"
+                                               VerticalAlignment="Center" Text="未连接" />
+                                    <local:MyButton x:Name="BtnLeave" Grid.Column="2" MinWidth="90" Margin="12,0,0,0" Padding="13,0"
+                                                    Text="退出房间" Visibility="Collapsed" />
+                                </Grid>
+                            </Border>
+
+                            <Grid Height="34">
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="76" />
                                     <ColumnDefinition Width="1*" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
-                                <Ellipse x:Name="DotStatus" Width="9" Height="9" VerticalAlignment="Center" Margin="2,0,12,0"
-                                         Fill="{DynamicResource ColorBrush1}" />
-                                <TextBlock x:Name="LabStatus" Grid.Column="1" FontSize="13" FontWeight="SemiBold" TextWrapping="Wrap"
-                                           VerticalAlignment="Center" Text="未连接" />
-                                <local:MyButton x:Name="BtnLeave" Grid.Column="2" MinWidth="90" Margin="12,0,0,0" Padding="13,0"
-                                                Text="退出房间" Visibility="Collapsed" />
+                                <TextBlock VerticalAlignment="Center" Text="房主" Opacity="0.85" />
+                                <TextBlock x:Name="LabRoomHost" Grid.Column="1" FontSize="13" VerticalAlignment="Center"
+                                           TextTrimming="CharacterEllipsis" Text="—" />
+                                <TextBlock x:Name="LabRoomRole" Grid.Column="2" FontSize="12" Opacity="0.65"
+                                           VerticalAlignment="Center" Text="" />
                             </Grid>
-                        </Border>
+
+                            <Grid Height="34">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="76" />
+                                    <ColumnDefinition Width="1*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock VerticalAlignment="Center" Text="房主 ID" Opacity="0.85"
+                                           ToolTip="房主的启动器机器识别码，换机或重装后会变" />
+                                <local:MyTextBox x:Name="TextRoomHostId" Grid.Column="1" FontFamily="Consolas"
+                                                 VerticalAlignment="Center" MaxHeight="28" IsReadOnly="True"
+                                                 ToolTip="房主的启动器机器识别码，换机或重装后会变" />
+                                <local:MyButton x:Name="BtnCopyHostId" Grid.Column="2" MinWidth="60" Margin="10,0,0,0" Padding="10,0"
+                                                Text="复制" />
+                            </Grid>
+
+                            <Grid Height="34">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="76" />
+                                    <ColumnDefinition Width="1*" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock VerticalAlignment="Center" Text="延迟" Opacity="0.85"
+                                           ToolTip="房主侧按 EasyTier 对等连接实测；加入侧是本机到房主的协议往返" />
+                                <TextBlock x:Name="LabRoomPing" Grid.Column="1" FontSize="13" VerticalAlignment="Center"
+                                           Text="—" />
+                            </Grid>
+
+                            <Grid Height="34">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="76" />
+                                    <ColumnDefinition Width="1*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock VerticalAlignment="Center" Text="房间号" Opacity="0.85"
+                                           ToolTip="由邀请码派生的 6 位短号，双方算出同一个，便于口头核对" />
+                                <TextBlock x:Name="LabRoomNumber" Grid.Column="1" FontSize="13" FontFamily="Consolas"
+                                           VerticalAlignment="Center" Text="—" />
+                                <TextBlock Grid.Column="2" FontSize="12" Opacity="0.6" VerticalAlignment="Center"
+                                           Text="仅用于口头核对" />
+                            </Grid>
+
+                            <Grid Height="34">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="76" />
+                                    <ColumnDefinition Width="1*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock VerticalAlignment="Center" Text="邀请码" Opacity="0.85" />
+                                <local:MyTextBox x:Name="TextRoomCode" Grid.Column="1" FontFamily="Consolas"
+                                                 VerticalAlignment="Center" MaxHeight="28" IsReadOnly="True" />
+                                <local:MyButton x:Name="BtnCopyRoomCode" Grid.Column="2" MinWidth="70" Margin="10,0,0,0" Padding="10,0"
+                                                Text="复制邀请码" />
+                            </Grid>
+
+                            <Grid x:Name="PanRoomAddress" Height="34" Visibility="Collapsed">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="76" />
+                                    <ColumnDefinition Width="1*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock VerticalAlignment="Center" Text="游戏内地址" Opacity="0.85"
+                                           ToolTip="在 Minecraft 的多人游戏里直接连接这条地址" />
+                                <local:MyTextBox x:Name="TextRoomAddress" Grid.Column="1" FontFamily="Consolas"
+                                                 VerticalAlignment="Center" MaxHeight="28" IsReadOnly="True" />
+                                <local:MyButton x:Name="BtnCopyRoomAddress" Grid.Column="2" MinWidth="60" Margin="10,0,0,0" Padding="10,0"
+                                                Text="复制" />
+                            </Grid>
+                        </StackPanel>
                     </local:MyCard>
+
+                    <!-- 成员卡：房主可把成员踢出房间 -->
+                    <local:MyCard x:Name="CardRoomPlayers" Margin="0,0,0,15" Title="房间成员">
+                        <StackPanel Margin="0,26,0,14">
+                            <ItemsControl x:Name="ListPlayers" Margin="8,0,8,0">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border CornerRadius="6" Margin="17,0,17,6" Padding="10,6"
+                                                Background="{DynamicResource ColorBrush8}">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="1*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel VerticalAlignment="Center" ToolTip="{Binding Detail}">
+                                                    <TextBlock Text="{Binding Name}" FontSize="13" FontWeight="SemiBold"
+                                                               TextTrimming="CharacterEllipsis" />
+                                                    <TextBlock Text="{Binding Sub}" FontSize="11" Opacity="0.62" Margin="0,2,0,0"
+                                                               TextTrimming="CharacterEllipsis" />
+                                                </StackPanel>
+                                                <TextBlock Grid.Column="1" Text="{Binding PingText}" FontSize="12"
+                                                           VerticalAlignment="Center" Margin="12,0,0,0" />
+                                                <local:MyButton Grid.Column="2" Text="踢出" MinWidth="60" Height="28"
+                                                                Margin="12,0,0,0" Padding="10,0"
+                                                                Tag="{Binding MachineId}"
+                                                                Visibility="{Binding KickVisibility}"
+                                                                Click="BtnKick_Click"
+                                                                ToolTip="把该成员移出房间：pcl-next 加入端会自动退出房间；PCL2-CE 加入端只会把它当作心跳失败。已经建立好的游戏连接不会立刻断开（游戏流量走 EasyTier 端口转发，不经过协议服务）。" />
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <TextBlock x:Name="LabPlayersEmpty" Margin="25,4,25,6" FontSize="12" Opacity="0.65"
+                                       TextWrapping="Wrap"
+                                       Text="还没有拿到成员信息：接入协议（PCL2-CE 大厅）时每 5 秒刷新一次；其它大厅类型不提供成员列表。" />
+                        </StackPanel>
+                    </local:MyCard>
+
                 </StackPanel>
 
                 <!-- 关于联机 -->
