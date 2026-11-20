@@ -310,8 +310,8 @@ namespace PCL
                 SetStatus($"房间已创建（{_target.KindName}，服务器端口 {serverPort}）。把邀请码发给好友即可加入，端口由房主在网内发布。");
             // 公共节点不可用时给一句提示，避免误以为好友一定能连进来
             await Task.Delay(6000, ct).ConfigureAwait(false);
-            int peers = await ModLinkEasyTier.GetPeerCountAsync(_rpcPort, ct).ConfigureAwait(false);
-            if (CurrentStage == Stage.Ready && peers == 0)
+            bool relayed = await ModLinkEasyTier.HasInfrastructurePeerAsync(_rpcPort, ct).ConfigureAwait(false);
+            if (CurrentStage == Stage.Ready && !relayed)
                 SetStatus($"房间已创建（{_target.KindName}，服务器端口 {serverPort}）。当前尚未连上任何公共节点，若好友加不进来，请改用直连地址 {HostDirectAddress}。");
         }
 
@@ -454,10 +454,16 @@ namespace PCL
                         await Task.Delay(5000, ct).ConfigureAwait(false);
                         if (asHost)
                         {
-                            Dictionary<string, int> latency =
-                                await ModLinkEasyTier.GetPeerLatencyAsync(_rpcPort, ct).ConfigureAwait(false);
+                            List<ModLinkEasyTier.PeerNode> nodes =
+                                await ModLinkEasyTier.GetPeerNodesAsync(_rpcPort, ct).ConfigureAwait(false);
+                            Dictionary<string, int> latency = new Dictionary<string, int>();
+                            foreach (ModLinkEasyTier.PeerNode node in nodes)
+                            {
+                                if (node.PingMs >= 0)
+                                    latency[node.Ip] = node.PingMs;
+                            }
                             _scaffoldServer?.ApplyLatency(latency);
-                            RefreshHostPlayers();
+                            RefreshHostPlayers(nodes);
                         }
                         else
                         {
@@ -477,12 +483,34 @@ namespace PCL
             }, CancellationToken.None);
         }
 
-        private static void RefreshHostPlayers()
+        private static void RefreshHostPlayers(IReadOnlyList<ModLinkEasyTier.PeerNode> nodes = null)
         {
             ModLinkScaffold.Server server = _scaffoldServer;
             if (server is null)
                 return;
-            _players = SortPlayers(server.Players);
+            List<ModLinkScaffold.PlayerInfo> list = server.Players.ToList();
+            // 有的加入者只连到 overlay、没走大厅协议（例如 CLI 的 link join），
+            // 协议里永远不会有它，但网络层能看到。这里把这类节点也补进成员列表，
+            // 否则房主看到的永远是「只有我自己」，没法判断好友到没到。
+            HashSet<string> knownIps = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (ModLinkScaffold.PlayerInfo player in list)
+            {
+                if (!string.IsNullOrEmpty(player.RemoteIp))
+                    knownIps.Add(player.RemoteIp);
+            }
+            foreach (ModLinkEasyTier.PeerNode node in nodes ?? Array.Empty<ModLinkEasyTier.PeerNode>())
+            {
+                if (node.IsLocal || string.IsNullOrEmpty(node.Ip) || knownIps.Contains(node.Ip))
+                    continue;
+                list.Add(new ModLinkScaffold.PlayerInfo
+                {
+                    Name = string.IsNullOrWhiteSpace(node.Hostname) ? node.Ip : node.Hostname,
+                    Kind = "GUEST",
+                    RemoteIp = node.Ip,
+                    PingMs = node.PingMs
+                });
+            }
+            _players = SortPlayers(list);
         }
 
         private static void RefreshJoinerPlayers()

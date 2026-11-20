@@ -601,6 +601,8 @@ namespace PCL
                 string sub = player.IsHost ? "房主" : "成员";
                 if (!string.IsNullOrEmpty(player.MachineId))
                     sub += " · " + player.MachineId;
+                else if (!string.IsNullOrEmpty(player.RemoteIp))
+                    sub += " · " + player.RemoteIp + "（仅网络层，未走大厅协议）";
                 rows.Add(new RoomPlayerRow
                 {
                     Name = name,

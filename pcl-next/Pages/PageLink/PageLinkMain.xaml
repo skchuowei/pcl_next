@@ -320,7 +320,7 @@
                             </ItemsControl>
                             <TextBlock x:Name="LabPlayersEmpty" Margin="25,4,25,6" FontSize="12" Opacity="0.65"
                                        TextWrapping="Wrap"
-                                       Text="还没有拿到成员信息：接入协议（PCL2-CE 大厅）时每 5 秒刷新一次；其它大厅类型不提供成员列表。" />
+                                       Text="还没有成员接入：房主每 5 秒刷新一次，只连到 EasyTier 网络的加入者（例如 CLI）也会出现在这里，并标注「仅网络层」。" />
                         </StackPanel>
                     </local:MyCard>
 

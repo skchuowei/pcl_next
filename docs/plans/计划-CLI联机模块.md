@@ -129,3 +129,12 @@ tcp://et.sumnight.top:11010
    房主看到的人数会虚高。`GetPeerCountAsync` 与 `GetPeerLatencyAsync` 现在都跳过 `hostname` 以 `PublicServer` 开头的条目（`IsInfrastructurePeer`）。
 4. **设置页文案**：`LinkCustomPeer` 的 ToolTip 示例一并换成可用节点，避免用户照着填死节点。
 5. 未决：GUI 安全模式的 `--encryption-algorithm` 取自大厅档案，档案缺省为空时 GUI 不带该参数，与 CLI 的 `aes-gcm` 仍可能握手失败；是否兜底留给下一轮。
+
+## 10 GUI 实测反馈后的两处补修（2026-11-20 21:20–21:40）
+
+1. **「尚未连上任何公共节点」是误报**：建房 6 秒后的提示原先拿 `GetPeerCountAsync` 当判据，而该函数在上一步已经把 `PublicServer_*` 过滤掉，
+   于是只要没别人进来、计数就是 0，提示就误挂在那里。改为新增 `HasInfrastructurePeerAsync`（专门判断是否存在公共节点条目），与成员计数彻底分开。
+2. **成员列表看不到 CLI 加入者**：GUI 的成员列表来自 Scaffolding 协议登记，而 `pclcli link join` 只连 overlay、不跑大厅协议，
+   所以房主侧永远只有自己。现在 `RefreshHostPlayers` 会把只存在于网络层的节点补进列表（按 `RemoteIp` 与协议成员去重，跳过本机节点），
+   UI 上标注「仅网络层，未走大厅协议」，并显示 EasyTier 观测到的延迟；这类条目没有 MachineId，因此不显示「踢出」按钮。
+3. 实测确认：同一时刻 GUI 侧 `easytier-cli peer list` 已能看到 `10.114.114.1 pclcli-client relay(2)`，而界面成员仍为空——问题只在展示层，不在网络层。

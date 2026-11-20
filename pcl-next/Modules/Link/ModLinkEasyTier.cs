@@ -399,16 +399,45 @@ namespace PCL
         }
 
         /// <summary>
-        /// 读取 peer 列表里的延迟表（`IP → 毫秒`），用于房间卡片展示成员延迟。
-        /// 拿不到延迟的节点不会出现在表里（调用方按「未知」处理）。
+        /// 是否已接上任意公共节点（中转可达性判据）。
+        /// <para>注意不能拿 <see cref="GetPeerCountAsync"/> 当代理：那玩意儿已经把公共节点过滤掉了，
+        /// 过滤后房主刚建好房时人数必然为 0，会误报「没连上公共节点」。</para>
         /// </summary>
-        public static async Task<Dictionary<string, int>> GetPeerLatencyAsync(int rpcPort, CancellationToken ct)
+        public static async Task<bool> HasInfrastructurePeerAsync(int rpcPort, CancellationToken ct)
         {
             JToken output = await RunCliAsync(rpcPort, new[] { "peer", "list" }, ct).ConfigureAwait(false);
             JArray list = ExtractPeerArray(output);
-            Dictionary<string, int> table = new Dictionary<string, int>();
             if (list is null)
-                return table;
+                return false;
+            foreach (JToken item in list)
+            {
+                if (IsInfrastructurePeer(item))
+                    return true;
+            }
+            return false;
+        }
+
+        /// <summary>overlay 里的一个远端节点（不含公共共享节点）。</summary>
+        public sealed class PeerNode
+        {
+            public string Ip { get; init; } = "";
+            public string Hostname { get; init; } = "";
+            public int PingMs { get; init; } = -1;
+            /// <summary>是否本机自身节点（成本为 Local）。</summary>
+            public bool IsLocal { get; init; }
+        }
+
+        /// <summary>
+        /// 读取 overlay 成员列表（IP、主机名、延迟），已剔除公共共享节点。
+        /// 用于房间卡片把「只在网络层、没走大厅协议」的加入者（例如 CLI）也列出来。
+        /// </summary>
+        public static async Task<List<PeerNode>> GetPeerNodesAsync(int rpcPort, CancellationToken ct)
+        {
+            JToken output = await RunCliAsync(rpcPort, new[] { "peer", "list" }, ct).ConfigureAwait(false);
+            JArray list = ExtractPeerArray(output);
+            List<PeerNode> nodes = new List<PeerNode>();
+            if (list is null)
+                return nodes;
             foreach (JToken item in list)
             {
                 if (IsInfrastructurePeer(item))
@@ -416,9 +445,29 @@ namespace PCL
                 string ip = item["ipv4"]?.ToString() ?? "";
                 if (string.IsNullOrWhiteSpace(ip))
                     continue;
-                int ping = ParseLatency(item);
-                if (ping >= 0)
-                    table[ip] = ping;
+                string cost = item["cost"]?.ToString() ?? "";
+                nodes.Add(new PeerNode
+                {
+                    Ip = ip,
+                    Hostname = item["hostname"]?.ToString() ?? "",
+                    PingMs = ParseLatency(item),
+                    IsLocal = cost.Equals("Local", StringComparison.OrdinalIgnoreCase)
+                });
+            }
+            return nodes;
+        }
+
+        /// <summary>
+        /// 读取 peer 列表里的延迟表（`IP → 毫秒`），用于房间卡片展示成员延迟。
+        /// 拿不到延迟的节点不会出现在表里（调用方按「未知」处理）。
+        /// </summary>
+        public static async Task<Dictionary<string, int>> GetPeerLatencyAsync(int rpcPort, CancellationToken ct)
+        {
+            Dictionary<string, int> table = new Dictionary<string, int>();
+            foreach (PeerNode node in await GetPeerNodesAsync(rpcPort, ct).ConfigureAwait(false))
+            {
+                if (node.PingMs >= 0)
+                    table[node.Ip] = node.PingMs;
             }
             return table;
         }
