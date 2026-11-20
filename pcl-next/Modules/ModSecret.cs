@@ -198,6 +198,16 @@ namespace PCL
                 SetBrush("ColorBrushHalfWhite", IsDark ? Color.FromArgb(34, 255, 255, 255) : Color.FromArgb(85, 255, 255, 255));
                 SetBrush("ColorBrushOnAccent", IsDark ? Color.FromArgb(255, 253, 254, 255) : (Color)Color8);
                 SetBrush("ColorBrushCard", ColorCard);
+                // 卡片透光材质：上缘透、底部实，与《流体云玻璃》的 L2 透光板同一条思路。
+                // 卡片底色半透明后，窗口背景（主题渐变 / 背景图 / 全局模糊层）会从上缘渗进卡片；
+                // 底部仍保持接近实色，正文只落在 ≥84% 的区域，不靠背景图赌对比度。
+                // 侧栏的 ColorSidebarGlass（alpha≈150）是同一族的更薄一层，卡片比它厚一档，保证正文可读。
+                var CardGlass = new LinearGradientBrush() { StartPoint = new Point(0d, 0d), EndPoint = new Point(0d, 1d) };
+                CardGlass.GradientStops.Add(new GradientStop((Color)new ModBase.MyColor(IsDark ? 148d : 153d, ColorCard), 0d));
+                CardGlass.GradientStops.Add(new GradientStop((Color)new ModBase.MyColor(IsDark ? 209d : 214d, ColorCard), 0.45d));
+                CardGlass.GradientStops.Add(new GradientStop((Color)new ModBase.MyColor(IsDark ? 240d : 245d, ColorCard), 1d));
+                CardGlass.Freeze();
+                Res["ColorBrushCardGlass"] = CardGlass;
                 SetBrush("ColorBrushPopup", ColorPopup);
                 SetBrush("ColorBrushTooltip", ColorTooltip);
                 SetBrush("ColorBrushOverlay", ColorOverlay);

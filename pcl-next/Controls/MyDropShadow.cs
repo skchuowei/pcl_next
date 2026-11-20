@@ -62,6 +62,24 @@ namespace PCL
         }
         public static readonly DependencyProperty CornerRadiusProperty = DependencyProperty.Register("CornerRadius", typeof(CornerRadius), typeof(MyDropShadow), new FrameworkPropertyMetadata(new CornerRadius(), FrameworkPropertyMetadataOptions.AffectsRender, new PropertyChangedCallback(ClearBrushes)), new ValidateValueCallback(IsCornerRadiusValid));
 
+        /// <summary>
+        /// 是否跳过中心整块填充，只绘制圆角外侧的一圈阴影。
+        /// 卡片底色改为半透明后，原先被卡片完全盖住的整块阴影会从卡片内部透出来
+        /// （悬停时阴影不透明度升到 0.4，卡片会明显发灰）；玻璃卡片因此只保留外圈。
+        /// </summary>
+        public bool SkipCenterFill
+        {
+            get
+            {
+                return Conversions.ToBoolean(GetValue(SkipCenterFillProperty));
+            }
+            set
+            {
+                SetValue(SkipCenterFillProperty, value);
+            }
+        }
+        public static readonly DependencyProperty SkipCenterFillProperty = DependencyProperty.Register("SkipCenterFill", typeof(bool), typeof(MyDropShadow), new FrameworkPropertyMetadata(false, FrameworkPropertyMetadataOptions.AffectsRender));
+
 
         // =======================================
         // 渲染
@@ -135,6 +153,13 @@ namespace PCL
 
                 var bottomRight = new Rect(guidelineSetX[4], guidelineSetY[4], cornerRadius.BottomRight, cornerRadius.BottomRight);
                 drawingContext.DrawRectangle(brushes[(int)Placement.BottomRight], null, bottomRight);
+
+                // 外圈已经画完：玻璃卡片只要这一圈，中心整块留给卡片自己的半透明底色透出背景。
+                if (SkipCenterFill)
+                {
+                    drawingContext.Pop();
+                    return;
+                }
 
                 if (cornerRadius.TopLeft == ShadowRadius && cornerRadius.TopLeft == cornerRadius.TopRight && cornerRadius.TopLeft == cornerRadius.BottomLeft && cornerRadius.TopLeft == cornerRadius.BottomRight)
                 {

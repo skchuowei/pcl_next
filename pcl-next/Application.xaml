@@ -73,6 +73,13 @@
             <!-- 语义颜色（随主题切换，深色主题下由 ModSecret.ThemeRefresh 覆盖） -->
             <SolidColorBrush x:Key="ColorBrushOnAccent" Color="#F5F9FF" />
             <SolidColorBrush x:Key="ColorBrushCard" Color="#F5FFFFFF" />
+            <!-- 卡片透光材质：上缘 60% → 中部 84% → 底部 96%，让窗口背景从卡片上缘渗进来；
+                 正文落在 ≥84% 的下半区，对比度不靠背景图吃饭。主题切换时由 ModSecret.ThemeRefresh 重算。 -->
+            <LinearGradientBrush x:Key="ColorBrushCardGlass" StartPoint="0,0" EndPoint="0,1">
+                <GradientStop Color="#99FFFFFF" Offset="0" />
+                <GradientStop Color="#D6FFFFFF" Offset="0.45" />
+                <GradientStop Color="#F5FFFFFF" Offset="1" />
+            </LinearGradientBrush>
             <SolidColorBrush x:Key="ColorBrushPopup" Color="#FFFFFF" />
             <SolidColorBrush x:Key="ColorBrushTooltip" Color="#FBFBFB" />
             <SolidColorBrush x:Key="ColorBrushOverlay" Color="#DDDDDDDD" />

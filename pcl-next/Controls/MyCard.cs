@@ -99,11 +99,12 @@ namespace PCL
         // UI 建立
         public MyCard()
         {
-            MainChrome = new MyDropShadow() { Margin = new Thickness(-3, -3, -3, -3 - ModBase.GetWPFSize(1d)), ShadowRadius = 3d, Opacity = DropShadowIdleOpacity, CornerRadius = new CornerRadius(5d) };
+            MainChrome = new MyDropShadow() { Margin = new Thickness(-3, -3, -3, -3 - ModBase.GetWPFSize(1d)), ShadowRadius = 3d, Opacity = DropShadowIdleOpacity, CornerRadius = new CornerRadius(5d), SkipCenterFill = true };
             MainChrome.SetResourceReference(MyDropShadow.ColorProperty, "ColorObjectShadow");
             Children.Insert(0, MainChrome);
             MainBorder = new Border() { CornerRadius = new CornerRadius(5d), IsHitTestVisible = false };
-            MainBorder.SetResourceReference(Border.BackgroundProperty, "ColorBrushCard");
+            // 卡片底色改为「上缘透、底部实」的半透明材质：窗口背景（主题渐变 / 背景图 / 全局模糊层）从卡片上缘渗进来
+            MainBorder.SetResourceReference(Border.BackgroundProperty, "ColorBrushCardGlass");
             Children.Insert(1, MainBorder);
             MainGrid = new Grid();
             Children.Add(MainGrid);
