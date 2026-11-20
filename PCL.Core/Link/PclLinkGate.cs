@@ -215,8 +215,9 @@ namespace PCL.Core.Link
                     _log?.Invoke($"[gate] 通过 {found.MachineId}");
 
                     WriteLine(stream, "OK");
-                    stream.ReadTimeout = 0;
-                    stream.WriteTimeout = 0;
+                    // 0 在 Linux 上是非法超时值（.NET 只接受正数或 Timeout.Infinite）
+                    stream.ReadTimeout = Timeout.Infinite;
+                    stream.WriteTimeout = Timeout.Infinite;
                     await PipeAsync(client, stream).ConfigureAwait(false);
                 }
                 catch (Exception ex)
@@ -428,8 +429,8 @@ namespace PCL.Core.Link
                     if (!reply.Equals("OK", StringComparison.Ordinal))
                         throw new InvalidOperationException("网关拒绝：" + reply);
 
-                    inbound.ReadTimeout = 0;
-                    inbound.WriteTimeout = 0;
+                    inbound.ReadTimeout = Timeout.Infinite;
+                    inbound.WriteTimeout = Timeout.Infinite;
                     using NetworkStream outbound = local.GetStream();
                     Task up = PumpAsync(outbound, inbound);
                     Task down = PumpAsync(inbound, outbound);
