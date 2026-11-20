@@ -155,6 +155,21 @@ namespace PCL
                     FeatureList.Add(new KeyValuePair<int, string>(2, "新增：按分支规范区分开发 / 收敛 / 内测 / 公测 / 正式 / 快照六种渠道"));
                 }
             }
+            else if (ModBuildChannel.Channel == ModBuildChannel.Channels.Beta)
+            {
+                // 公测线的更新日志（2026-11-20 补：此前 Beta 落入 else 兜底分支，
+                // 按 Snapshot 旧版本号判断，导致从旧版升级时更新日志为空）。
+                // 按《分支与发布规范》§5.1 的版本号段排列。
+                if (LastVersion < 5060) // beta.1 2.100.0.7
+                {
+                    FeatureList.Add(new KeyValuePair<int, string>(1, "重写：Windows 线完成 VB.NET → C# 全量重写，主程序不再依赖 VB 实现"));
+                    FeatureList.Add(new KeyValuePair<int, string>(2, "修复：此前所有登录方式（离线 / 正版 / Nide / Auth）均失败、无法启动游戏，alpha 阶段已修好"));
+                    FeatureList.Add(new KeyValuePair<int, string>(2, "新增：按分支规范区分开发 / 收敛 / 内测 / 公测 / 正式 / 快照六种渠道"));
+                    FeatureList.Add(new KeyValuePair<int, string>(1, "说明：beta.1 基线为 alpha.1，无新增代码修复；单人自检版本，未经外部用户测试"));
+                    FeatureCount += 1;
+                    BugCount += 1;
+                }
+            }
             else if (ModBuildChannel.Channel == ModBuildChannel.Channels.Dev || ModBuildChannel.Channel == ModBuildChannel.Channels.Slush)
             {
                 // 开发线 / 收敛线的更新日志，按《分支与发布规范》§5.1 的版本号段排列

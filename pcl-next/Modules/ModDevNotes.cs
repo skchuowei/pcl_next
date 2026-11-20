@@ -45,6 +45,10 @@ namespace PCL
                 int versionCode = ModBase.VersionCode;
                 switch (versionCode)
                 {
+                    case 5060: // beta.1 2.100.0.7（2026-11-20 补：此前只写到 5005，公测版无开发阶段提示）
+                        {
+                            return "你正在使用 PCL Next 的公测版（beta）。Windows 线的 C# 全量重写已完成，主程序不再依赖 VB 实现。" + "\r\n" + "\r\n" + "已知说明：" + "\r\n" + "- beta.1 代码基线为 alpha.1，无新增代码修复，主要用于完成阶段流转与扩大验证面；" + "\r\n" + "- 单人自检版本，未经外部用户测试，遇到崩溃 / 卡死 / 配置丢失请附 PCL/Log1.txt 反馈；" + "\r\n" + "- 代码仍带 VB 语义残留（dynamic / Microsoft.VisualBasic 转换函数），是后续代码质量主线。";
+                        }
                     case 5005: // dev 2.100.0.6
                         {
                             return "你正在使用 PCL Next 的开发版（dev）。本版完成下载功能的修复与真机回归：" + "NeoForge / Forge 安装器参数、安装器所需 Java 版本、Modrinth 版本列表、资源搜索与版本图标加载均已修复；" + "安装编排的步骤、权重、Block 与下载清单改由 C# 描述符决定，VB 只做无逻辑装配。" + "\r\n" + "\r\n" + "本版本已知限制：" + "\r\n" + "- 下载 UI 的编排外壳（加载器树生成、任务列表与进度）仍是 VB；五个安装复合体的内部子列表尚未下沉（P4-B 批次 2）；" + "\r\n" + "- 六类加载器列表仍未逐类真机安装冒烟；" + "\r\n" + "- 未配置 PCL_CURSEFORGE_API_KEY 时 OptiFabric 会跳过 CurseForge 直查、返回空列表；" + "\r\n" + "- C# 完整重写尚未完成，Phase 6（下线 VB 下载模块）未开始；" + "\r\n" + "- 配置与存档结构可能在后续版本调整，建议定期备份；遇到异常请附 PCL/Log1.txt。";
@@ -88,6 +92,10 @@ namespace PCL
                 int versionCode = ModBase.VersionCode;
                 switch (versionCode)
                 {
+                    case 5060: // beta.1 2.100.0.7（2026-11-20 补）
+                        {
+                            return "· 重写：Windows 线完成 VB.NET → C# 全量重写，VB 源码退出编译链，主程序不再依赖 VB 实现。" + "\r\n" + "· 修复：alpha 阶段修复阻塞级登录缺陷（此前所有登录方式均失败、无法启动游戏）及打开网页 / 目录 / 日志失效、管理员重启不提权等共 13 项。" + "\r\n" + "· 门禁：单人自检版本——自动化自测 691 项全绿（Download 568 + MeloongCore 123），双 RID 完整编译 0 错误、架构校验通过。" + "\r\n" + "· 修复：补 Beta 渠道更新日志（ShowUpdateLog 此前漏 Beta 分支，升级时显示「没有更新日志」）。";
+                        }
                     case 5005: // dev 2.100.0.6
                         {
                             return "· 重写：口径 A 落地——InstallTaskDescriptor / InstallTaskPlanner.Describe 输出全部编排决策与任务描述符，" + "InstallPlanStep 挂 Task/Inputs/Outputs/SubSteps/DownloadKinds/Cancel/ReportsProgress/SubStepsSource；" + "NetFileDescriptorKind 扩到 13 类，收编 VB FileChecker 的逐类校验口径。" + "\r\n" + "· 重写：LoaderPlanAdapter.vb 薄装配层——McInstallLoadersGet 196 行降至 91 行，" + "7 处 If 组件已选 与 14 处 Plan.GetStep 归零，名称/权重/Block/Show 一律读 DTO，执行 lambda 不变。" + "\r\n" + @"· 修复：InstallerArguments.QuoteDirectory 统一去路径尾斜杠——RequestTaskTempFolder 返回尾 \，" + @"包进命令行引号后，尾斜杠吞掉了转义，gameDir 参数末尾多出一个字面引号，安装器拿到不存在的目录；盘符根 C:\ 在引号内写 \\。" + "\r\n" + "· 修复：JavaRequirement.ReadRequiredJavaMajor 读原版 json 的 javaVersion.majorVersion（兼容旧 java_version），" + "≥22 时先精确匹配该主版本，本机没有才放宽为 AtLeast；旧口径按 JavaList 顺序取首个通过者，26.3 需 25 却选到 21。" + "\r\n" + "· 修复：Settings.vb 补注册 SystemPendingUpdateLogFrom——未注册导致每次启动抛 KeyNotFoundException，" + "连带跳过 ServerLoader.Start() 与临时目录清理。" + "\r\n" + "· 修复：ResourceVersion.FromPlatformJson 的 Modrinth Id 改取 data[\"id\"]（回退 project_id）——" + "旧口径让 DistinctBy(a => a.Id) 把同一项目的 1221 个版本压成 1 条。" + "\r\n" + "· 降级：无 PCL_CURSEFORGE_API_KEY 时 DlOptiFabricLoader 跳过 CF 项目 322385 直查、返回空列表并记日志（Modrinth 无 optifabric 项目）。" + "\r\n" + "· 修复：MyBitmap 归一化旧程序集名 pack URI（Plain Craft Launcher 2;component/Images/...）。" + "\r\n" + "· 测试：568 例全绿；InstallerArguments 26 例、描述符 60 例、多版本不折叠守门用例各含变异反证。";
