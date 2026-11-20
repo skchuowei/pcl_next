@@ -53,17 +53,12 @@ namespace PCL
                 ["Argument"] = "--no-tun",
 
                 // 回退发现节点：主节点不可用时房主/加入者共同连它，保证能互相发现
-                ["DiscoverPeer"] = "tcp://public.easytier.top:11010",
+                ["DiscoverPeer"] = ModLinkEasyTier.PublicPeers[0],
                 ["DiscoverPeerId"] = 0,
 
-                // 内置节点池：EasyTier 官方公共节点（社区免费共享，无 SLA）
-                ["Peers"] = new JArray
-                {
-                    "tcp://public.easytier.top:11010",
-                    "tcp://public2.easytier.cn:54321",
-                    "udp://public.easytier.top:11010",
-                    "udp://public2.easytier.cn:54321"
-                },
+                // 内置节点池：社区公共节点（免费共享，无 SLA）。
+                // 唯一真源在 ModLinkEasyTier.PublicPeers，这里只做引用，避免两处列表各改各的。
+                ["Peers"] = new JArray(ModLinkEasyTier.PublicPeers),
                 ["PeersBlackList"] = new JArray(),
                 ["MandatoryPeers"] = new JArray(),
                 // 加入者额外连接的中继节点个数

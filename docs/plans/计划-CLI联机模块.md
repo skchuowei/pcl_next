@@ -116,4 +116,16 @@ tcp://et.sumnight.top:11010
 
 ## 8 回滚方案
 
-删除 `PCL.Core/Link/` 与 `PCL.Cli/Commands/LinkCommand.cs`，回退 `Program.cs`、`CliExitCode.cs`；EasyTier 二进制与状态文件都在 `--workdir` 下，随目录删除即可。GUI 侧零改动，回滚不影响任何现有功能。
+删除 `PCL.Core/Link/` 与 `PCL.Cli/Commands/LinkCommand.cs`，回退 `Program.cs`、`CliExitCode.cs`；EasyTier 二进制与状态文件都在 `--workdir` 下，随目录删除即可。GUI 侧的本轮改动（节点表 / peer 过滤）只改常量与统计口径，回退到 `ModLinkEasyTier.cs`、`ModLinkConfig.cs` 上一版即可，不影响建房、加入与游戏启动。
+
+## 9 根治：GUI 默认节点与成员统计（2026-11-20）
+
+1. **换掉 GUI 内置节点**：`ModLinkEasyTier.PublicPeers` 由已 NXDOMAIN 的 `public.easytier.top` / `public2.easytier.cn` 换成四个社区节点
+   （`225284.xyz` / `easytier.weiai.org.cn` / `183.230.36.171` / `et.sumnight.top`，均 `tcp://…:11010`），
+   本机实测四个均可 A 记录解析且 TCP 11010 可达。`ModLinkSession.GetPeers()` 会把列表逐个展开成 `-p`，所以房主与加入者共用同一批中转。
+2. **消灭重复真源**：`ModLinkConfig.cs` 的 `["Peers"]` / `["DiscoverPeer"]` 原先是另一份写死死节点的副本，改为直接引用
+   `ModLinkEasyTier.PublicPeers`（`DiscoverPeer` 取 `[0]`），以后只改一处。
+3. **成员统计去掉公共节点**：EasyTier `peer list` 会把社区节点列成 `PublicServer_*` 条目，原先 GUI 的房间成员数/延迟表把它们也算成人，
+   房主看到的人数会虚高。`GetPeerCountAsync` 与 `GetPeerLatencyAsync` 现在都跳过 `hostname` 以 `PublicServer` 开头的条目（`IsInfrastructurePeer`）。
+4. **设置页文案**：`LinkCustomPeer` 的 ToolTip 示例一并换成可用节点，避免用户照着填死节点。
+5. 未决：GUI 安全模式的 `--encryption-algorithm` 取自大厅档案，档案缺省为空时 GUI 不带该参数，与 CLI 的 `aes-gcm` 仍可能握手失败；是否兜底留给下一轮。

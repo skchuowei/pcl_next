@@ -21,7 +21,7 @@ namespace PCL
     /// <para>
     /// 本类为 pcl-next 自研实现，不依赖上游 <c>ModSecret.ServerConfig</c>、也不走旧的
     /// 「联机模块」加载器链路（旧链路在开源构建里拿不到配置、下载进度也容易卡死）。
-    /// 网络层只用 EasyTier 公共节点（public.easytier.top / public2.easytier.cn），无自建服务。
+    /// 网络层只用 EasyTier 社区公共节点（列表见 <see cref="PublicPeers"/>），无自建服务。
     /// </para>
     /// </summary>
     public static class ModLinkEasyTier
@@ -40,12 +40,20 @@ namespace PCL
         /// <summary>发行包体积上限：实测约 40–60 MB，留 200 MB 余量，防止被镜像塞入异常大文件。</summary>
         private const int LinkMaxBytes = 200 * 1024 * 1024;
 
-        /// <summary>公共节点（社区免费共享，无 SLA，仅作发现与中转）。</summary>
+        /// <summary>
+        /// 公共节点（社区免费共享，无 SLA，仅作发现与中转）。
+        /// <para>
+        /// 2026-11-20 实测：原先内置的 <c>public.easytier.top</c> / <c>public2.easytier.cn</c> 已无 A 记录
+        /// （权威 DNS 返回 NXDOMAIN），房主接不上任何中转集群，外网加入者拿到邀请码也发现不了房间。
+        /// 这里换成社区节点监控页（info.qtet.cn/uptime/easytier）在册、且 Windows 与云端 Linux 双向 TCP 可达的节点。
+        /// </para>
+        /// </summary>
         public static readonly string[] PublicPeers =
         {
-            "tcp://public.easytier.top:11010",
-            "tcp://public2.easytier.cn:54321",
-            "udp://public.easytier.top:11010"
+            "tcp://225284.xyz:11010",
+            "tcp://easytier.weiai.org.cn:11010",
+            "tcp://183.230.36.171:11010",
+            "tcp://et.sumnight.top:11010"
         };
 
         private static string RootDir => Paths.AppDataThenName + @"Link\EasyTier\";
@@ -373,11 +381,21 @@ namespace PCL
             int remote = 0;
             foreach (JToken item in list)
             {
+                // 公共节点也是 peer 条目（hostname 形如 PublicServer_xxx），不能算成房间成员
+                if (IsInfrastructurePeer(item))
+                    continue;
                 string cost = item["cost"]?.ToString() ?? "";
                 if (!cost.Equals("Local", StringComparison.OrdinalIgnoreCase))
                     remote++;
             }
             return remote;
+        }
+
+        /// <summary>peer 条目是不是公共共享节点（EasyTier 用 <c>PublicServer_</c> 前缀标记）。</summary>
+        private static bool IsInfrastructurePeer(JToken item)
+        {
+            string hostname = item["hostname"]?.ToString() ?? "";
+            return hostname.StartsWith("PublicServer", StringComparison.OrdinalIgnoreCase);
         }
 
         /// <summary>
@@ -393,6 +411,8 @@ namespace PCL
                 return table;
             foreach (JToken item in list)
             {
+                if (IsInfrastructurePeer(item))
+                    continue;
                 string ip = item["ipv4"]?.ToString() ?? "";
                 if (string.IsNullOrWhiteSpace(ip))
                     continue;
