@@ -57,6 +57,8 @@ namespace PCL.Core.Link
             public int GatePort { get; set; }
             /// <summary>大厅协议里展示的昵称。</summary>
             public string Nickname { get; set; } = "";
+            /// <summary>网关隧道子进程 PID（0 表示没有走网关）。</summary>
+            public int TunnelPid { get; set; }
             public int ListenPort { get; set; }
             public int RpcPort { get; set; }
             public int Pid { get; set; }
@@ -285,12 +287,13 @@ namespace PCL.Core.Link
                             throw new InvalidOperationException("房主没有给出有效的服务器端口");
                     }
                     PclLinkScaffoldClient.GateInfo? gate = scaffold.GetGate();
-                    if (gate is not null)
+                    if (gate is not null && gate.Port > 0 && !string.IsNullOrEmpty(gate.Ticket))
                     {
-                        PclLinkGate.Client tunnel = new(localPort, options.OverlayIp, gate.Port, info.FullSecret, gate.Ticket,
-                            msg => status?.Invoke(msg));
-                        tunnel.Start();
+                        // CLI 进程退出后隧道就没了：必须交给独立子进程常驻
+                        state.TunnelPid = StartGateTunnel(workDir, localPort, options.OverlayIp, gate.Port,
+                            info.FullSecret, gate.Ticket);
                         state.GatePort = gate.Port;
+                        status?.Invoke($"准入网关已握手，隧道子进程 PID {state.TunnelPid}");
                     }
                 }
             }
@@ -307,6 +310,84 @@ namespace PCL.Core.Link
             }
             Save(workDir, state);
             return state;
+        }
+
+        /// <summary>
+        /// 起一个常驻的网关隧道子进程：本机 <paramref name="localPort"/> 经 HMAC 握手转到房主网关端口。
+        /// 凭据写入受限权限的配置文件，避免出现在进程命令行里。
+        /// </summary>
+        private static int StartGateTunnel(string workDir, int localPort, string hostIp, int gatePort,
+            string secret, string ticket)
+        {
+            string runDir = Path.Combine(workDir, "link");
+            Directory.CreateDirectory(runDir);
+            string configPath = Path.Combine(runDir, "gate-tunnel.json");
+            string logPath = Path.Combine(runDir, "gate-tunnel.log");
+            string json = JsonSerializer.Serialize(new
+            {
+                localPort,
+                hostIp,
+                gatePort,
+                secret,
+                ticket
+            }, JsonOptions);
+            File.WriteAllText(configPath, json, new UTF8Encoding(false));
+            if (!OperatingSystem.IsWindows())
+            {
+                try
+                {
+                    File.SetUnixFileMode(configPath,
+                        UnixFileMode.UserRead | UnixFileMode.UserWrite);
+                }
+                catch
+                {
+                    // 某些文件系统不支持，忽略
+                }
+            }
+
+            string exe = Environment.ProcessPath ?? throw new InvalidOperationException("拿不到 CLI 可执行文件路径");
+            string scriptPath = Path.Combine(runDir, OperatingSystem.IsWindows() ? "run-gate-tunnel.cmd" : "run-gate-tunnel.sh");
+            StringBuilder script = new();
+            if (OperatingSystem.IsWindows())
+            {
+                script.AppendLine("@echo off");
+                script.Append('"').Append(exe).Append('"');
+            }
+            else
+            {
+                script.AppendLine("#!/bin/sh");
+                script.Append("exec \"").Append(exe).Append('"');
+            }
+            foreach (string arg in new[]
+                     {
+                         "link", "tunnel", "--config", configPath, "--log", logPath
+                     })
+                script.Append(' ').Append('"').Append(arg).Append('"');
+            script.Append(" >> ").Append('"').Append(logPath).Append('"').AppendLine(" 2>&1");
+            File.WriteAllText(scriptPath, script.ToString(), new UTF8Encoding(false));
+            if (!OperatingSystem.IsWindows())
+            {
+                File.SetUnixFileMode(scriptPath,
+                    UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+            }
+
+            ProcessStartInfo info = OperatingSystem.IsWindows()
+                ? new ProcessStartInfo("cmd.exe")
+                : new ProcessStartInfo("/bin/sh");
+            info.UseShellExecute = false;
+            info.CreateNoWindow = true;
+            if (OperatingSystem.IsWindows())
+            {
+                info.ArgumentList.Add("/c");
+                info.ArgumentList.Add(scriptPath);
+            }
+            else
+            {
+                info.ArgumentList.Add(scriptPath);
+            }
+            using Process process = new() { StartInfo = info };
+            process.Start();
+            return process.Id;
         }
 
         /// <summary>向本机 easytier-cli 动态加一条端口转发。</summary>
@@ -485,6 +566,15 @@ namespace PCL.Core.Link
         {
             state = Load(workDir);
             bool stopped = state is not null && PclLinkEasyTier.Stop(state.Pid);
+            if (state is not null && state.TunnelPid > 0)
+                PclLinkEasyTier.Stop(state.TunnelPid);
+            if (state is not null)
+            {
+                foreach (string file in new[] { "gate-tunnel.json", "gate-tunnel.log" })
+                {
+                    try { File.Delete(Path.Combine(workDir, "link", file)); } catch { /* 忽略 */ }
+                }
+            }
             Clear(workDir);
             return stopped;
         }

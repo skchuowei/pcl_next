@@ -42,6 +42,9 @@ internal static class LinkCommand
             加入者用 --local-port 连 127.0.0.1 即经 overlay 转到房主 --port。
           · 公共节点不可达时用 --direct 指向对方公网 IP:监听端口（需对方端口可达）。
           · 服务器没开游戏也能验证：房主跑 link echo，加入者跑 link probe。
+          · 房主开了 p-next 大厅协议时，join 会注册成员、自动问出 MC 端口；
+            若房主启用准入网关，join 会拉起常驻隧道子进程（link stop 一并清理），
+            overlay 上不再直接暴露 MC 端口，没走协议的一方连不进来。
         """;
 
     public static async Task<int> RunAsync(CliSession session)
@@ -62,6 +65,7 @@ internal static class LinkCommand
                 "stop" => Stop(session),
                 "probe" => await ProbeAsync(session).ConfigureAwait(false),
                 "echo" => await EchoAsync(session).ConfigureAwait(false),
+                "tunnel" => await TunnelAsync(session).ConfigureAwait(false),
                 "selftest" => SelfTest(session),
                 _ => throw new CliUsageException("未知 link 子命令，可选 install / create / join / status / stop / probe / echo / selftest")
             };
@@ -113,6 +117,45 @@ internal static class LinkCommand
             ("core", PclLinkEasyTier.CorePath(session.WorkDir)),
             ("cli", PclLinkEasyTier.CliPath(session.WorkDir)));
         session.Output.Result(true, ("ready", true));
+        return (int)CliExitCode.Ok;
+    }
+
+    /// <summary>
+    /// 隐藏子命令：常驻网关隧道（由 link join 拉起，进程退出即隧道失效，所以必须独立进程）。
+    /// 凭据从受限权限的 JSON 文件读取，不走命令行。
+    /// </summary>
+    private static async Task<int> TunnelAsync(CliSession session)
+    {
+        var args = session.Args;
+        string configPath = args.Get("config") ?? "";
+        if (!File.Exists(configPath))
+            throw new CliUsageException("link tunnel 需要 --config <路径>");
+        using JsonDocument doc = JsonDocument.Parse(File.ReadAllText(configPath));
+        JsonElement root = doc.RootElement;
+        int localPort = root.GetProperty("localPort").GetInt32();
+        string hostIp = root.GetProperty("hostIp").GetString() ?? "";
+        int gatePort = root.GetProperty("gatePort").GetInt32();
+        string secret = root.GetProperty("secret").GetString() ?? "";
+        string ticket = root.GetProperty("ticket").GetString() ?? "";
+
+        TextWriter? log = null;
+        string logPath = args.Get("log") ?? "";
+        if (!string.IsNullOrEmpty(logPath))
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(logPath)!);
+            log = new StreamWriter(logPath, append: true) { AutoFlush = true };
+        }
+
+        using var tunnel = new PclLinkGate.Client(localPort, hostIp, gatePort, secret, ticket, msg =>
+        {
+            log?.WriteLine($"[{DateTime.Now:HH:mm:ss}] {msg}");
+        });
+        tunnel.Start();
+        session.Output.Say($"网关隧道运行中：127.0.0.1:{localPort} → {hostIp}:{gatePort}");
+        // 常驻：直到进程被杀（link stop）或父进程发取消
+        while (!session.Token.IsCancellationRequested)
+            await Task.Delay(1000, session.Token).ConfigureAwait(false);
+        log?.Dispose();
         return (int)CliExitCode.Ok;
     }
 
