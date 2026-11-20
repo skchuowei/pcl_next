@@ -41,7 +41,7 @@ namespace PCL
                                              // 2026-11-13 进入 alpha：本目录（PCL_NEXT_Windows_slush）改检出 alpha-Windows，
                                              // 号段按 §5.2 从 slush 的 5010 移到 alpha 区间（base+20…59），取 5020；
                                              // 版本名仍为 2.100.0.7（未发布新大版本，仅阶段推进）。
-        public const int VersionCode = 5020;
+        public const int VersionCode = 5060;
 
         // 版本信息
         /// <summary>
