@@ -162,6 +162,37 @@
                 </Grid>
             </local:MyCard>
 
+            <local:MyCard Margin="0,0,0,15" Title="自动更新">
+                <Grid Margin="25,40,25,17">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" SharedSizeGroup="Name" />
+                        <ColumnDefinition Width="1*" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="28" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <TextBlock VerticalAlignment="Center" HorizontalAlignment="Left" Text="更新渠道" Margin="0,0,25,0" ToolTip="选择自动更新跟随的发布渠道。渠道稳定性由低到高为 dev → slush → alpha → beta → rc。" />
+                    <local:MyComboBox x:Name="ComboUpdateChannel" local:SettingService.Key="SystemUpdateChannel" Grid.Column="1" HorizontalAlignment="Left" Width="200">
+                        <local:MyComboBoxItem Content="开发版 dev" />
+                        <local:MyComboBoxItem Content="收敛版 slush" />
+                        <local:MyComboBoxItem Content="内测版 alpha" />
+                        <local:MyComboBoxItem Content="公测版 beta" />
+                        <local:MyComboBoxItem Content="正式版 rc" />
+                    </local:MyComboBox>
+                    <TextBlock Grid.Row="1" Grid.Column="1" TextWrapping="Wrap" LineHeight="16" Margin="0,2,0,8"
+                               Text="默认跟随当前版本的渠道。切换后不会降级安装：只接受版本号更高、且渠道不低于所选渠道的更新。" />
+                    <!-- 正式版（rc / sp）没有更高渠道可晋级，整块折叠；非测试渠道保留 -->
+                    <StackPanel x:Name="PanGraduate" Grid.Row="2" Grid.ColumnSpan="2">
+                        <local:MyCheckBox x:Name="CheckUpdateGraduate" local:SettingService.Key="SystemUpdateGraduate"
+                                          Text="陆续退出测试版（检测到更高渠道发布时自动晋级，一次跳到最高）" />
+                        <TextBlock TextWrapping="Wrap" LineHeight="16" Margin="25,2,0,0"
+                                   Text="开启后持续生效：若在 dev 检测到 slush / alpha / beta / rc 已有新版本，将直接升级到其中最稳定的版本，此后不再接受低渠道更新；到达正式版（rc）后本开关自动关闭。" />
+                    </StackPanel>
+                </Grid>
+            </local:MyCard>
+
             <!-- <local:MyCard x:Name="CardMain" Margin="0,15" Title="全局设置">
                 <StackPanel Margin="25,40,25,15">
                     <Grid x:Name="PanMainLang" Height="28" Margin="0,0,0,10" Visibility="Collapsed">

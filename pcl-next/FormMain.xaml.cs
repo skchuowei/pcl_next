@@ -637,7 +637,7 @@ namespace PCL
             {
                 Logger.Error(ex, "初始化加载池运行失败");
             }
-            // 清理自动更新文件
+            // 清理旧版自动更新残留文件
             try
             {
                 FileUtils.Delete(Paths.Base + @"PCL\pcl-next.exe");
@@ -646,6 +646,17 @@ namespace PCL
             catch (Exception ex)
             {
                 Logger.Warn(ex, "清理自动更新文件失败");
+            }
+            // 自动更新：启动后台静默检查（有更新才提示）。延迟 3 秒避开启动高峰，
+            // 失败静默记日志，绝不阻塞启动。用户可在设置 → 启动器里关闭或改渠道。
+            try
+            {
+                Thread.Sleep(3000);
+                ModUpdate.RunInteractiveCheck(Silent: true);
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn(ex, "启动自动更新检查失败");
             }
             // 更新日志 / 开发阶段提示统一在「更新后第一次启动」触发：
             // UpgradeSub 只写待显示标记，由 RunCountSub 负责呈现并清除（2026-11-08 用户裁决）。

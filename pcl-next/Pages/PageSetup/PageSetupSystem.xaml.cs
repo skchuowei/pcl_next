@@ -38,6 +38,18 @@ namespace PCL
             // 重复加载部分
             this.PanBack.ScrollToHome();
 
+            // 自动更新：把未设置（-1，跟随编译渠道）规范到当前渠道的下拉项，
+            // 并让 MyComboBox 的 SelectedIndex 与设置值保持一致（index 0..4 = Dev..Rc）。
+            int SavedChannel = Settings.Get<int>("SystemUpdateChannel");
+            if (SavedChannel < 0 || SavedChannel > (int)ModBuildChannel.Channels.Rc)
+                SavedChannel = (int)ModBuildChannel.Channel;
+            this.ComboUpdateChannel.SelectedIndex = SavedChannel;
+
+            // 正式版（RC / SP）没有更高渠道可晋级，「陆续退出测试版」无意义，整块折叠。
+            // 其余测试渠道（dev / slush / alpha / beta）保留该选项。
+            if (ModBuildChannel.ChannelIsOfficial)
+                this.PanGraduate.Visibility = Visibility.Collapsed;
+
             if (ModBuildChannel.ChannelIsOfficial)
             {
                 this.PanDonate.Visibility = Visibility.Collapsed;

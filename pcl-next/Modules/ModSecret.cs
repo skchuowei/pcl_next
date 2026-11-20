@@ -352,11 +352,17 @@ namespace PCL
 
         #region 更新
 
-        // pcl-next 没有内置自动更新服务器，检查更新时统一引导用户前往 GitHub 仓库 Releases 获取新版本。
-        // 仓库地址：https://github.com/skchuowei/pcl_next
+        // 2026-11-20：上线内置自动更新，检查更新走 ModUpdate（GitHub Releases API → 下载 → 重启安装）。
+        // 若用户把「启动器更新」设为关闭（SystemSystemUpdate == 3），RunInteractiveCheck 会直接返回；
+        // 这种情况下再引导用户手动前往 Releases，避免出现"点了检查更新却什么都没发生"。
         internal static void UpdateCheckByButton()
         {
-            ModBase.OpenWebsite("https://github.com/skchuowei/pcl_next/releases");
+            if (Settings.Get<int>("SystemSystemUpdate") == 3)
+            {
+                ModBase.OpenWebsite("https://github.com/skchuowei/pcl_next/releases");
+                return;
+            }
+            ModUpdate.RunInteractiveCheck(Silent: false);
         }
 
         #endregion
