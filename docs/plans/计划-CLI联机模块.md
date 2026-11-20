@@ -101,6 +101,19 @@ tcp://et.sumnight.top:11010
 5. **父进程退出会带走子进程的输出管道**：不能用 `RedirectStandardOutput` 直接起核心，必须走启动脚本重定向到日志文件（见 §4.3）。
 6. **沙箱 DNS 不可用作网络判据**：`getent` 无结果不等于节点不可达，要用 DoH 复核（本次 DoH 直接给出 NXDOMAIN 才是真死）。
 
-## 7 回滚方案
+## 7 追加：安全模式与 GUI 房间可达性（2026-11-20 晚，实测）
+
+1. **安全模式必须显式对齐加密算法**：GUI 建房参数是 `--secure-mode true --encryption-algorithm aes-gcm`；CLI 只给 `--secure-mode true` 时，房主侧会以
+   `conn closed during wait handshake response` 直接断开（本机直连也失败）。已在 `PclLinkSession.BaseArguments` 里补 `aes-gcm`，与 GUI 一致。
+2. **GUI 房间目前没有可达中继**：`ModLinkEasyTier.PublicPeers` 仍是 `public.easytier.top` / `public2.easytier.cn`（已 NXDOMAIN），
+   所以 GUI 建出的房间只在局域网可达，云端拿到邀请码也找不到房主。
+3. **验证用「本地 CLI 节点做桥」**：本地节点同时 `-p` 四个社区节点与 `-p tcp://192.168.101.17:30005`（GUI 的监听端口），
+   房主与云端都连到这座桥。云端 `link status` 实测可见：
+   `10.114.114.1 pclcli-client relay(2) 233 ms`、`10.114.114.114 pclnext-mc-server-30003 relay(3) 238 ms`，`hostPresent=true`。
+4. **桥只能用 LAN IP**：同机连 `127.0.0.1:30005` 会报 `10049 AddrNotAvailable`（EasyTier 的 TCP 绑定行为），改用本机 WLAN 地址即通。
+5. 房间内没有开 MC 服务端，所以 `link probe --target 127.0.0.1:25567` 连上后无回显（25567 已在监听，转发到房主 25565 后无人应答），这是预期现象。
+6. 根治办法：把 GUI 的默认节点列表换成 CLI 现在用的四个社区节点（本轮为避开并行线的未提交改动，未动 GUI 代码）。
+
+## 8 回滚方案
 
 删除 `PCL.Core/Link/` 与 `PCL.Cli/Commands/LinkCommand.cs`，回退 `Program.cs`、`CliExitCode.cs`；EasyTier 二进制与状态文件都在 `--workdir` 下，随目录删除即可。GUI 侧零改动，回滚不影响任何现有功能。

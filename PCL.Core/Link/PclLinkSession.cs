@@ -295,6 +295,9 @@ namespace PCL.Core.Link
             {
                 args.Add("--secure-mode");
                 args.Add("true");
+                // 加密算法必须与对等节点一致，否则握手会被对方直接断开（表现为 conn closed during wait handshake）
+                args.Add("--encryption-algorithm");
+                args.Add("aes-gcm");
             }
             return args;
         }
