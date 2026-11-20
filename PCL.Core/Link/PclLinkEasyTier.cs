@@ -53,12 +53,15 @@ namespace PCL.Core.Link
             "tcp://et.sumnight.top:11010"
         };
 
-        /// <summary>GitHub 下载镜像前缀（空串表示直连）。顺序按实测速度排列。</summary>
+        /// <summary>
+        /// GitHub 下载镜像前缀（空串表示直连）。顺序按 2026-11-20 实测速度排列：
+        /// 云端 Linux 上 GitHub 直连只有 3 KB/s，ghfast 约 120 KB/s。
+        /// </summary>
         public static readonly string[] DownloadPrefixes =
         {
-            "",
-            "https://gh-proxy.com/",
             "https://ghfast.top/",
+            "https://gh-proxy.com/",
+            "",
             "https://ghproxy.net/"
         };
 
@@ -206,6 +209,9 @@ namespace PCL.Core.Link
                 received += read;
                 if (received > MaxBytes)
                     throw new Exception("发行包下载超出体积上限，已中止");
+                // 慢源熔断：20 秒还不到 512 KB 就换下一个镜像，别把 5 分钟超时耗死在 3 KB/s 的直连上
+                if (watch.Elapsed.TotalSeconds > 20 && received < 512 * 1024)
+                    throw new Exception($"下载速度过慢（20 秒仅 {received / 1024.0:0} KB），换下一个下载源");
                 if (status is null) continue;
                 double speed = received / 1024.0 / Math.Max(0.5, watch.Elapsed.TotalSeconds);
                 if (total > 0)

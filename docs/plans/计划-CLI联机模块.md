@@ -36,6 +36,7 @@
 3. **进程脱离 CLI**：写一个启动脚本（Windows `.cmd` / Linux `.sh`）把核心 stdout/stderr 重定向到 `link/easytier-<tag>.log`，再启动脚本。Linux 用 `exec` 让 sh 变成 core（PID 直接可 kill）；Windows 保留 `cmd.exe` 父进程，`Process.Kill(entireProcessTree: true)` 连子进程一起收。
 4. **状态文件**：`<workdir>/link/session.json`（mode / 邀请码 / 网络名/密钥 / overlay IP / 服务端口 / 本地转发端口 / rpcPort / PID / 日志路径）。每次 CLI 调用独立进程，全靠它续接。
 5. **peer 口径**：EasyTier 的 `peer list` 同时包含公共共享节点（`hostname = PublicServer_*`）。`remotePeers` 必须排除它们，否则「加入成功」会在根本没连上房主时成立；加入判定改为「列表里出现 `pclcli-host-` 主机名或房主 overlay IP」。
+6. **下载源排序 + 慢源熔断**：云端 Linux 上 GitHub 直连实测 3 KB/s（24 MB 要 40 小时级），`ghfast.top` 约 120 KB/s。因此镜像顺序改为 `ghfast → gh-proxy → 直连 → ghproxy`，并加「20 秒不足 512 KB 立即换源」的熔断，避免耗死在一个源上。
 
 ## 5 验证步骤与证据
 
