@@ -26,6 +26,9 @@ internal enum CliExitCode
     /// <summary>未预期的内部错误（含未捕获异常）。</summary>
     Internal = 6,
 
+    /// <summary>联机失败：无会话、连不上房主、探测回显不一致。</summary>
+    LinkFailed = 7,
+
     /// <summary>用户中断（Ctrl+C）。</summary>
     Canceled = 130,
 }

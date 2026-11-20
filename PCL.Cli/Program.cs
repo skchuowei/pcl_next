@@ -43,8 +43,8 @@ internal static class Program
                 return (int)CliExitCode.Argument;
             }
 
-            if (command is not ("download" or "install" or "loader" or "resource" or "selftest"))
-                throw new CliUsageException($"未知命令「{command}」，可选 download / install / loader / resource / selftest");
+            if (command is not ("download" or "install" or "loader" or "resource" or "link" or "selftest"))
+                throw new CliUsageException($"未知命令「{command}」，可选 download / install / loader / resource / link / selftest");
 
             using var session = CliSession.Create(command, args);
             return command switch
@@ -53,6 +53,7 @@ internal static class Program
                 "install" => await InstallCommand.RunAsync(session).ConfigureAwait(false),
                 "loader" => await InstallLoaderCommand.RunAsync(session).ConfigureAwait(false),
                 "resource" => await ResourceCommand.RunAsync(session).ConfigureAwait(false),
+                "link" => await LinkCommand.RunAsync(session).ConfigureAwait(false),
                 "selftest" => await SelfTestCommand.RunAsync(session).ConfigureAwait(false),
                 _ => throw new CliUsageException("未知命令：" + command),
             };
@@ -109,6 +110,7 @@ internal static class Program
           install     按版本 JSON 拉取 client / libraries / assets 的下载段
           loader      拼装原版 + Fabric/Forge/NeoForge 完整实例（下载依赖并合并版本 JSON）
           resource    资源站联网查询（search / versions / fingerprint）
+          link        联机（EasyTier overlay：create / join / status / stop / probe / echo）
           selftest    自检套件（offline / b1 / b2 / b5 / all，默认 offline）
           help        显示本帮助
           version     显示版本
@@ -120,6 +122,8 @@ internal static class Program
         {{InstallLoaderCommand.Usage.Replace("pclcli", ToolName)}}
 
         {{ResourceCommand.Usage.Replace("pclcli", ToolName)}}
+
+        {{LinkCommand.Usage.Replace("pclcli", ToolName)}}
 
         {{SelfTestCommand.Usage.Replace("pclcli", ToolName)}}
 
@@ -135,7 +139,7 @@ internal static class Program
 
         退出码：
           0 成功   1 网络失败   2 校验失败   3 参数错误
-          4 策略禁用   5 资源站不可用   6 内部错误   130 中断
+          4 策略禁用   5 资源站不可用   6 内部错误   7 联机失败   130 中断
 
         输出约定：
           stdout 只输出 JSON Lines（末行必为 result 事件）；stderr 为人读进度；
