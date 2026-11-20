@@ -57,15 +57,33 @@ pclcli link probe --target 127.0.0.1:25567
 - 探测：`连接 27 ms，往返 33 ms，回显一致`，退出码 0；
 - `stop` 后 `easytier-core` / 启动脚本无残留。
 
-### 5.2 云端 Linux（无 GUI）
+### 5.2 跨机（云端 Linux 房主 + 本地 Windows 加入）—— 已实测通过
+
+云端 `115.190.67.243` 无入站（本地 TCP 40001 直接超时），公共节点是唯一可行 rendezvous。
+云端 `~/.dotnet` 已有 10.0.403 SDK（只是不在 PATH），因此无需安装运行时，补 `DOTNET_ROOT` 即可：
 
 ```bash
-export PATH=$HOME/.dotnet:$PATH
-dotnet build PCL.Cli/PCL.Cli.csproj -c Release -r linux-x64
-# 房主：link create + link echo；本地：link join + link probe（--peer 用社区节点）
+export DOTNET_ROOT=$HOME/.dotnet
+dotnet build PCL.Cli/PCL.Cli.csproj -c Release -r linux-x64     # 0 错误（2 条既有 PCL.Download 告警）
+pclcli link install --workdir /home/user/pclcli-linktest        # ghfast 243 KB/s，24.3 MB
+pclcli link echo --port 25566 &
+pclcli link create --port 25566 --workdir /home/user/pclcli-linktest
 ```
 
-公共节点改用社区监控页（info.qtet.cn/uptime/easytier）在册且双向可达的四个：
+2026-11-20 实测记录：
+
+| 环节 | 结果 |
+|---|---|
+| 云端建房 | 邀请码 `G9ZGM-HRE76-941596da`，pid 1992，`nodeAlive=true` |
+| 本地加入 | `已加入 pclnext-G9ZGM`，`hostPresent=true`，房主 `10.114.114.114` `cost=relay(2)` 530 ms |
+| 云端看到的成员 | `10.114.114.1` / `pclcli-client` / `cost=relay(2)` / 60 ms |
+| 云端 echo | `收到连接：127.0.0.1:47714`，`回显 17 字节` |
+| 本地 probe | 连接 18 ms、往返 674 ms、回显一致，退出码 0 |
+| 隧道日志 | 两条 tcp 隧道分别落在 `easytier.weiai.org.cn:11010`、`225284.xyz:11010` |
+
+结论：`link` 模块在无 GUI 的云端 Linux 上可独立完成建房/回显，本地 Windows 用同一份代码加入并把房主端口转发到 `127.0.0.1`，链路与端口转发均成立；**不启动游戏也能判断联机是否可用**（用 probe 回显判定，而不是看进程是否活着）。
+
+默认公共节点（2026-11-20 云端与本地双向 TCP OPEN，可作 `--peer` 覆盖）：
 
 ```
 tcp://225284.xyz:11010
@@ -73,8 +91,6 @@ tcp://easytier.weiai.org.cn:11010
 tcp://183.230.36.171:11010
 tcp://et.sumnight.top:11010
 ```
-
-（Windows 本地与云端 Linux 对这四个节点均实测 TCP OPEN。）
 
 ## 6 踩坑记录
 
