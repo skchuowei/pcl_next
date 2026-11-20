@@ -181,13 +181,19 @@ internal static class LinkCommand
             ("network", state.NetworkName),
             ("overlayIp", state.OverlayIp),
             ("servicePort", state.ServicePort),
+            ("gatePort", state.GatePort == 0 ? null : state.GatePort),
+            ("scaffoldPort", state.ScaffoldPort == 0 ? null : state.ScaffoldPort),
+            ("nickname", string.IsNullOrEmpty(state.Nickname) ? null : state.Nickname),
             ("localJoinPort", state.LocalJoinPort),
             ("listenPort", state.ListenPort),
             ("rpcPort", state.RpcPort),
             ("pid", state.Pid),
             ("log", state.LogPath));
         session.Output.Say($"已加入 {state.NetworkName}");
-        session.Output.Say($"本地转发：127.0.0.1:{state.LocalJoinPort} → {state.OverlayIp}:{state.ServicePort}");
+        if (state.GatePort > 0)
+            session.Output.Say($"准入网关：已认证并建立隧道（本地 {state.LocalJoinPort} → 房主网关 {state.GatePort}）");
+        else
+            session.Output.Say($"本地转发：127.0.0.1:{state.LocalJoinPort} → {state.OverlayIp}:{state.ServicePort}");
         session.Output.Say($"验证：pclcli link probe --target 127.0.0.1:{state.LocalJoinPort}");
         session.Output.Result(true,
             ("network", state.NetworkName),
@@ -218,7 +224,8 @@ internal static class LinkCommand
                 .ConfigureAwait(false)
             : null;
         bool hostPresent = rawPeers is not null &&
-                           PclLinkEasyTier.HasRoomHost(rawPeers, "pclcli-host-", state.OverlayIp);
+                           (PclLinkEasyTier.HasRoomHost(rawPeers, "pclcli-host-", state.OverlayIp) ||
+                            PclLinkEasyTier.HasRoomHost(rawPeers, "pclnext-mc-server-", state.OverlayIp));
 
         session.Output.Event("link",
             ("mode", state.Mode),
@@ -226,6 +233,9 @@ internal static class LinkCommand
             ("network", state.NetworkName),
             ("overlayIp", state.OverlayIp),
             ("servicePort", state.ServicePort),
+            ("scaffoldPort", state.ScaffoldPort == 0 ? null : state.ScaffoldPort),
+            ("gatePort", state.GatePort == 0 ? null : state.GatePort),
+            ("nickname", string.IsNullOrEmpty(state.Nickname) ? null : state.Nickname),
             ("localJoinPort", state.LocalJoinPort == 0 ? null : state.LocalJoinPort),
             ("pid", state.Pid),
             ("processAlive", alive),

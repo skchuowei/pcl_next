@@ -5,8 +5,10 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
@@ -49,6 +51,12 @@ namespace PCL.Core.Link
             public int ServicePort { get; set; }
             /// <summary>加入侧本地转发端口（连 127.0.0.1:LocalJoinPort 就等于连房主 ServicePort）。</summary>
             public int LocalJoinPort { get; set; }
+            /// <summary>房主大厅协议端口（从房主主机名后缀拿到；CLI 自建房间为 0）。</summary>
+            public int ScaffoldPort { get; set; }
+            /// <summary>认证网关端口（0 表示房主没启用网关，走旧直连转发）。</summary>
+            public int GatePort { get; set; }
+            /// <summary>大厅协议里展示的昵称。</summary>
+            public string Nickname { get; set; } = "";
             public int ListenPort { get; set; }
             public int RpcPort { get; set; }
             public int Pid { get; set; }
@@ -191,8 +199,9 @@ namespace PCL.Core.Link
 
             PclLinkCode.CodeInfo info = PclLinkCode.Parse(PclLinkCode.ExtractCode(options.Code));
             int servicePort = options.ServicePort ?? (info.Port > 0 ? info.Port : 0);
-            if (servicePort is < 1 or > 65535)
-                throw new ArgumentException("邀请码里没有端口，请用 --port 指定房主服务端口");
+            // 新码里没有端口：先不报错，等连上房主后用大厅协议问出来（房主没协议时再要求 --port）
+            if (servicePort is > 65535)
+                throw new ArgumentException("--port 超出范围");
 
             HashSet<int> reserved = new();
             int rpcPort = PclLinkEasyTier.FindFreePort(30000, reserved);
@@ -210,11 +219,6 @@ namespace PCL.Core.Link
             args.Add("0");
             args.Add("--udp-whitelist");
             args.Add("0");
-            // 房主侧服务端口 → 本地回环端口；连接 127.0.0.1:localPort 即经 overlay 到房主
-            args.Add("--port-forward");
-            args.Add($"tcp://127.0.0.1:{localPort}/{options.OverlayIp}:{servicePort}");
-            args.Add("--port-forward");
-            args.Add($"udp://127.0.0.1:{localPort}/{options.OverlayIp}:{servicePort}");
             if (!string.IsNullOrWhiteSpace(options.Direct))
             {
                 string direct = options.Direct.Trim();
@@ -224,8 +228,9 @@ namespace PCL.Core.Link
             }
             AddPeers(args, options.Peers, Array.Empty<string>());
 
-            status?.Invoke($"正在启动联机模块（加入 {info.FullNetworkName}，转发本地 {localPort} → 房主 {servicePort}）…");
+            status?.Invoke($"正在启动联机模块（加入 {info.FullNetworkName}）…");
             PclLinkEasyTier.LinkProcess process = PclLinkEasyTier.Launch(workDir, args, "join");
+            (string nickname, string machineId) = GetOrCreateIdentity(workDir);
             LinkState state = new()
             {
                 Mode = "join",
@@ -235,6 +240,7 @@ namespace PCL.Core.Link
                 OverlayIp = options.OverlayIp,
                 ServicePort = servicePort,
                 LocalJoinPort = localPort,
+                Nickname = nickname,
                 ListenPort = listenPort,
                 RpcPort = rpcPort,
                 Pid = process.Pid,
@@ -247,14 +253,162 @@ namespace PCL.Core.Link
 
             bool connected = await WaitAsync(async () =>
             {
-                var peers = await PclLinkEasyTier.QueryAsync(workDir, rpcPort, new[] { "peer", "list" }, ct)
+                JsonNode? peers = await PclLinkEasyTier.QueryAsync(workDir, rpcPort, new[] { "peer", "list" }, ct)
                     .ConfigureAwait(false);
-                return PclLinkEasyTier.HasRoomHost(peers, "pclcli-host-", options.OverlayIp);
+                return PclLinkEasyTier.HasRoomHost(peers, "pclcli-host-", options.OverlayIp) ||
+                       PclLinkEasyTier.HasRoomHost(peers, "pclnext-mc-server-", options.OverlayIp);
             }, options.WaitSeconds, ct).ConfigureAwait(false);
             if (!connected)
                 throw new TimeoutException($"联机模块 {options.WaitSeconds}s 内没有连上房主，" +
                                            $"请查看日志 {process.LogPath}（公共节点不可达时可试 --direct）");
+
+            // 房主主机名里带大厅协议端口（pclnext-mc-server-<port>）；有它就能注册、问端口、拿网关凭据。
+            JsonNode? peerList = await PclLinkEasyTier.QueryAsync(workDir, rpcPort, new[] { "peer", "list" }, ct)
+                .ConfigureAwait(false);
+            string hostHostname = FindHostHostname(peerList, options.OverlayIp);
+            int scaffoldPort = ParseHostScaffoldPort(hostHostname);
+            state.ScaffoldPort = scaffoldPort;
+            if (scaffoldPort > 0)
+            {
+                int localScaffold = PclLinkEasyTier.FindFreePort(30000, reserved);
+                await AddForwardAsync(workDir, rpcPort, "tcp", localScaffold, options.OverlayIp, scaffoldPort, ct)
+                    .ConfigureAwait(false);
+                using PclLinkScaffoldClient scaffold = await ConnectScaffoldAsync(
+                    localScaffold, machineId, nickname, ct).ConfigureAwait(false);
+                if (scaffold is not null)
+                {
+                    if (state.ServicePort <= 0)
+                    {
+                        status?.Invoke("向房主询问服务器端口…");
+                        state.ServicePort = scaffold.GetServerPort();
+                        if (state.ServicePort <= 0)
+                            throw new InvalidOperationException("房主没有给出有效的服务器端口");
+                    }
+                    PclLinkScaffoldClient.GateInfo? gate = scaffold.GetGate();
+                    if (gate is not null)
+                    {
+                        PclLinkGate.Client tunnel = new(localPort, options.OverlayIp, gate.Port, info.FullSecret, gate.Ticket,
+                            msg => status?.Invoke(msg));
+                        tunnel.Start();
+                        state.GatePort = gate.Port;
+                    }
+                }
+            }
+
+            if (state.GatePort <= 0)
+            {
+                if (state.ServicePort <= 0)
+                    throw new ArgumentException("房主没有启用大厅协议，无法自动得知端口，请用 --port 指定房主服务端口");
+                // 旧路径（房主没启用网关、或是 PCL2-CE / 陶瓦 房间）：直接把房主端口转到本地
+                await AddForwardAsync(workDir, rpcPort, "tcp", localPort, options.OverlayIp, state.ServicePort, ct)
+                    .ConfigureAwait(false);
+                await AddForwardAsync(workDir, rpcPort, "udp", localPort, options.OverlayIp, state.ServicePort, ct)
+                    .ConfigureAwait(false);
+            }
+            Save(workDir, state);
             return state;
+        }
+
+        /// <summary>向本机 easytier-cli 动态加一条端口转发。</summary>
+        private static async Task AddForwardAsync(string workDir, int rpcPort, string protocol,
+            int localPort, string overlayIp, int targetPort, CancellationToken ct)
+        {
+            await PclLinkEasyTier.QueryAsync(workDir, rpcPort, new[]
+            {
+                "port-forward", "add", protocol, $"127.0.0.1:{localPort}", $"{overlayIp}:{targetPort}"
+            }, ct).ConfigureAwait(false);
+        }
+
+        /// <summary>等房主的协议端口被转发起来并完成注册；返回已注册的客户端，失败返回 null。</summary>
+        private static async Task<PclLinkScaffoldClient?> ConnectScaffoldAsync(int localPort, string machineId,
+            string nickname, CancellationToken ct)
+        {
+            DateTime deadline = DateTime.Now.AddSeconds(20);
+            Exception? last = null;
+            while (DateTime.Now < deadline)
+            {
+                PclLinkScaffoldClient? client = null;
+                try
+                {
+                    client = new PclLinkScaffoldClient("127.0.0.1", localPort, machineId, nickname,
+                        "pclcli, EasyTier " + PclLinkEasyTier.Version);
+                    client.Connect();
+                    client.Register();
+                    return client;
+                }
+                catch (Exception ex)
+                {
+                    last = ex;
+                    client?.Dispose();
+                    await Task.Delay(700, ct).ConfigureAwait(false);
+                }
+            }
+            if (last is not null)
+                throw new InvalidOperationException("连不上房主的大厅协议端口：" + last.Message, last);
+            return null;
+        }
+
+        /// <summary>在 peer 列表里找房主的 hostname（优先匹配固定 overlay IP，其次匹配已知前缀）。</summary>
+        private static string FindHostHostname(JsonNode? output, string overlayIp)
+        {
+            string fallback = "";
+            foreach ((string ip, string hostname, _, _) in PclLinkEasyTier.DescribeRoomPeers(output))
+            {
+                if (!hostname.StartsWith("pclnext-mc-server-", StringComparison.OrdinalIgnoreCase))
+                    continue;
+                if (ip == overlayIp) return hostname;
+                fallback = hostname;
+            }
+            return fallback;
+        }
+
+        /// <summary>从 <c>pclnext-mc-server-&lt;port&gt;</c> 里取大厅协议端口；不是这种主机名返回 0。</summary>
+        private static int ParseHostScaffoldPort(string hostname)
+        {
+            const string prefix = "pclnext-mc-server-";
+            if (!hostname.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                return 0;
+            int port = int.TryParse(hostname[prefix.Length..], out int value) ? value : 0;
+            return port is > 0 and <= 65535 ? port : 0;
+        }
+
+        /// <summary>本机在大厅里的昵称与机器码：落盘复用，避免每次加入都换身份。</summary>
+        private static (string Nickname, string MachineId) GetOrCreateIdentity(string workDir)
+        {
+            string file = Path.Combine(workDir, "link", "identity.json");
+            try
+            {
+                if (File.Exists(file))
+                {
+                    using JsonDocument doc = JsonDocument.Parse(File.ReadAllText(file));
+                    string name = doc.RootElement.TryGetProperty("nickname", out JsonElement n) ? (n.GetString() ?? "") : "";
+                    string id = doc.RootElement.TryGetProperty("machineId", out JsonElement m) ? (m.GetString() ?? "") : "";
+                    if (!string.IsNullOrWhiteSpace(name) && !string.IsNullOrWhiteSpace(id))
+                        return (name, id);
+                }
+            }
+            catch
+            {
+                // 文件坏了就重新生成
+            }
+            string[] alphabet = { "ABCDEFGHJKMNPQRSTUVWXYZ23456789" };
+            string tag = new string(Enumerable.Range(0, 4)
+                .Select(_ => alphabet[0][RandomNumberGenerator.GetInt32(alphabet[0].Length)]).ToArray());
+            string machineId = string.Join('-', Enumerable.Range(0, 4)
+                .Select(_ => new string(Enumerable.Range(0, 4)
+                    .Select(__ => "0123456789ABCDEFGHJKMNPQRSTUVWXYZ"[RandomNumberGenerator.GetInt32(32)]).ToArray())));
+            (string, string) identity = ("pclcli-" + tag, machineId);
+            try
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(file)!);
+                File.WriteAllText(file, JsonSerializer.Serialize(new { nickname = identity.Item1, machineId = identity.Item2 }),
+                    new UTF8Encoding(false));
+            }
+            catch
+            {
+                // 落盘失败也能用
+            }
+            return identity;
         }
 
         private static void AddPeers(List<string> args, IReadOnlyList<string> peers, IReadOnlyList<string> direct)

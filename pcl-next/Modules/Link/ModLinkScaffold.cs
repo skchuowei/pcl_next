@@ -44,6 +44,8 @@ namespace PCL
         public const string TypeServerPort = "c:server_port";
         public const string TypePlayerPing = "c:player_ping";
         public const string TypePlayerList = "c:player_profiles_list";
+        /// <summary>请求网关凭据（pcl-next 私有扩展；房主没启用网关时回 32）。</summary>
+        public const string TypeGate = "c:gate";
 
         private const byte StatusOk = 0;
         private const byte StatusBadRequest = 32;
@@ -335,6 +337,12 @@ namespace PCL
             /// <summary>有玩家加入时的通知（参数是玩家名）。</summary>
             public event Action<string> PlayerJoined;
 
+            /// <summary>
+            /// 准入网关（可选）。设置后 <c>c:gate</c> 会为已登记成员发放凭据，
+            /// 踢人时同步撤销其凭据与在途隧道。
+            /// </summary>
+            public PCL.Core.Link.PclLinkGate.Host Gate { get; set; }
+
             public Server(int scaffoldPort, ushort mcPort, string hostName)
             {
                 _mcPort = mcPort;
@@ -390,6 +398,7 @@ namespace PCL
                     _players.Remove(machineId);
                     _kicked.Add(machineId);
                 }
+                Gate?.Revoke(machineId);
                 Logger.Info("联机：房主把玩家移出房间（" + (string.IsNullOrEmpty(name) ? machineId : name) + "）");
                 return true;
             }
@@ -486,6 +495,9 @@ namespace PCL
                                 case TypePlayerList:
                                     body = Encoding.UTF8.GetBytes(SnapshotPlayers().ToString(Formatting.None));
                                     break;
+                                case TypeGate:
+                                    body = IssueGateTicket(Encoding.UTF8.GetString(frame.Value.Body), out status);
+                                    break;
                                 default:
                                     status = StatusBadRequest;
                                     break;
@@ -553,6 +565,38 @@ namespace PCL
                     try { PlayerJoined?.Invoke(name); } catch { /* 忽略回调异常 */ }
                 }
                 return StatusOk;
+            }
+
+            /// <summary>
+            /// 为已登记成员发放网关凭据。未登记、已被踢、或房主没启用网关时一律回 32。
+            /// </summary>
+            private byte[] IssueGateTicket(string machineId, out byte status)
+            {
+                status = StatusOk;
+                PCL.Core.Link.PclLinkGate.Host gate = Gate;
+                machineId = (machineId ?? "").Trim();
+                if (gate is null || string.IsNullOrEmpty(machineId))
+                {
+                    status = StatusBadRequest;
+                    return Array.Empty<byte>();
+                }
+                lock (_playersLock)
+                {
+                    if (!_players.ContainsKey(machineId) || _kicked.Contains(machineId))
+                    {
+                        status = StatusBadRequest;
+                        return Array.Empty<byte>();
+                    }
+                }
+                (string ticket, DateTime expiresAt) = gate.IssueTicket(machineId);
+                Logger.Info($"联机：已向 {machineId} 发放网关凭据（端口 {gate.Port}）");
+                JObject body = new JObject
+                {
+                    ["port"] = gate.Port,
+                    ["ticket"] = ticket,
+                    ["expiresAt"] = expiresAt.ToString("o")
+                };
+                return Encoding.UTF8.GetBytes(body.ToString(Formatting.None));
             }
 
             private JArray SnapshotPlayers()
@@ -676,6 +720,34 @@ namespace PCL
                 if (body.Length != 2)
                     throw new InvalidDataException("房主返回的端口长度不正确");
                 return (ushort)((body[0] << 8) | body[1]);
+            }
+
+            /// <summary>向房主索取准入网关凭据；房主未启用网关时返回 null。</summary>
+            public PCL.Core.Link.PclLinkScaffoldClient.GateInfo GetGate()
+            {
+                try
+                {
+                    byte[] body = SendRequest(TypeGate, Encoding.UTF8.GetBytes(GetMachineId()));
+                    if (body.Length == 0)
+                        return null;
+                    JObject json = JObject.Parse(Encoding.UTF8.GetString(body));
+                    string ticket = (string)json["ticket"] ?? "";
+                    if (string.IsNullOrEmpty(ticket))
+                        return null;
+                    return new PCL.Core.Link.PclLinkScaffoldClient.GateInfo
+                    {
+                        Port = (int?)json["port"] ?? 0,
+                        Ticket = ticket,
+                        ExpiresAt = DateTime.TryParse((string)json["expiresAt"] ?? "", out DateTime exp)
+                            ? exp
+                            : DateTime.UtcNow.AddHours(12)
+                    };
+                }
+                catch (IOException)
+                {
+                    // 老房主不认 c:gate，按 32 拒绝；当作「没有网关」回退直连
+                    return null;
+                }
             }
 
             private byte[] SendRequest(string type, byte[] body)

@@ -88,6 +88,11 @@ namespace PCL
         /// <summary>PCL2-CE 协议（Scaffolding）：加入侧客户端实例。</summary>
         private static ModLinkScaffold.Client _scaffoldClient;
 
+        /// <summary>准入网关：房主侧实例（p-next 大厅且启用网关时非 null）。</summary>
+        private static PCL.Core.Link.PclLinkGate.Host _gateHost;
+        /// <summary>准入网关：加入侧隧道实例。</summary>
+        private static PCL.Core.Link.PclLinkGate.Client _gateClient;
+
         /// <summary>当前大厅成员（含房主自己）；拿不到时为 null，界面按「暂无」显示。</summary>
         private static volatile List<ModLinkScaffold.PlayerInfo> _players;
 
@@ -178,6 +183,10 @@ namespace PCL
             try { _cts?.Cancel(); } catch { /* 忽略 */ }
             _cts = null;
             StopScaffold();
+            try { _gateClient?.Dispose(); } catch { /* 忽略 */ }
+            _gateClient = null;
+            try { _gateHost?.Dispose(); } catch { /* 忽略 */ }
+            _gateHost = null;
             ModLinkEasyTier.Stop();
             CurrentRole = Role.None;
             CurrentStage = Stage.Idle;
@@ -252,6 +261,10 @@ namespace PCL
                 ? ModLinkScaffold.HostnamePrefix
                 : ModLinkScaffold.PclNextHostnamePrefix;
             int scaffoldPort = scaffold ? ModLinkEasyTier.FindFreePort() : 0;
+            // 准入网关：只对 p-next 大厅启用（协议在，才谈得上「先登记再放行」）。
+            // 启用后 overlay 上不再直接放行 MC 端口，只有协议端口与网关端口可入。
+            bool useGate = scaffold && _target.Kind == LobbyKind.PclNext;
+            int gatePort = useGate ? ModLinkEasyTier.FindFreePort() : 0;
             _rpcPort = ModLinkEasyTier.FindFreePort();
             int listenPort = ModLinkEasyTier.FindFreePort();
             List<string> args = BuildBaseArguments(_target, _rpcPort, listenPort);
@@ -262,16 +275,25 @@ namespace PCL
             args.Add(scaffold ? hostPrefix + scaffoldPort : GetHostname("Server"));
             if (scaffold)
             {
-                // 协议端口与 MC 端口都要在对方那份白名单语义里放行
+                // 协议端口必须放行：加入者要先连上大厅才能问端口、领凭据
                 args.Add("--tcp-whitelist");
                 args.Add(scaffoldPort.ToString());
                 args.Add("--udp-whitelist");
                 args.Add(scaffoldPort.ToString());
             }
-            args.Add("--tcp-whitelist");
-            args.Add(serverPort.ToString());
-            args.Add("--udp-whitelist");
-            args.Add(serverPort.ToString());
+            if (useGate)
+            {
+                // 走网关：只放行网关端口，MC 端口不进 overlay 白名单
+                args.Add("--tcp-whitelist");
+                args.Add(gatePort.ToString());
+            }
+            else
+            {
+                args.Add("--tcp-whitelist");
+                args.Add(serverPort.ToString());
+                args.Add("--udp-whitelist");
+                args.Add(serverPort.ToString());
+            }
             SetStatus("正在启动联机模块…");
             ModLinkEasyTier.Launch(args);
             RoomNumber = ModLinkInterop.RoomNumber(InviteCode);
@@ -280,7 +302,18 @@ namespace PCL
                 // 协议服务先起来，对方一连进来就能查到 MC 端口
                 _scaffoldServer = new ModLinkScaffold.Server(scaffoldPort, serverPort, GetDisplayName());
                 _scaffoldServer.PlayerJoined += _ => RaiseChanged();
+                if (useGate)
+                {
+                    _gateHost = new PCL.Core.Link.PclLinkGate.Host(gatePort, serverPort, _networkSecret,
+                        msg => Logger.Info("联机网关：" + msg));
+                    _scaffoldServer.Gate = _gateHost;
+                }
                 _scaffoldServer.Start();
+                if (useGate)
+                {
+                    _gateHost.Start();
+                    Logger.Info($"联机：准入网关已启用（overlay 端口 {gatePort} → MC {serverPort}）");
+                }
                 RefreshHostPlayers();
             }
             else
@@ -396,9 +429,23 @@ namespace PCL
                 if (mcPort == 0)
                     throw new Exception("房主没有给出有效的服务器端口");
                 HostServerPort = mcPort;
-                SetStatus($"房主服务器端口为 {mcPort}，正在建立游戏端口转发…");
-                await ModLinkEasyTier.AddPortForwardAsync(_rpcPort, "tcp", LocalJoinPort, host.Value.Ip, mcPort, ct).ConfigureAwait(false);
-                await ModLinkEasyTier.AddPortForwardAnyAsync(_rpcPort, "udp", LocalJoinPort, host.Value.Ip, mcPort, ct).ConfigureAwait(false);
+                PCL.Core.Link.PclLinkScaffoldClient.GateInfo gate = _scaffoldClient.GetGate();
+                if (gate is not null && gate.Port > 0 && !string.IsNullOrEmpty(gate.Ticket))
+                {
+                    // 房主启用了准入网关：overlay 上 MC 端口不开放，只能经网关隧道进
+                    SetStatus("房主启用了准入网关，正在进行认证…");
+                    _gateClient = new PCL.Core.Link.PclLinkGate.Client(LocalJoinPort, host.Value.Ip, gate.Port,
+                        _networkSecret, gate.Ticket, msg => Logger.Info("联机网关：" + msg));
+                    _gateClient.Start();
+                    Logger.Info($"联机：已通过网关认证（本地 {LocalJoinPort} → {host.Value.Ip}:{gate.Port}）");
+                }
+                else
+                {
+                    // 未启用网关（老房间 / 其他大厅）：沿用直接转发
+                    SetStatus($"房主服务器端口为 {mcPort}，正在建立游戏端口转发…");
+                    await ModLinkEasyTier.AddPortForwardAsync(_rpcPort, "tcp", LocalJoinPort, host.Value.Ip, mcPort, ct).ConfigureAwait(false);
+                    await ModLinkEasyTier.AddPortForwardAnyAsync(_rpcPort, "udp", LocalJoinPort, host.Value.Ip, mcPort, ct).ConfigureAwait(false);
+                }
             }
             catch
             {
