@@ -4,9 +4,49 @@
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
     xmlns:local="clr-namespace:PCL"
-    xmlns:sys="clr-namespace:System;assembly=mscorlib"
     PanScroll="PanBack">
     <local:MyScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" x:Name="PanBack">
-        <TextBlock Text="为便于维护，开源内容中不包含百宝箱功能……" HorizontalAlignment="Center" FontSize="15" Height="30" VerticalAlignment="Center" />
+        <StackPanel Margin="25,10,25,30" x:Name="PanMain">
+            <local:MyHint Margin="0,15,0,0" Theme="Yellow" Text="百宝箱功能处于测试阶段，目前仅提供自定义文件下载。请只下载你信任的来源，下载内容的完整性与安全性由你自行确认。" />
+            <local:MyCard Margin="0,15,0,0" Title="自定义文件下载">
+                <StackPanel Margin="25,39,23,20">
+                    <TextBlock TextWrapping="Wrap" LineHeight="18" Foreground="{DynamicResource ColorBrushGray1}"
+                               Text="从任意 http / https 直链下载文件到指定位置，使用启动器内置的多线程下载引擎，支持断点续传与实时速度显示。文件名留空时会自动从链接中识别。" />
+                    <Grid Margin="0,18,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="1*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="下载地址" VerticalAlignment="Center" Margin="0,0,20,12" />
+                        <local:MyTextBox Grid.Row="0" Grid.Column="1" Grid.ColumnSpan="2" x:Name="TextUrl" Margin="0,0,0,12"
+                                         HintText="https://example.com/file.zip" MaxLength="2000" />
+                        <TextBlock Grid.Row="1" Grid.Column="0" Text="保存到" VerticalAlignment="Center" Margin="0,0,20,12" />
+                        <local:MyTextBox Grid.Row="1" Grid.Column="1" x:Name="TextFolder" Margin="0,0,0,12"
+                                         HintText="选择文件保存的文件夹" MaxLength="500" />
+                        <local:MyButton Grid.Row="1" Grid.Column="2" x:Name="BtnSelectFolder" Text="浏览" Width="90" Height="30"
+                                        Margin="12,0,0,12" Padding="10,0" Click="BtnSelectFolder_Click" />
+                        <TextBlock Grid.Row="2" Grid.Column="0" Text="文件名" VerticalAlignment="Center" Margin="0,0,20,0" />
+                        <local:MyTextBox Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2" x:Name="TextFileName"
+                                         HintText="留空则自动使用链接中的文件名" MaxLength="200" />
+                    </Grid>
+                    <StackPanel Orientation="Horizontal" Margin="0,18,0,0">
+                        <local:MyButton x:Name="BtnStartDownload" Text="开始下载" Width="140" Height="32" Padding="13,0" Click="BtnStartDownload_Click" />
+                        <local:MyButton x:Name="BtnCancelDownload" Text="取消下载" Width="140" Height="32" Padding="13,0" Margin="15,0,0,0"
+                                        Visibility="Collapsed" Click="BtnCancelDownload_Click" />
+                        <local:MyButton x:Name="BtnOpenFolder" Text="打开文件夹" Width="140" Height="32" Padding="13,0" Margin="15,0,0,0"
+                                        Visibility="Collapsed" Click="BtnOpenFolder_Click" />
+                    </StackPanel>
+                    <local:MyLoading x:Name="LoadDownload" Height="52" Margin="0,16,0,0" Text="正在下载" ShowProgress="True" AutoRun="False" Visibility="Collapsed" />
+                    <TextBlock x:Name="LabStatus" Margin="0,10,0,0" TextWrapping="Wrap" FontSize="12.5" LineHeight="17"
+                               Foreground="{DynamicResource ColorBrushGray3}" />
+                </StackPanel>
+            </local:MyCard>
+        </StackPanel>
     </local:MyScrollViewer>
 </local:MyPageRight>
