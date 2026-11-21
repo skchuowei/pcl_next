@@ -231,5 +231,6 @@ MeloongCore.Tests → Shared + Wpf（TUnit 1.43，`net10.0-windows`）
 - 分支：`dev-Windows` @ `71f9275`；worktree `../PCL_NEXT_Windows_slush` @ `c0ee4ce`（`beta-Windows`，VersionCode 5061，beta.2 晋级提交，本地 tag 未建）。
 - 已打 tag：`v2.100.0.6-dev.6/7-Windows`、`v2.100.0.7-{slush,alpha,beta}.1-Windows`。
 - 工作区**有大量未提交改动**（`.github/workflows/*`、`PCL.Download/Install*`、`pcl-next` 多个 Modules/Pages、若干 docs）。
+- 本文已入库：`docs: 新增面向 AI 的仓库索引 AI_INDEX.md` = `51a6130`（Build 2.43）；`.gitignore` 排除项 = `fd94b97`（Build 2.44）。
 - 构建树最新为 `pcl-next/bin-net10/Dev/2.100.0.7-2.40/` 与 `Slush/2.100.0.7-1.01/`；归档有 `Dev/2.100.0.6`、`Slush/2.100.0.7`（夹带 DLL/日志，见 §9 第 15 条）。
 - 规则文档 §0E.5 记录的「当前代号」为 `alpha`（2026-11-13），现场已出现 beta tag；**代号以用户指示为准**。
