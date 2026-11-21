@@ -13,7 +13,7 @@ pcl-next 在 PCL2 的基础上，把内核（下载 / 版本解析 / 启动）�
 
 | 分支 | 平台 | 定位 |
 |---|---|---|
-| `dev-Windows` | Windows | **主线 / 功能开发线**。新功能与重构都落在这里（当前版本名 `2.100.0.7`、`VersionCode = 5007`）；可以本地编译、验证、归档，但按规则**不推发布 tag、不创建 GitHub Release**。 |
+| `dev-Windows` | Windows | **主线 / 功能开发线**。项目已进入外测阶段，只接受缺陷修复与重构，不再添加新功能；对外版本只从下面的发布线发布，dev 版本若对外发布会造成版本线冲突。当前版本名 `2.100.0.7`、`VersionCode = 5007`。 |
 | `slush-Windows` → `alpha-Windows` → `beta-Windows` → `rc-Windows` | Windows | 稳定化到发布候选的逐级推进线，对外制品只从这几条分支发布。最新公测版为 `v2.100.0.7-beta.2-Windows`。 |
 | `dev-linux` → `rc-linux` | linux | Linux 平台线（独立工作区），推送须过 `kernel-guard.yml` 跨平台门禁。 |
 | `feat/*` / `fix/*` | — | 短期分支：从对应的 `<代号>-<平台>` 拉出，修完合回原分支，不跨平台、不跨代号。 |
