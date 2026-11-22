@@ -71,6 +71,8 @@ namespace PCL
                     this.LabSpeed.Text = "0 B/s";
                     this.LabFile.Text = "0";
                     this.LabThread.Text = "0 / " + ModNet.NetTaskThreadLimit;
+                    UpdateActiveFiles();
+                    ResetStageTimes();
                 }
                 else
                 {
@@ -82,6 +84,7 @@ namespace PCL
                     this.LabSpeed.Text = StringUtils.FormatByteSize(ModNet.NetManager.Speed) + "/s";
                     this.LabFile.Text = Conversions.ToString(ModNet.NetManager.FileRemain < 0 ? "0*" : global::PCL.ModNet.NetManager.FileRemain);
                     this.LabThread.Text = ModNet.NetTaskThreadCount + " / " + ModNet.NetTaskThreadLimit;
+                    UpdateActiveFiles();
                 }
             }
             #endregion
@@ -102,6 +105,141 @@ namespace PCL
                 Logger.Error(ex, "任务管理右栏监视出错");
             }
         }
+        /// <summary>
+    /// 刷新左栏的并发文件数、当前正在下载的文件名与最慢文件（2026-11-22 新增）。
+    /// 数据直接取自下载管理器的活动文件快照，不额外维护计时状态。
+    /// </summary>
+        private void UpdateActiveFiles()
+        {
+            try
+            {
+                var Active = new List<ModNet.NetFile>();
+                foreach (var File in ModNet.NetManager.AllFiles.Values)
+                {
+                    if (File.State == ModNet.NetState.Connecting || File.State == ModNet.NetState.Reading || File.State == ModNet.NetState.Downloading)
+                        Active.Add(File);
+                }
+                this.LabConcurrent.Text = Active.Count + " 个文件";
+                if (Active.Count == 0)
+                {
+                    SetFileNameText(this.LabCurrentFile, "—", "—");
+                    SetFileNameText(this.LabSlowestFile, "—", "—");
+                    return;
+                }
+                ModNet.NetFile Fastest = Active[0];
+                ModNet.NetFile Slowest = null;
+                foreach (var File in Active)
+                {
+                    if (File.Speed > Fastest.Speed)
+                        Fastest = File;
+                    if (File.Speed > 0L && (Slowest is null || File.Speed < Slowest.Speed))
+                        Slowest = File;
+                }
+                string FastName = Fastest.LocalName ?? "未知文件";
+                SetFileNameText(this.LabCurrentFile, FastName, FastName + " · " + StringUtils.FormatByteSize(Math.Max(0L, Fastest.Speed)) + "/s");
+                if (Slowest is null)
+                {
+                    SetFileNameText(this.LabSlowestFile, "—", "—");
+                }
+                else
+                {
+                    string SlowText = (Slowest.LocalName ?? "未知文件") + " · " + StringUtils.FormatByteSize(Slowest.Speed) + "/s";
+                    SetFileNameText(this.LabSlowestFile, SlowText, SlowText);
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn(ex, "刷新下载文件信息失败");
+            }
+        }
+
+        private static void SetFileNameText(System.Windows.Controls.TextBlock Target, string Text, string ToolTip)
+        {
+            if (Target.Text != Text)
+                Target.Text = Text;
+            if ((Target.ToolTip as string) != ToolTip)
+                Target.ToolTip = ToolTip;
+        }
+
+        /// <summary>
+    /// 记录各加载器阶段的起止时刻（2026-11-22 新增）。
+    /// 只在 UI 侧按 300 ms 轮询观测，不侵入加载器与下载器核心状态机。
+    /// </summary>
+        private readonly object StageTimeLock = new object();
+        private readonly Dictionary<ModLoader.LoaderBase, long> StageStartTimes = new Dictionary<ModLoader.LoaderBase, long>();
+        private readonly Dictionary<ModLoader.LoaderBase, long> StageEndTimes = new Dictionary<ModLoader.LoaderBase, long>();
+
+        private void TrackStageTime(ModLoader.LoaderBase Loader)
+        {
+            long Now = ModBase.GetTimeMs();
+            lock (StageTimeLock)
+            {
+                if (Loader.State == ModBase.LoadState.Loading)
+                {
+                    if (!StageStartTimes.ContainsKey(Loader))
+                    {
+                        StageStartTimes[Loader] = Now;
+                        StageEndTimes.Remove(Loader);
+                    }
+                }
+                else if (Loader.State >= ModBase.LoadState.Finished && StageStartTimes.ContainsKey(Loader) && !StageEndTimes.ContainsKey(Loader))
+                {
+                    StageEndTimes[Loader] = Now;
+                }
+            }
+        }
+
+        private void ResetStageTimes()
+        {
+            lock (StageTimeLock)
+            {
+                if (StageStartTimes.Count == 0 && StageEndTimes.Count == 0)
+                    return;
+                StageStartTimes.Clear();
+                StageEndTimes.Clear();
+            }
+        }
+
+        /// <summary>
+    /// 把加载器耗时格式化为卡片行尾的附注（未观测到开始时刻时返回空串）。
+    /// </summary>
+        private string FormatElapsedLabel(ModLoader.LoaderBase Loader)
+        {
+            long Start = 0L;
+            long Stop = 0L;
+            lock (StageTimeLock)
+            {
+                if (!StageStartTimes.TryGetValue(Loader, out Start))
+                    return "";
+                StageEndTimes.TryGetValue(Loader, out Stop);
+            }
+            long Now = ModBase.GetTimeMs();
+            long Ms = Math.Max(0L, (Stop > 0L && Stop >= Start ? Stop : Now) - Start);
+            if (Ms <= 0L)
+                return "";
+            string Time;
+            if (Ms < 10000L)
+                Time = (Ms / 1000d).ToString("0.0") + " s";
+            else if (Ms < 60000L)
+                Time = Ms / 1000L + " s";
+            else
+                Time = Ms / 60000L + ":" + (Ms % 60000L / 1000L).ToString("00");
+            return "  ·  " + Time;
+        }
+
+        private void UpdateRowLabel(Grid Card, int Row, ModLoader.LoaderBase Loader)
+        {
+            int Index = Row * 2 + 1;
+            if (Card.Children.Count <= Index)
+                return;
+            if (Card.Children[Index] is TextBlock Label)
+            {
+                string Text = (Loader.Name ?? "") + FormatElapsedLabel(Loader);
+                if (Label.Text != Text)
+                    Label.Text = Text;
+            }
+        }
+
         public void TaskRefresh(ModLoader.LoaderBase Loader)
         {
             if (Loader is null || !Loader.Show)
@@ -122,6 +260,8 @@ namespace PCL
                     // 非 LoaderCombo（如 LoaderTask）没有子加载器，卡片就显示自己。
                     LoaderList = new List<ModLoader.LoaderBase> { Loader };
                 }
+                foreach (var SubTask in LoaderList)
+                    TrackStageTime(SubTask);
                 if (RightCards.ContainsKey(Loader.Name))
                 {
                     // 已有此卡片
@@ -204,7 +344,7 @@ namespace PCL
                                                             {
                                                                 ((TextBlock)Card.Children[Row * 2]).Text = Math.Floor(SubTask.Progress * 100d) + "%";
                                                             }
-
+                                                            UpdateRowLabel(Card, Row, SubTask);
                                                             break;
                                                         }
                                                     case ModBase.LoadState.Finished:
@@ -215,6 +355,7 @@ namespace PCL
                                                                 Card.Children.Insert(Row * 2, (UIElement)ModBase.GetObjectFromXML("<Path xmlns=\"http://schemas.microsoft.com/winfx/2006/xaml/presentation\" xmlns:x=\"http://schemas.microsoft.com/winfx/2006/xaml\" xmlns:local=\"clr-namespace:PCL;assembly=pcl-next\" Stretch=\"Uniform\" Tag=\"Finished\" Data=\"F1 M 23.7501,33.25L 34.8334,44.3333L 52.2499,22.1668L 56.9999,26.9168L 34.8334,53.8333L 19.0001,38L 23.7501,33.25 Z\" Height=\"16\" Width=\"15\" HorizontalAlignment=\"Center\" Grid.Column=\"0\" Grid.Row=\"" + Row + "\" Fill=\"{DynamicResource ColorBrush3}\" Margin=\"0,3,0,0\" VerticalAlignment=\"Top\"/>"));
                                                             }
 
+                                                            UpdateRowLabel(Card, Row, SubTask);
                                                             break;
                                                         }
                                                 }
@@ -281,7 +422,7 @@ namespace PCL
                                         break;
                                     }
                             }
-                            CardXAML += "<TextBlock Text=\"" + StringUtils.XmlEscape(SubTask.Name) + "\" HorizontalAlignment=\"Left\" Grid.Column=\"1\" Grid.Row=\"" + Row + "\"/>";
+                            CardXAML += "<TextBlock Text=\"" + StringUtils.XmlEscape(SubTask.Name) + FormatElapsedLabel(SubTask).Replace("\"", "") + "\" HorizontalAlignment=\"Left\" Grid.Column=\"1\" Grid.Row=\"" + Row + "\"/>";
                             Row += 1;
                         }
                         CardXAML += "</Grid></local:MyCard>";

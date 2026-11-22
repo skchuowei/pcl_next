@@ -43,6 +43,18 @@
         <RowDefinition Height="Auto" />
         <RowDefinition Height="Auto" />
         <RowDefinition Height="Auto" />
+        <RowDefinition Height="0.4*" />
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="0.4*" />
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="0.4*" />
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="Auto" />
         <RowDefinition Height="1*" />
     </Grid.RowDefinitions>
     <TextBlock Text="总进度" Grid.Row="1" HorizontalAlignment="Center" FontSize="14" Foreground="{DynamicResource ColorBrush3}" />
@@ -57,4 +69,13 @@
     <TextBlock Text="剩余线程" Grid.Row="13" HorizontalAlignment="Center" FontSize="14" Foreground="{DynamicResource ColorBrush3}" />
     <TextBlock Grid.Row="14" Style="{DynamicResource Split}" />
     <TextBlock Text="123456789" Grid.Row="15" Name="LabThread" HorizontalAlignment="Center" FontSize="20" />
+    <TextBlock Text="并发下载" Grid.Row="17" HorizontalAlignment="Center" FontSize="14" Foreground="{DynamicResource ColorBrush3}" />
+    <TextBlock Grid.Row="18" Style="{DynamicResource Split}" />
+    <TextBlock Text="0 个文件" Grid.Row="19" Name="LabConcurrent" HorizontalAlignment="Center" FontSize="20" />
+    <TextBlock Text="当前文件" Grid.Row="21" HorizontalAlignment="Center" FontSize="14" Foreground="{DynamicResource ColorBrush3}" />
+    <TextBlock Grid.Row="22" Style="{DynamicResource Split}" />
+    <TextBlock Text="—" Grid.Row="23" Name="LabCurrentFile" HorizontalAlignment="Center" FontSize="13.5" MaxWidth="168" TextTrimming="CharacterEllipsis" TextAlignment="Center" ToolTip="—" />
+    <TextBlock Text="最慢文件" Grid.Row="25" HorizontalAlignment="Center" FontSize="14" Foreground="{DynamicResource ColorBrush3}" />
+    <TextBlock Grid.Row="26" Style="{DynamicResource Split}" />
+    <TextBlock Text="—" Grid.Row="27" Name="LabSlowestFile" HorizontalAlignment="Center" FontSize="13.5" MaxWidth="168" TextTrimming="CharacterEllipsis" TextAlignment="Center" ToolTip="—" />
 </local:MyPageLeft>
