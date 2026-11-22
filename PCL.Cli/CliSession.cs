@@ -13,7 +13,8 @@ internal sealed class CliSession : IDisposable
 
     private CliSession(CliArguments args, CliOutput output, CliPolicy policy, string workDir,
         McMirrorPreference mirror, int maxConcurrency, long speedLimit,
-        int? chunksPerHost, int? chunksPerHostRelaxed, int? chunksPerFile, long? speedLow)
+        int? chunksPerHost, int? chunksPerHostRelaxed, int? chunksPerFile, long? speedLow,
+        bool multiSource, int? multiSourceMax)
     {
         Args = args;
         Output = output;
@@ -26,6 +27,8 @@ internal sealed class CliSession : IDisposable
         ChunksPerHostRelaxed = chunksPerHostRelaxed;
         ChunksPerFile = chunksPerFile;
         SpeedLow = speedLow;
+        MultiSource = multiSource;
+        MultiSourceMax = multiSourceMax;
 
         Console.CancelKeyPress += OnCancelKeyPress;
     }
@@ -41,6 +44,8 @@ internal sealed class CliSession : IDisposable
     public int? ChunksPerHostRelaxed { get; }
     public int? ChunksPerFile { get; }
     public long? SpeedLow { get; }
+    public bool MultiSource { get; }
+    public int? MultiSourceMax { get; }
     public CancellationToken Token => _cts.Token;
 
     /// <summary>创建工作会话：解析全局参数、建目录、开日志、读策略。</summary>
@@ -75,9 +80,11 @@ internal sealed class CliSession : IDisposable
         var chunksPerHostRelaxed = args.GetInt("chunks-per-host-relaxed");
         var chunksPerFile = args.GetInt("chunks-per-file");
         var speedLow = args.GetLong("speed-low");
+        var multiSource = args.GetBool("multi-source", true);
+        var multiSourceMax = args.GetInt("multi-source-max");
 
         return new CliSession(args, output, policy, workDir, mirror, concurrency, speedLimit,
-            chunksPerHost, chunksPerHostRelaxed, chunksPerFile, speedLow);
+            chunksPerHost, chunksPerHostRelaxed, chunksPerFile, speedLow, multiSource, multiSourceMax);
     }
 
     /// <summary>把策略命中的来源打印到日志首行与 stdout（计划 §5.4：便于事后核对）。</summary>
@@ -110,6 +117,8 @@ internal sealed class CliSession : IDisposable
             MaxChunksPerHostUnrestricted = ChunksPerHostRelaxed ?? defaults.MaxChunksPerHostUnrestricted,
             MaxChunksPerFile = ChunksPerFile ?? defaults.MaxChunksPerFile,
             SpeedLimitLow = SpeedLow ?? defaults.SpeedLimitLow,
+            MultiSourceParallel = MultiSource,
+            MultiSourceMaxSources = MultiSourceMax ?? defaults.MultiSourceMaxSources,
             Log = Output.EngineInfo,
             LogWarn = (ex, message) => Output.EngineWarn(message, ex),
         };

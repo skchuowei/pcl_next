@@ -228,8 +228,12 @@ internal sealed class FileTask
     }
 
     /// <summary>
-    /// 为「追加分块」挑选下载源：在未禁用且允许分段的源中选活动分块数最少者（平局取 Id 小者）。
-    /// 全部候选源都不允许分段（如仅有 BMCLAPI）时返回 null，维持不分割行为。
+    /// 为「追加分块」挑选下载源。
+    /// <para/>多源并行（默认开启）：在未禁用且允许分段的源里按「慢源降级 → 活动分块少 →
+    /// 实测吞吐高 → 首包竞速胜负」排序，让官方 CDN 与镜像同时分担同一文件的分块；
+    /// 参与源数受 <see cref="DownloadOptions.MultiSourceMaxSources"/> 约束。
+    /// 关闭多源并行时退回旧行为：竞速已分胜负且文件 ≤32MB 的场合只允许赢家参与。
+    /// </para>
     /// </summary>
     private DownloadSource? GetSplitCapableSource(DownloadOptions options)
     {
@@ -241,24 +245,93 @@ internal sealed class FileTask
                 .ToList();
             if (candidates.Count == 0) return null;
 
-            // 已经发生过首包竞速的场合，只允许「竞速赢过」的源参与追加分块：
-            // 未参赛的源速度未知、落败的源已知更慢，把追加分块压上去只会吃满一个连接超时
-            //（真机 NeoForge installer：竞速赢家是不允许分段的镜像，2 个追加分块却压到 6s 超时的
-            // 官方 maven，7MB 拖了近 10 秒）。赢家若不可分段，宁可不追加分块——
-            // 单连接快源好过一堆慢连接。未发生竞速（对冲关闭、单源）时保持原行为，
-            // 不影响大文件并行与既有测试。
-            if (FileSize is > 0 and <= 32L * 1024 * 1024 && Sources.Any(s => s.HedgeWins > 0))
+            if (!options.MultiSourceParallel)
             {
-                candidates = candidates.Where(s => s.HedgeWins > 0).ToList();
+                // 旧行为：只允许首包竞速赢家参与追加分块。
+                // 未参赛的源速度未知、落败的源已知更慢，把追加分块压上去只会吃满一个连接超时
+                //（真机 NeoForge installer：竞速赢家是不允许分段的镜像，2 个追加分块却压到
+                // 6s 超时的官方 maven，7MB 拖了近 10 秒）。
+                if (FileSize is > 0 and <= 32L * 1024 * 1024 && Sources.Any(s => s.HedgeWins > 0))
+                {
+                    candidates = candidates.Where(s => s.HedgeWins > 0).ToList();
+                    if (candidates.Count == 0) return null;
+                }
+                return candidates
+                    .OrderByDescending(s => s.HedgeWins)
+                    .ThenBy(s => s.HedgeLosses)
+                    .ThenBy(s => Chunks.Count(c => ReferenceEquals(c.Source, s) && !c.IsEnded))
+                    .ThenBy(s => s.Id)
+                    .First();
+            }
+
+            // 多源并行：参与源数有限，名额已满时只在已参与的源里继续挑。
+            // 否则每轮追加大概率挑到新源，分块被摊给 5、6 个源各一两条连接，反而整体变慢。
+            var participating = new List<DownloadSource>();
+            foreach (var c in Chunks)
+            {
+                if (c.IsEnded || c.Source.IsFailed) continue;
+                if (!participating.Contains(c.Source)) participating.Add(c.Source);
+            }
+            var maxSources = options.MultiSourceMaxSources > 0 ? options.MultiSourceMaxSources : int.MaxValue;
+            if (participating.Count >= maxSources)
+            {
+                var allowed = candidates.Where(s => participating.Contains(s)).ToList();
+                candidates = allowed.Count > 0 ? allowed : participating.Where(s => !s.IsFailed).ToList();
                 if (candidates.Count == 0) return null;
             }
-            // 优先历史上赢过首包竞速、且少落败的源：对冲判定出谁快之后，后续分块不再回头用慢源
-            return candidates
-                .OrderByDescending(s => s.HedgeWins)
-                .ThenBy(s => s.HedgeLosses)
-                .ThenBy(s => Chunks.Count(c => ReferenceEquals(c.Source, s) && !c.IsEnded))
-                .ThenBy(s => s.Id)
+
+            // 一次性取齐速度样本（避免排序 lambda 里反复加锁）
+            var stats = candidates.Select(s =>
+            {
+                double speed;
+                long samples;
+                lock (s.SpeedLock)
+                {
+                    speed = s.SpeedEwma;
+                    samples = s.SpeedSampleBytes;
+                }
+                var isSlow = options.MultiSourceSlowSourceBytesPerSecond > 0 &&
+                             speed >= 0 && samples >= 1024 * 1024 &&
+                             speed < options.MultiSourceSlowSourceBytesPerSecond;
+                return new
+                {
+                    Source = s,
+                    Slow = isSlow ? 1 : 0,
+                    Active = Chunks.Count(c => ReferenceEquals(c.Source, s) && !c.IsEnded),
+                    Speed = speed,
+                };
+            }).ToList();
+
+            return stats
+                .OrderBy(x => x.Slow)               // 有可信证据的慢源排到最后
+                .ThenBy(x => x.Active)              // 先把连接铺到还闲着的源上
+                .ThenByDescending(x => x.Speed)     // 同负载时快源优先（未知速度 -1 不奖不罚）
+                .ThenByDescending(x => x.Source.HedgeWins)
+                .ThenBy(x => x.Source.HedgeLosses)
+                .ThenBy(x => x.Source.Id)
+                .Select(x => x.Source)
                 .First();
+        }
+    }
+
+    /// <summary>
+    /// 用刚结束的分块更新源吞吐样本（多源并行的选源依据）。
+    /// <para/>门槛：至少 256 KB 且耗时 ≥1 秒 —— 太小的分块受建连/首包开销主导，
+    /// 会把一个健康的快源误判成慢源，此后所有新分块都被排到它后面。
+    /// 样本只影响优先级，不参与判死。
+    /// </para>
+    /// </summary>
+    private void UpdateSourceSpeed(Chunk chunk)
+    {
+        var elapsed = Environment.TickCount64 - chunk.InitTime;
+        var done = chunk.Done;
+        if (done < 256 * 1024 || elapsed < 1000) return;
+        var speed = done * 1000.0 / elapsed;
+        var source = chunk.Source;
+        lock (source.SpeedLock)
+        {
+            source.SpeedEwma = source.SpeedEwma < 0 ? speed : source.SpeedEwma * 0.7 + speed * 0.3;
+            source.SpeedSampleBytes += done;
         }
     }
 
@@ -962,6 +1035,8 @@ internal sealed class FileTask
         }
         finally
         {
+            // 记录本分块的实测吞吐：多源并行靠它判断谁是慢源（失败不影响主流程）
+            try { UpdateSourceSpeed(chunk); } catch { /* 忽略 */ }
             request?.Dispose();
             response?.Dispose();
             responseStream?.Dispose();

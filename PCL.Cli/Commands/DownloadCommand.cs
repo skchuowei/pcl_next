@@ -25,6 +25,8 @@ internal static class DownloadCommand
           --chunks-per-host-relaxed <N>  普通主机（官方 CDN）并发分块上限（默认 16）
           --chunks-per-file <N>          单文件并发分块上限（默认 12）
           --speed-low <字节/秒>          低于该速度时追加分块（默认 256 KB/s）
+          --multi-source <on|off>        同一文件是否多源并行下载（默认 on）
+          --multi-source-max <N>         同时参与的源数上限（默认 4，0 = 不限制）
 
         请求.json 格式：
           { "files": [ { "to": "D:\\a\\b.jar", "sources": ["https://..."],

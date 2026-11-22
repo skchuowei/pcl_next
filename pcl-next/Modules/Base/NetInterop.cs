@@ -58,6 +58,22 @@ namespace PCL
         }
 
         /// <summary>
+    /// 读取下载开关类设置；设置项缺失或读取失败时返回给定的兜底值，不阻断下载。
+    /// </summary>
+        private static bool GetBoolSetting(string Key, bool Fallback)
+        {
+            try
+            {
+                return Settings.Get<bool>(Key);
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn(ex, $"读取下载设置失败：{Key}");
+                return Fallback;
+            }
+        }
+
+        /// <summary>
     /// 用 C# 引擎下载单个文件（由 NetFile.TryBeginThread 抢占标记后调用）。
     /// </summary>
         public static void RunCSharpDownload(ModNet.NetFile File)
@@ -114,6 +130,9 @@ namespace PCL
                     MaxChunksPerHostUnrestricted = ClampChunkSetting("ToolDownloadChunkPerHostRelaxed"),
                     MaxChunksPerFile = ClampChunkSetting("ToolDownloadChunkPerFile"),
                     SpeedLimitLow = ClampChunkSetting("ToolDownloadSpeedLow") * SpeedLowStepBytes,
+                    // 多源并行：同一文件的分块可分配给不同源同时下载（关闭后退回竞速赢家独占）
+                    MultiSourceParallel = GetBoolSetting("ToolDownloadMultiSource", true),
+                    MultiSourceMaxSources = ClampChunkSetting("ToolDownloadMultiSourceMax"),
                     Log = new Action<string>(m => Logger.Info(m)),
                     LogWarn = new Action<Exception, string>((ex, m) => Logger.Warn(ex, m))
                 };

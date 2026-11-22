@@ -84,6 +84,19 @@ public sealed class DownloadSource
     /// <summary>若该下载源正在进行强制单线程下载，标记这个唯一的分块。</summary>
     internal object? SingleChunk;
 
+    /// <summary>
+    /// 该源最近观测到的有效吞吐（EWMA，Byte/s）；负数表示尚无样本。
+    /// <para/>只用于「多源并行」时给分块挑源：慢源排到最后，快源优先分到更多分块。
+    /// 不参与判死（判死仍走失败计数），也没有任何 UI 展示用途。
+    /// </summary>
+    internal double SpeedEwma = -1;
+
+    /// <summary>已用于速度采样的字节累计：样本太小时不采信，避免一次短分块把源判成「慢源」。</summary>
+    internal long SpeedSampleBytes;
+
+    /// <summary>保护 <see cref="SpeedEwma"/> / <see cref="SpeedSampleBytes"/> 的读写（多分块并行收尾时会并发更新）。</summary>
+    internal readonly object SpeedLock = new();
+
     public override string ToString() => Url;
 }
 
@@ -316,6 +329,28 @@ public sealed class DownloadOptions
     /// <see cref="MaxConcurrentChunks"/> 约束。
     /// </summary>
     public int MaxChunksPerFile { get; init; } = 12;
+
+    /// <summary>
+    /// 多源并行：同一文件的不同分块可以分配给不同下载源同时下载。
+    /// <para/>关闭后回到旧行为（首包竞速赢家独占追加分块）。默认开启。
+    /// </para>
+    /// </summary>
+    public bool MultiSourceParallel { get; init; } = true;
+
+    /// <summary>
+    /// 多源并行时，同一文件同时参与的源数上限。0 或负数表示不限制（用全部可用源）。
+    /// <para/>默认 4：再多会把连接摊得过散，单源分不到足够分块，反而更容易触发镜像限流。
+    /// </para>
+    /// </summary>
+    public int MultiSourceMaxSources { get; init; } = 4;
+
+    /// <summary>
+    /// 慢源降级阈值（Byte/s）：源的实测吞吐低于该值且样本可信时，多源调度把它的优先级排到最后。
+    /// <para/>默认 48 KB/s。只影响新分块的分配顺序，已有分块不会被强行中断（慢速换源另有独立机制）。
+    /// 小于等于 0 关闭慢源降级。
+    /// </para>
+    /// </summary>
+    public long MultiSourceSlowSourceBytesPerSecond { get; init; } = 48 * 1024;
 
     /// <summary>连接超时上限（毫秒）。单个连接建立超时 = min(max(平均首包时间,下限) × (1+源失败数), 该值)。</summary>
     public int ConnectTimeoutMilliseconds { get; init; } = 30000;

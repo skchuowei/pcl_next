@@ -875,6 +875,75 @@ public class DownloadEngineTests
             $"单文件并发越过 MaxChunksPerFile：峰值 {server.PeakConcurrent}");
     }
 
+    /// <summary>
+    /// 多源并行：同一文件的分块应分摊到两个不同的下载源上（官方 CDN + 镜像同时出力）。
+    /// </summary>
+    [Fact]
+    public async Task MultiSourceParallel_SharesFileAcrossSources()
+    {
+        var data = RandomBytes(4 * 1024 * 1024);
+        const int slow = 25;
+        using var first = new FakeFileServer { Data = data, DelayMsPerChunk = slow };
+        using var second = new FakeFileServer { Data = data, DelayMsPerChunk = slow };
+        var target = TempPath("multi-source.bin");
+        var options = new DownloadOptions
+        {
+            MaxConcurrentChunks = 8,
+            MaxChunksPerHost = 4,
+            MaxChunksPerHostUnrestricted = 4, // 两个源同为 127.0.0.1，合计 4 条连接
+            MaxChunksPerFile = 6,
+            SpeedLimitLow = 1L << 30,
+            HedgeDelayMilliseconds = 0,
+            MultiSourceParallel = true,
+            MultiSourceMaxSources = 4,
+            TickMilliseconds = 20,
+        };
+
+        await new DownloadEngine().DownloadAsync(
+            [new DownloadFileRequest { Sources = [first.Url, second.Url], LocalPath = target, Check = Sha1Rule(data) }],
+            options);
+
+        Assert.Equal(data, await File.ReadAllBytesAsync(target));
+        Assert.True(first.Requests.Count > 0, "首选源未收到请求");
+        Assert.True(second.Requests.Count > 0,
+            $"第二源完全没参与：first={first.Requests.Count}，second={second.Requests.Count}");
+    }
+
+    /// <summary>
+    /// 关闭多源并行：退回「首包竞速赢家独占」，落败源不参与追加分块（只留竞速那一条请求）。
+    /// </summary>
+    [Fact]
+    public async Task MultiSourceParallelDisabled_HedgeWinnerExclusive()
+    {
+        var data = RandomBytes(2 * 1024 * 1024);
+        // 首选源迟迟不给首包，对冲 300ms 后第二源启动并胜出
+        using var slowFirst = new FakeFileServer { Data = data, FirstByteDelayMs = 800, DelayMsPerChunk = 10 };
+        using var fastSecond = new FakeFileServer { Data = data, FirstByteDelayMs = 150, DelayMsPerChunk = 10 };
+        var target = TempPath("multi-source-off.bin");
+        var options = new DownloadOptions
+        {
+            MaxConcurrentChunks = 6,
+            MaxChunksPerHost = 3,
+            MaxChunksPerHostUnrestricted = 3,
+            MaxChunksPerFile = 4,
+            SpeedLimitLow = 1L << 30,
+            HedgeDelayMilliseconds = 300,
+            MultiSourceParallel = false,
+            TickMilliseconds = 20,
+        };
+
+        await new DownloadEngine().DownloadAsync(
+            [new DownloadFileRequest { Sources = [slowFirst.Url, fastSecond.Url], LocalPath = target, Check = Sha1Rule(data) }],
+            options);
+
+        Assert.Equal(data, await File.ReadAllBytesAsync(target));
+        // 竞速落败方只应留下启动时的那一条请求，追加分块全部落在赢家上
+        Assert.True(slowFirst.Requests.Count <= 1,
+            $"关闭多源并行后，竞速落败源仍被追加分块：{slowFirst.Requests.Count} 条请求");
+        Assert.True(fastSecond.Requests.Count > slowFirst.Requests.Count,
+            $"竞速赢家未独占追加分块：winner={fastSecond.Requests.Count}，loser={slowFirst.Requests.Count}");
+    }
+
     #endregion
 
     #endregion
