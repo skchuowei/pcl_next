@@ -35,6 +35,29 @@ namespace PCL
         private readonly static ConcurrencyBudget GlobalBudget = new ConcurrencyBudget(32);
 
         /// <summary>
+    /// 下载并发档位的单步大小：设置页滑动条 1 档 = 128 KB/s（0 档 = 不主动追加分块）。
+    /// </summary>
+        private const int SpeedLowStepBytes = 128 * 1024;
+
+        /// <summary>
+    /// 读取下载并发档位设置并夹紧到合法范围（0 = 引擎按「不限制」处理）。
+    /// 设置项缺失或读取失败时回退到 0，由引擎使用自身默认语义，不阻断下载。
+    /// </summary>
+        private static int ClampChunkSetting(string Key)
+        {
+            try
+            {
+                var Value = Settings.Get<int>(Key);
+                return Value < 0 ? 0 : Math.Min(Value, 64);
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn(ex, $"读取下载并发设置失败：{Key}");
+                return 0;
+            }
+        }
+
+        /// <summary>
     /// 用 C# 引擎下载单个文件（由 NetFile.TryBeginThread 抢占标记后调用）。
     /// </summary>
         public static void RunCSharpDownload(ModNet.NetFile File)
@@ -85,6 +108,12 @@ namespace PCL
                     MaxConcurrentChunks = ModNet.NetTaskThreadLimit,
                     SharedBudget = GlobalBudget,
                     SpeedLimitHigh = ModNet.NetTaskSpeedLimitHigh,
+                    // 下列并发档位由「设置 → 下载」页开放；≤0 交由引擎解释为「不限制」。
+                    // 默认值来自 Settings 的默认项（镜像 4 / 官方源 16 / 单文件 12 / 阈值 2 档）。
+                    MaxChunksPerHost = ClampChunkSetting("ToolDownloadChunkPerHost"),
+                    MaxChunksPerHostUnrestricted = ClampChunkSetting("ToolDownloadChunkPerHostRelaxed"),
+                    MaxChunksPerFile = ClampChunkSetting("ToolDownloadChunkPerFile"),
+                    SpeedLimitLow = ClampChunkSetting("ToolDownloadSpeedLow") * SpeedLowStepBytes,
                     Log = new Action<string>(m => Logger.Info(m)),
                     LogWarn = new Action<Exception, string>((ex, m) => Logger.Warn(ex, m))
                 };
