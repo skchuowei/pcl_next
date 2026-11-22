@@ -793,6 +793,88 @@ public class DownloadEngineTests
             $"未快速失败，耗时 {watch.ElapsedMilliseconds}ms（疑似永久卡死）");
     }
 
+    /// <summary>
+    /// 主机并发分级：受限镜像（BMCLAPI 等）仍按 MaxChunksPerHost 限流，
+    /// 普通主机（官方 CDN）放宽到 MaxChunksPerHostUnrestricted。
+    /// <para/>回归背景：此前所有主机统一锁 4 条连接，整合包 127 个 Mod 全部来自 cdn.modrinth.com，
+    /// 全局并发被压到 4，实测只有 400~500 KB/s；而实测该 CDN 在 16 连接时仍有 6.9 MB/s。
+    /// </para>
+    /// </summary>
+    [Fact]
+    public async Task HostConcurrency_RestrictedHostCapped_UnrestrictedHostScales()
+    {
+        var data = RandomBytes(2 * 1024 * 1024);
+        const int slow = 20; // 64KB/20ms ≈ 单连接 3 MB/s 上限，保证有观察并发的窗口
+
+        // 用例 1：命中受限关键字（路径含 bmclapi），单主机只许 1 个并发分块
+        using var restricted = new FakeFileServer
+        {
+            Data = data, UrlPath = "/bmclapi/file.bin", DelayMsPerChunk = slow,
+        };
+        var targetA = TempPath("host-restricted.bin");
+        var optionsRestricted = new DownloadOptions
+        {
+            MaxConcurrentChunks = 8,
+            SpeedLimitLow = 1L << 30,
+            HedgeDelayMilliseconds = 0,
+            MaxChunksPerHost = 1,
+            MaxChunksPerHostUnrestricted = 4,
+            TickMilliseconds = 20,
+        };
+        await new DownloadEngine().DownloadAsync(
+            [new DownloadFileRequest { Sources = [restricted.Url], LocalPath = targetA, Check = Sha1Rule(data) }],
+            optionsRestricted);
+        Assert.Equal(data, await File.ReadAllBytesAsync(targetA));
+        Assert.True(restricted.PeakConcurrent <= 1,
+            $"受限主机并发被突破：峰值 {restricted.PeakConcurrent} 条连接（应 ≤ 1）");
+
+        // 用例 2：普通主机（不限关键字），应能放宽到 MaxChunksPerHostUnrestricted
+        using var normal = new FakeFileServer { Data = data, DelayMsPerChunk = slow };
+        var targetB = TempPath("host-normal.bin");
+        var optionsNormal = new DownloadOptions
+        {
+            MaxConcurrentChunks = 8,
+            SpeedLimitLow = 1L << 30,
+            HedgeDelayMilliseconds = 0,
+            MaxChunksPerHost = 1,                 // 受限主机的严格值，不应作用到普通主机
+            MaxChunksPerHostUnrestricted = 4,
+            TickMilliseconds = 20,
+        };
+        await new DownloadEngine().DownloadAsync(
+            [new DownloadFileRequest { Sources = [normal.Url], LocalPath = targetB, Check = Sha1Rule(data) }],
+            optionsNormal);
+        Assert.Equal(data, await File.ReadAllBytesAsync(targetB));
+        Assert.True(normal.PeakConcurrent >= 3,
+            $"普通主机未放宽并发：峰值仅 {normal.PeakConcurrent} 条连接（应 ≥ 3）");
+    }
+
+    /// <summary>
+    /// 单文件分块上限：一个超大文件不得吃满主机名额。
+    /// </summary>
+    [Fact]
+    public async Task MaxChunksPerFile_CapsSingleFileChunks()
+    {
+        var data = RandomBytes(4 * 1024 * 1024);
+        using var server = new FakeFileServer { Data = data, DelayMsPerChunk = 20 };
+        var target = TempPath("per-file-cap.bin");
+        var options = new DownloadOptions
+        {
+            MaxConcurrentChunks = 16,
+            MaxChunksPerHostUnrestricted = 16,
+            MaxChunksPerFile = 2,
+            SpeedLimitLow = 1L << 30,
+            HedgeDelayMilliseconds = 0,
+            TickMilliseconds = 20,
+        };
+        await new DownloadEngine().DownloadAsync(
+            [new DownloadFileRequest { Sources = [server.Url], LocalPath = target, Check = Sha1Rule(data) }],
+            options);
+
+        Assert.Equal(data, await File.ReadAllBytesAsync(target));
+        Assert.True(server.PeakConcurrent <= 2,
+            $"单文件并发越过 MaxChunksPerFile：峰值 {server.PeakConcurrent}");
+    }
+
     #endregion
 
     #endregion

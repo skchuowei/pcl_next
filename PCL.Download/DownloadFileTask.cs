@@ -394,7 +394,11 @@ internal sealed class FileTask
 
             lock (ChunksLock)
             {
-                if (runningChunks >= options.MaxConcurrentChunks || !HasAvailableSource()) return null;
+                // 单文件并发上限：防止一个大文件吃满主机名额，把小文件挤成串行
+                var perFileLimit = options.MaxChunksPerFile > 0
+                    ? Math.Min(options.MaxConcurrentChunks, options.MaxChunksPerFile)
+                    : options.MaxConcurrentChunks;
+                if (runningChunks >= perFileLimit || !HasAvailableSource()) return null;
 
                 if (IsNoSplit && Chunks.Any(c => !c.IsEnded))
                 {
@@ -492,9 +496,14 @@ internal sealed class FileTask
                 // 连接发起限频（非阻塞）：未到间隔则本轮放弃，下个调度周期再试
                 if (!HostStartThrottle.TryReserve(source.Url, options)) return null;
 
-                // 按主机限制并发分块数：单主机开太多连接会被镜像限速（429）
+                // 按主机限制并发分块数：受限镜像（BMCLAPI 等）开太多连接会被限速（429），
+                // 官方 CDN 则放宽到 MaxChunksPerHostUnrestricted 以吃满带宽。
                 var hostKey = HostConcurrency.KeyOf(source.Url);
-                if (!HostConcurrency.TryEnter(hostKey, options.MaxChunksPerHost)) return null;
+                var hostLimit = options.HostConcurrencyLimitedKeywords.Any(k =>
+                        source.Url.Contains(k, StringComparison.OrdinalIgnoreCase))
+                    ? options.MaxChunksPerHost
+                    : options.MaxChunksPerHostUnrestricted;
+                if (!HostConcurrency.TryEnter(hostKey, hostLimit)) return null;
 
                 var chunk = new Chunk
                 {

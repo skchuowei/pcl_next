@@ -60,6 +60,11 @@ public sealed class FakeFileServer : IDisposable
 
     /// <summary>TCP 连接被接受的次数（含 HangConnections 模式——此时 Requests 不增长）。</summary>
     public int AcceptCount;
+
+    /// <summary>同时处于处理中的请求数的峰值（用于验证主机并发上限）。</summary>
+    public int PeakConcurrent;
+
+    private int _activeRequests;
     public int Port { get; }
 
     /// <summary>URL 路径。测试可改为含 "bmclapi" 等关键字的路径以命中引擎的主机关键字规则。</summary>
@@ -133,6 +138,13 @@ public sealed class FakeFileServer : IDisposable
 
     private async Task HandleAsync(TcpClient client, CancellationToken ct)
     {
+        var active = Interlocked.Increment(ref _activeRequests);
+        while (true)
+        {
+            var peak = Volatile.Read(ref PeakConcurrent);
+            if (active <= peak) break;
+            if (Interlocked.CompareExchange(ref PeakConcurrent, active, peak) == peak) break;
+        }
         try
         {
             using var _ = client;
@@ -213,6 +225,10 @@ public sealed class FakeFileServer : IDisposable
         catch
         {
             // 测试服务器忽略处理错误
+        }
+        finally
+        {
+            Interlocked.Decrement(ref _activeRequests);
         }
     }
 

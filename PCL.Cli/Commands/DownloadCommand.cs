@@ -19,6 +19,13 @@ internal static class DownloadCommand
                         [--browser] [--replace]
         pclcli download --file <请求.json>
 
+        调优点（默认即最优，仅压测/排障时覆盖）：
+          --concurrency <N>              全局并发上限（默认 33）
+          --chunks-per-host <N>          受限主机（BMCLAPI 等）并发分块上限（默认 4）
+          --chunks-per-host-relaxed <N>  普通主机（官方 CDN）并发分块上限（默认 16）
+          --chunks-per-file <N>          单文件并发分块上限（默认 12）
+          --speed-low <字节/秒>          低于该速度时追加分块（默认 256 KB/s）
+
         请求.json 格式：
           { "files": [ { "to": "D:\\a\\b.jar", "sources": ["https://..."],
                          "sha1": "…", "size": 123, "browserHeaders": false } ] }

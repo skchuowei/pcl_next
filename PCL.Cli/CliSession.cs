@@ -12,7 +12,8 @@ internal sealed class CliSession : IDisposable
     private bool _disposed;
 
     private CliSession(CliArguments args, CliOutput output, CliPolicy policy, string workDir,
-        McMirrorPreference mirror, int maxConcurrency, long speedLimit)
+        McMirrorPreference mirror, int maxConcurrency, long speedLimit,
+        int? chunksPerHost, int? chunksPerHostRelaxed, int? chunksPerFile, long? speedLow)
     {
         Args = args;
         Output = output;
@@ -21,6 +22,10 @@ internal sealed class CliSession : IDisposable
         Mirror = mirror;
         MaxConcurrency = maxConcurrency;
         SpeedLimit = speedLimit;
+        ChunksPerHost = chunksPerHost;
+        ChunksPerHostRelaxed = chunksPerHostRelaxed;
+        ChunksPerFile = chunksPerFile;
+        SpeedLow = speedLow;
 
         Console.CancelKeyPress += OnCancelKeyPress;
     }
@@ -32,6 +37,10 @@ internal sealed class CliSession : IDisposable
     public McMirrorPreference Mirror { get; }
     public int MaxConcurrency { get; }
     public long SpeedLimit { get; }
+    public int? ChunksPerHost { get; }
+    public int? ChunksPerHostRelaxed { get; }
+    public int? ChunksPerFile { get; }
+    public long? SpeedLow { get; }
     public CancellationToken Token => _cts.Token;
 
     /// <summary>创建工作会话：解析全局参数、建目录、开日志、读策略。</summary>
@@ -61,7 +70,14 @@ internal sealed class CliSession : IDisposable
 
         var speedLimit = args.GetLong("speed-limit") ?? -1;
 
-        return new CliSession(args, output, policy, workDir, mirror, concurrency, speedLimit);
+        // 主机/单文件并发覆盖项：仅用于压测与故障复现；不传时走 DownloadOptions 的默认策略
+        var chunksPerHost = args.GetInt("chunks-per-host");
+        var chunksPerHostRelaxed = args.GetInt("chunks-per-host-relaxed");
+        var chunksPerFile = args.GetInt("chunks-per-file");
+        var speedLow = args.GetLong("speed-low");
+
+        return new CliSession(args, output, policy, workDir, mirror, concurrency, speedLimit,
+            chunksPerHost, chunksPerHostRelaxed, chunksPerFile, speedLow);
     }
 
     /// <summary>把策略命中的来源打印到日志首行与 stdout（计划 §5.4：便于事后核对）。</summary>
@@ -83,13 +99,21 @@ internal sealed class CliSession : IDisposable
     }
 
     /// <summary>构造下载引擎选项，日志接到本会话的输出器。</summary>
-    public DownloadOptions CreateOptions() => new()
+    public DownloadOptions CreateOptions()
     {
-        MaxConcurrentChunks = MaxConcurrency,
-        SpeedLimitHigh = SpeedLimit,
-        Log = Output.EngineInfo,
-        LogWarn = (ex, message) => Output.EngineWarn(message, ex),
-    };
+        var defaults = new DownloadOptions();
+        return new DownloadOptions
+        {
+            MaxConcurrentChunks = MaxConcurrency,
+            SpeedLimitHigh = SpeedLimit,
+            MaxChunksPerHost = ChunksPerHost ?? defaults.MaxChunksPerHost,
+            MaxChunksPerHostUnrestricted = ChunksPerHostRelaxed ?? defaults.MaxChunksPerHostUnrestricted,
+            MaxChunksPerFile = ChunksPerFile ?? defaults.MaxChunksPerFile,
+            SpeedLimitLow = SpeedLow ?? defaults.SpeedLimitLow,
+            Log = Output.EngineInfo,
+            LogWarn = (ex, message) => Output.EngineWarn(message, ex),
+        };
+    }
 
     /// <summary>构造进度回调（节流到 ~5 次/秒，同时写 stdout 的 progress 事件与 stderr 的进度行）。</summary>
     public IProgress<DownloadProgress> CreateProgress(string label) => new ThrottledProgress(Output, label);

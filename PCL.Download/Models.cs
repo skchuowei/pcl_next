@@ -218,9 +218,11 @@ public sealed class DownloadOptions
     public ConcurrencyBudget? SharedBudget { get; init; }
 
     /// <summary>
-    /// 速度下限（Byte/s）：当前速度低于该值时为进行中的文件追加下载分块。默认 256K/s。
-    /// 该值会随历史速度以 85% 比例自适应抬升（对应 VB 的 NetTaskSpeedLimitLow），
-    /// 调度时以「当前速度 &lt; max(该值, 动态下限)」判定是否补分块。
+    /// 速度下限（Byte/s）：当前速度低于该值时为进行中的文件追加下载分块。默认 256K/s（与 VB 对齐）。
+    /// <para/>补充说明（2026-11-22 实测）：调度首轮 <c>CurrentSpeed</c> 为 0，必然低于该值，
+    /// 因此单文件一开跑就会连续追加数个分块，随后速度超过阈值才收敛；配合
+    /// <see cref="MaxChunksPerHostUnrestricted"/> 放宽后，单文件 28 MB 实测 1.06 → 3.05 MB/s。
+    /// 若把阈值抬到 1 MB/s 反而更慢（多分块压满主机名额后互相排队），故保持 256K。
     /// </summary>
     public long SpeedLimitLow { get; init; } = 256 * 1024;
 
@@ -282,11 +284,38 @@ public sealed class DownloadOptions
     public int SlowSourceRotateAfterMilliseconds { get; init; } = 5000;
 
     /// <summary>
-    /// 同一主机允许同时进行的分块数上限。BMCLAPI 等镜像会按并发/频率限速，
+    /// 「受限主机」允许同时进行的分块数上限。BMCLAPI 等镜像会按并发/频率限速，
     /// 单文件被切成十几个分块同时压过去会立刻回 429（随后全线失败 → 0 B/s 卡死）。
-    /// 默认 4，0 或负数表示不限制。
+    /// 只对 <see cref="HostConcurrencyLimitedKeywords"/> 命中的主机生效；默认 4，0 或负数表示不限制。
     /// </summary>
     public int MaxChunksPerHost { get; init; } = 4;
+
+    /// <summary>
+    /// 受限主机关键字：URL 命中者按 <see cref="MaxChunksPerHost"/> 限并发，其余主机按
+    /// <see cref="MaxChunksPerHostUnrestricted"/>。
+    /// <para/>默认只锁 BMCLAPI 与自建服务：它们按请求频率/并发限速，压太狠会 429。
+    /// 官方 CDN（cdn.modrinth.com / forgecdn / objects.githubusercontent.com）实测对并发不敏感，
+    /// 归入「非受限」以吃满带宽。
+    /// </summary>
+    public IReadOnlyList<string> HostConcurrencyLimitedKeywords { get; init; } =
+        ["bmclapi", "pcl2-server", "meloong.com"];
+
+    /// <summary>
+    /// 非受限主机（官方 CDN / 第三方镜像）同一主机允许同时进行的分块数上限。
+    /// <para/>默认 16：实测国内到 cdn.modrinth.com 的 HTTP/1.1 多连接吞吐随并发线性增长
+    /// （4 连接 1.5 MB/s、8 连接 3.6 MB/s、16 连接 6.9 MB/s），此前全局锁 4 条连接是整合包下载
+    /// 长期只有 400~500 KB/s 的直接原因。真正的全局上限仍由 <see cref="SharedBudget"/> 与
+    /// <see cref="MaxConcurrentChunks"/> 控制。
+    /// </summary>
+    public int MaxChunksPerHostUnrestricted { get; init; } = 16;
+
+    /// <summary>
+    /// 单个文件允许同时进行的分块数上限，防止一个大文件把主机并发名额全部吃光，
+    /// 把其余小文件挤成串行。默认 12：留 4 个名额给其它文件，同时单文件也能吃到
+    /// 接近 <see cref="MaxChunksPerHostUnrestricted"/> 的吞吐。0 或负数表示只受
+    /// <see cref="MaxConcurrentChunks"/> 约束。
+    /// </summary>
+    public int MaxChunksPerFile { get; init; } = 12;
 
     /// <summary>连接超时上限（毫秒）。单个连接建立超时 = min(max(平均首包时间,下限) × (1+源失败数), 该值)。</summary>
     public int ConnectTimeoutMilliseconds { get; init; } = 30000;
