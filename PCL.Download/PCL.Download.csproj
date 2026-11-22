@@ -18,6 +18,14 @@
   </PropertyGroup>
 
   <!-- 纯 BCL 实现，不引入任何第三方依赖；宿主通过 DI/选项注入日志与策略 -->
+  <ItemGroup>
+    <!--
+      仅向测试工程开放 internal：分块区间账本（Chunk.RangeEnd）与按偏移合并（MergeByOffset）
+      是「下载后文件比 FileSize 长」这一缺陷的唯一可确定性回归入口，
+      走 public API 只能靠慢速源碰运气复现，无法钉住具体区间。
+    -->
+    <InternalsVisibleTo Include="PCL.Download.Tests" />
+  </ItemGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
     <DefineConstants>$(DefineConstants);SNAPSHOT</DefineConstants>
   </PropertyGroup>

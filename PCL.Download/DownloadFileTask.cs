@@ -9,10 +9,27 @@ namespace PCL.Download;
 /// </summary>
 internal sealed class Chunk
 {
+    /// <summary>区间右端尚未确定（只有首块在拿到响应头之前会处于这个状态）。</summary>
+    public const long NoRangeEnd = long.MaxValue;
+
     public required long Start;
     public long Done;
     public required DownloadSource Source;
     public string? TempPath;
+
+    /// <summary>
+    /// 本分块**独占**的文件区间右端（闭区间）。分块创建时从「持有者区间」里切出来即固定，
+    /// 此后任何新增分块都只能通过缩短持有者的区间来腾位置，不能反过来让在飞分块的区间静默缩水。
+    /// <para/>旧实现没有这个账本，区间由 <c>End()</c> 取「下一个更大 Start − 1」在**查询时**反推：
+    /// 后续插入分块会让在飞分块的可见区间当场缩水，但已写入的字节与 <see cref="Done"/> 不回退，
+    /// 于是同一尾段在两份 .tmp 里各存一遍；合并又按 Start 顺序把 Done 个字节直接串起来，
+    /// 结果文件比 FileSize 多出一整段（真机：期望 29,975,184 B，实际 30,423,278 B）。
+    /// </summary>
+    private long _rangeEnd = NoRangeEnd;
+
+    public long RangeEnd => Interlocked.Read(ref _rangeEnd);
+
+    public void SetRangeEnd(long value) => Interlocked.Exchange(ref _rangeEnd, value);
 
     public ChunkPhase Phase = ChunkPhase.Waiting;
     public long InitTime = Environment.TickCount64;
@@ -38,20 +55,34 @@ internal sealed class Chunk
 
     public long End(FileTask file)
     {
-        lock (file.ChunksLock)
-        {
-            long nextStart = long.MaxValue;
-            foreach (var other in file.Chunks)
-            {
-                if (other.Start > Start && other.Start < nextStart) nextStart = other.Start;
-            }
-            if (nextStart != long.MaxValue) return nextStart - 1;
-            if (file.IsUnknownSize) return 1_000_000_000_000L;
-            return file.FileSize - 1;
-        }
+        var rangeEnd = Interlocked.Read(ref _rangeEnd);
+        if (rangeEnd != NoRangeEnd) return rangeEnd;
+        // 区间未登记的只有「首块还没拿到响应头」这一种：文件大小一确定就按整文件兜底，
+        // 之后一旦被切割，SetRangeEnd 会把它改成真实右端。
+        if (file.IsUnknownSize) return 1_000_000_000_000L;
+        return file.FileSize - 1;
     }
 
-    public long Undone(FileTask file) => End(file) - (Start + Done) + 1;
+    /// <summary>本分块区间长度；返回 -1 表示大小未知（不设上限）。</summary>
+    public long RangeLength(FileTask file)
+    {
+        if (Interlocked.Read(ref _rangeEnd) == NoRangeEnd && file.IsUnknownSize) return -1;
+        return Math.Max(0, End(file) - Start + 1);
+    }
+
+    /// <summary>
+    /// 本分块对文件「唯一覆盖」的有效字节数：Done 超出本区间时按区间裁剪。
+    /// <para/>进度与「数据是否已齐」都必须用这个值，不能再用累计投递字节——
+    /// 重复字节会让进度虚高并提前触发合并。
+    /// </summary>
+    public long EffectiveDone(FileTask file)
+    {
+        var len = RangeLength(file);
+        return len < 0 ? Done : Math.Min(Done, len);
+    }
+
+    /// <summary>未下载字节数（夹紧到 0：区间被缩短后旧分块可能已越过新右端，此时不能再写）。</summary>
+    public long Undone(FileTask file) => Math.Max(0, End(file) - (Start + Done) + 1);
 }
 
 internal enum ChunkPhase
@@ -390,12 +421,26 @@ internal sealed class FileTask
     }
 
     /// <summary>
-    /// 数据是否已齐（可以进入合并）。只看字节面，不再看是谁触发的：
+    /// 数据是否已齐（可以进入合并）。只看「唯一覆盖的字节」，不再看是谁触发的：
     /// 末块因换源/失败退场时同样可能已经把 FileSize 顶满，此时若跳过合并，这个文件就再没人推进。
+    /// <para/>必须用 <see cref="Chunk.EffectiveDone"/> 求和而不是累计投递字节 <see cref="DownloadDone"/>：
+    /// 后者把「切给别人、自己又重复写过的尾段」也计进去，会让进度虚高到 FileSize 并提前合并，
+    /// 合出来的是重复字节（真机 30,423,278 B vs 29,975,184 B 的直接成因）。
     /// </summary>
-    public bool IsDataComplete => IsUnknownSize
-        ? Interlocked.Read(ref DownloadDone) > 0
-        : FileSize >= 0 && Interlocked.Read(ref DownloadDone) >= FileSize;
+    public bool IsDataComplete
+    {
+        get
+        {
+            if (IsUnknownSize) return Interlocked.Read(ref DownloadDone) > 0;
+            if (FileSize < 0) return false;
+            lock (ChunksLock)
+            {
+                long covered = 0;
+                foreach (var chunk in Chunks) covered += chunk.EffectiveDone(this);
+                return covered >= FileSize;
+            }
+        }
+    }
 
     /// <summary>
     /// 是否仍有分块处于「持有临时文件写入」的阶段（建连/读取/下载）。
@@ -459,10 +504,12 @@ internal sealed class FileTask
             if (State < DownloadFileState.Connecting) State = DownloadFileState.Connecting;
 
             long start;
+            long rangeEnd = Chunk.NoRangeEnd;
             DownloadSource? source;
             var isSingleThreadOnce = false;
             var inheritedFailCount = 0;
             Chunk? claimedBroken = null;
+            Chunk? splitOwner = null;
             int? advanceFirstSourceTo = null;
 
             lock (ChunksLock)
@@ -493,6 +540,8 @@ internal sealed class FileTask
                     if (Chunks.Count > 0) Reset(options);
                     isSingleThreadOnce = true;
                     start = 0;
+                    // 大小已知时区间右端就是文件末尾；未知（-2/-1）留空，等响应头回来再登记。
+                    rangeEnd = !IsUnknownSize && FileSize >= 0 ? FileSize - 1 : Chunk.NoRangeEnd;
                     source = onceSource ?? GetSource(0);
                     if (source is null)
                     {
@@ -508,6 +557,7 @@ internal sealed class FileTask
                     if (Chunks.Count == 0)
                     {
                         start = 0;
+                        rangeEnd = !IsUnknownSize && FileSize >= 0 ? FileSize - 1 : Chunk.NoRangeEnd;
                         source = GetSource(_firstSourceIndex);
                         if (source is null) return null;
                         // 与「认领断点」同理：轮转下标必须等分块真正建出来再前进。
@@ -529,7 +579,21 @@ internal sealed class FileTask
                         }
                         if (broken is not null)
                         {
-                            start = broken.Start + broken.Done;
+                            // 区间交接：续传块接管的是「旧块区间里还没下载的那一段」，
+                            // 旧块的右端必须同步缩到交接点之前 —— 否则同一尾段会被两个分块各写一遍。
+                            var brokenEnd = broken.End(this);
+                            var brokenLen = broken.RangeLength(this);
+                            // 旧账本时代 Done 可能已越过可见区间：先按区间裁剪，否则续传点会落到区间外
+                            var covered = brokenLen < 0 ? broken.Done : Math.Min(broken.Done, brokenLen);
+                            if (brokenLen >= 0 && covered >= brokenLen)
+                            {
+                                // 这个区间其实已经下满了，只是状态没落成 Finished（换源/失败打断）：
+                                // 认领它毫无意义，直接作废，让「覆盖已满」把文件推进到合并。
+                                broken.Superseded = true;
+                                return null;
+                            }
+                            start = broken.Start + covered;
+                            rangeEnd = brokenEnd;
                             source = GetSource(broken.Source.Id + 1);
                             if (source is null) return null;
                             // 认领动作必须等分块真正创建后才生效：中间还有限频/主机并发等可能提前返回 null，
@@ -554,17 +618,31 @@ internal sealed class FileTask
                             source = GetSplitCapableSource(options);
                             if (source is null) return null;
                             Chunk? largest = null;
+                            long largestUndone = 0;
                             foreach (var c in Chunks)
                             {
-                                if (largest is null || c.Undone(this) > largest.Undone(this)) largest = c;
+                                var undone = c.Undone(this);
+                                if (largest is null || undone > largestUndone)
+                                {
+                                    largest = c;
+                                    largestUndone = undone;
+                                }
                             }
-                            if (largest is null || largest.Undone(this) < options.PieceLimitBytes) return null;
-                            start = largest.End(this) - (long)(largest.Undone(this) * 0.4);
+                            if (largest is null || largestUndone < options.PieceLimitBytes) return null;
+                            var largestEnd = largest.End(this);
+                            // 从「未下载尾部」的 60% 处下刀：新块只拿它真正没写过的区间，
+                            // 旧块右端立即缩到 start - 1，此后旧块的写循环因 Undone()==0 自行停手。
+                            start = largestEnd - (long)(largestUndone * 0.4);
+                            if (start <= largest.Start || start > largestEnd) return null;
+                            rangeEnd = largestEnd;
+                            splitOwner = largest;
                         }
                     }
                 }
 
                 if (start < 0 || (start > FileSize && FileSize >= 0 && !IsUnknownSize)) return null;
+                // 区间自检：起点必须落在自己的区间内，绝不允许「起点在右端之后」的空区间分块
+                if (rangeEnd != Chunk.NoRangeEnd && start > rangeEnd) return null;
 
                 // 连接发起限频（非阻塞）：未到间隔则本轮放弃，下个调度周期再试
                 if (!HostStartThrottle.TryReserve(source.Url, options)) return null;
@@ -585,6 +663,7 @@ internal sealed class FileTask
                     HostKey = hostKey,
                     FailCount = inheritedFailCount,
                 };
+                chunk.SetRangeEnd(rangeEnd);
                 if (isSingleThreadOnce)
                 {
                     source.SingleChunk = chunk;
@@ -592,9 +671,14 @@ internal sealed class FileTask
                 // 分块真正落地后才认领旧断点：中间任何提前返回都不会把区间变成无人负责的孤儿
                 if (claimedBroken is not null)
                 {
+                    // 区间交接：旧块只保留「自己已经下完的那一段」，其余全部划给新块。
+                    // Done=0 时旧块区间长度归零（合并时自动跳过），同起点重复也不再被双计。
+                    claimedBroken.SetRangeEnd(start - 1);
                     claimedBroken.Superseded = true;
                     chunk.FailCount = inheritedFailCount;
                 }
+                // 切割同理：持有者区间缩到新块起点之前，账本上两段严格不重叠
+                if (splitOwner is not null) splitOwner.SetRangeEnd(start - 1);
                 Chunks.Add(chunk);
                 if (advanceFirstSourceTo is { } nextFirst) _firstSourceIndex = nextFirst;
                 // 与 VB 对齐：首分块记 Info，续传/追加分块记日志留痕（此前完全静默，UI 卡死时无从排查）
@@ -919,6 +1003,12 @@ internal sealed class FileTask
             // 绝不能让它参与后续流程——否则会以「文件大小未知」等名义把健康源判成死源
             //（真机 Forge 安装：9MB installer 正常从镜像下载时，镜像被这么误杀，随后全程回落到 30KB/s 的官方源）。
             if (chunk.Superseded) return;
+
+            // 首块在拿到响应头之前不知道区间右端：这里补登一次，此后区间不再变动。
+            // 登记之后 End() 不再回读可变的 FileSize，切割又只能缩短右端，
+            // 写循环的钳制才真正有边界（旧实现每次反推区间，边界会在飞行中被改小）。
+            if (chunk.Start == 0 && chunk.RangeEnd == Chunk.NoRangeEnd && !IsUnknownSize && FileSize >= 0)
+                chunk.SetRangeEnd(FileSize - 1);
 
             chunk.Phase = ChunkPhase.Reading;
             SetState(DownloadFileState.Reading);
@@ -1412,42 +1502,35 @@ internal sealed class FileTask
                     }
                     else
                     {
-                        var ordered = Chunks.OrderBy(c => c.Start).ToList();
+                        var ordered = Chunks.Where(c => c.Done > 0 && c.TempPath is not null)
+                            .OrderBy(c => c.Start).ToList();
                         var single = ordered.Count == 1 ? ordered[0] : null;
-                        if (single?.TempPath is not null)
+                        var singleCoversAll = single is not null && single.Start == 0 &&
+                            (IsUnknownSize || single.EffectiveDone(this) >= FileSize);
+                        if (single is not null && singleCoversAll)
                         {
                             options.Log?.Invoke($"{LocalName}：下载结束，仅有一个分块，无需合并");
                             // 同卷优先 Move，免去一次全量拷贝（大文件收益明显）；跨卷回退为复制
                             try
                             {
-                                File.Move(single.TempPath, Request.LocalPath, overwrite: true);
+                                File.Move(single.TempPath!, Request.LocalPath, overwrite: true);
                             }
                             catch
                             {
-                                File.Copy(single.TempPath, Request.LocalPath, overwrite: true);
-                                File.Delete(single.TempPath);
+                                File.Copy(single.TempPath!, Request.LocalPath, overwrite: true);
+                                File.Delete(single.TempPath!);
                             }
                             single.TempPath = null;
                         }
                         else
                         {
                             options.Log?.Invoke($"{LocalName}：下载结束，开始合并 {ordered.Count} 个分块");
-                            using var output = new FileStream(Request.LocalPath, FileMode.Create, FileAccess.Write);
-                            foreach (var chunk in ordered)
-                            {
-                                if (chunk.Done == 0 || chunk.TempPath is null) continue;
-                                // FileShare.Read：写入方若因调度竞争仍在收尾，也不至于立刻互斥失败
-                                using var temp = new FileStream(chunk.TempPath, FileMode.Open, FileAccess.Read, FileShare.Read, 1024 * 64, FileOptions.SequentialScan);
-                                var remaining = chunk.Done;
-                                var buffer = new byte[1024 * 256];
-                                while (remaining > 0)
-                                {
-                                    var read = temp.Read(buffer, 0, (int)Math.Min(buffer.Length, remaining));
-                                    if (read <= 0) throw new IOException($"分块文件意外结束：{chunk.TempPath}");
-                                    output.Write(buffer, 0, read);
-                                    remaining -= read;
-                                }
-                            }
+                            using var output = new FileStream(
+                                Request.LocalPath, FileMode.Create, FileAccess.Write, FileShare.None, 1024 * 64);
+                            // 预分配最终长度：按偏移写入时，缺口会以 0 字节留在文件里而不是把文件截短，
+                            // 后面的大小校验才有意义
+                            if (!IsUnknownSize && FileSize > 0) output.SetLength(FileSize);
+                            MergeByOffset(output, ordered);
                         }
                     }
                 }
@@ -1470,7 +1553,8 @@ internal sealed class FileTask
                     lock (ChunksLock)
                     {
                         foreach (var chunk in Chunks)
-                            options.Log?.Invoke($"- 分块 {chunk.Start}~，已下载 {chunk.Done}，状态 {chunk.Phase}");
+                            options.Log?.Invoke(
+                                $"- 分块 {chunk.Start}~{chunk.End(this)}，已下载 {chunk.Done}（有效 {chunk.EffectiveDone(this)}），状态 {chunk.Phase}");
                     }
                     throw new MergeVerifyException(checkError);
                 }
@@ -1526,6 +1610,56 @@ internal sealed class FileTask
                 await Task.Delay(300 * (1 << (attempt - 1)), cancellationToken).ConfigureAwait(false);
             }
         }
+    }
+
+    /// <summary>
+    /// 按**字节偏移**把各分块的有效字节写进 output，并校验区间覆盖（缺口或重叠直接抛
+    /// <see cref="MergeVerifyException"/>）。
+    /// <para/>旧实现是「按 Start 排序后把每个分块的 Done 个字节依次 append」：只要某一段落被
+    /// 切给新分块而旧分块已经多写过一遍，同一段字节就在结果文件里出现两次，文件比 FileSize 长
+    /// （真机 30,423,278 B vs 29,975,184 B，随即触发整文件重下，慢网下 5 分钟无进展）。
+    /// 按偏移写 + 覆盖校验后，这类重复在落地前就会被挡住并给出具体区间。
+    /// </summary>
+    internal void MergeByOffset(FileStream output, IReadOnlyList<Chunk> chunks)
+    {
+        var coverage = new List<(long Start, long End)>(chunks.Count);
+        var buffer = new byte[1024 * 256];
+        foreach (var chunk in chunks)
+        {
+            var length = chunk.EffectiveDone(this);
+            if (length <= 0 || chunk.TempPath is null) continue;
+
+            output.Position = chunk.Start;
+            // FileShare.Read：写入方若因调度竞争仍在收尾，也不至于立刻互斥失败
+            using var temp = new FileStream(
+                chunk.TempPath, FileMode.Open, FileAccess.Read, FileShare.Read, 1024 * 64, FileOptions.SequentialScan);
+            var remaining = length;
+            while (remaining > 0)
+            {
+                var read = temp.Read(buffer, 0, (int)Math.Min(buffer.Length, remaining));
+                if (read <= 0) throw new IOException($"分块文件意外结束：{chunk.TempPath}");
+                output.Write(buffer, 0, read);
+                remaining -= read;
+            }
+            coverage.Add((chunk.Start, chunk.Start + length - 1));
+        }
+
+        if (IsUnknownSize) return;
+
+        var expected = 0L;
+        foreach (var (first, last) in coverage)
+        {
+            if (first > expected)
+                throw new MergeVerifyException(
+                    $"分块合并出现缺口：{expected}~{first - 1}（{first - expected} B）没有任何分块负责，下一块起于 {first}");
+            if (first < expected)
+                throw new MergeVerifyException(
+                    $"分块区间重叠：{first}~{expected - 1}（{expected - first} B）被写了两次，下一块起于 {first}");
+            expected = last + 1;
+        }
+        if (expected != FileSize)
+            throw new MergeVerifyException(
+                $"分块覆盖长度与文件大小不符：覆盖 {expected} B，应为 {FileSize} B");
     }
 
     public void Fail(Exception? ex)
