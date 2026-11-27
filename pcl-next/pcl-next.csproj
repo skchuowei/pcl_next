@@ -43,6 +43,15 @@
     <!-- 必须关掉：否则 SDK 会在已是 ...\<版本>\<RID>\ 的路径后再追加一层同名 RID -->
     <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <!--
+      RID 隔离（2026-11-14）：上面两条关掉后，IntermediateOutputPath 退化成 obj\<配置>\，
+      两个 RID 共用同一份中间程序集与 R2R 镜像目录（obj\<配置>\R2R\）。
+      PublishReadyToRun 生成的 R2R 镜像是**架构相关**的：先编 x64 再编 arm64 时，
+      arm64 发布会复用 x64 的 R2R 结果，产物 PE Machine 仍是 0x8664
+      （§5.3.1 要求 arm64 必须是 0xAA64，机械校验会直接失败，但若不校验就会发出错包）。
+      这里按 RID 分目录隔离，两个架构各编各的。
+    -->
+    <IntermediateOutputPath Condition="'$(RuntimeIdentifier)' != ''">$(BaseIntermediateOutputPath)$(Configuration)\$(RuntimeIdentifier)\</IntermediateOutputPath>
     <!-- 启用 Directory.Build.props 的 PclTreePathGuard（OutputPath 必须含代号与版本两段） -->
     <PclUseTreePath>true</PclUseTreePath>
     <ProduceReferenceAssembly>false</ProduceReferenceAssembly>
@@ -148,6 +157,12 @@
     <PackageReference Include="Imazen.WebP" Version="11.0.0" />
     <PackageReference Include="ThrottleDebounce" Version="2.0.2" />
     <!--
+      L1 代码扩展（Mixin）的补丁引擎，口径见 docs/扩展规范.md §8。
+      用 Thin 变体（与参考实现 PCL2-Nex 同款）：只保留运行时 patch 能力，不带额外工具；
+      由宿主统一加载，扩展包内不得自带 0Harmony.dll（否则会出现两份静态状态）。
+    -->
+    <PackageReference Include="Lib.Harmony.Thin" Version="2.4.2" />
+    <!--
       NU1510：以下两个包在 net10.0-windows + UseWindowsForms 下由 WindowsDesktop 共享框架提供，
       显式 PackageReference 会被裁剪告警。移除引用，改为依赖框架自带版本。
     -->
@@ -227,7 +242,7 @@
       -->
       <_PclBuildCacheFile>$(MSBuildProjectDirectory)\obj\pcl-build.small</_PclBuildCacheFile>
     </PropertyGroup>
-    <Exec Command="powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\scripts\Get-BuildSmallVersion.ps1&quot; -RepoRoot &quot;$(MSBuildProjectDirectory)\..&quot; -OutFile &quot;$(_PclBuildInfoFile)&quot; -CacheFile &quot;$(_PclBuildCacheFile)&quot;" IgnoreExitCode="true" StandardOutputImportance="low" StandardErrorImportance="low" />
+    <Exec Command="&quot;$(PclPowerShell)&quot; -NoProfile -NonInteractive -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\scripts\Get-BuildSmallVersion.ps1&quot; -RepoRoot &quot;$(MSBuildProjectDirectory)\..&quot; -OutFile &quot;$(_PclBuildInfoFile)&quot; -CacheFile &quot;$(_PclBuildCacheFile)&quot;" IgnoreExitCode="false" StandardOutputImportance="low" StandardErrorImportance="low" />
     <ItemGroup>
       <Compile Include="$(_PclBuildInfoFile)" Condition="Exists('$(_PclBuildInfoFile)')" />
     </ItemGroup>
@@ -244,10 +259,10 @@
       真正的可执行入口是 apphost $(TargetDir)$(AssemblyName).exe，必须显式拼出来，
       否则会把 dll 改名成 exe 复制到产物旁边，得到一个双击就跑不起来的假 exe。
     -->
-    <Exec Command="powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\scripts\Copy-VersionedArtifact.ps1&quot; -ExePath &quot;$(TargetDir)$(AssemblyName).exe&quot; -Channel &quot;$(PclChannel)&quot;&#xD;&#xA;" IgnoreExitCode="true" StandardOutputImportance="low" StandardErrorImportance="low" />
+    <Exec Command="&quot;$(PclPowerShell)&quot; -NoProfile -NonInteractive -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\scripts\Copy-VersionedArtifact.ps1&quot; -ExePath &quot;$(TargetDir)$(AssemblyName).exe&quot; -Channel &quot;$(PclChannel)&quot;&#xD;&#xA;" IgnoreExitCode="false" StandardOutputImportance="low" StandardErrorImportance="low" />
   </Target>
   <Target Name="PclVersionedArtifactPublish" AfterTargets="Publish" Condition="'$(PublishDir)' != ''">
-    <Exec Command="powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\scripts\Copy-VersionedArtifact.ps1&quot; -ExePath &quot;$(PublishDir)$(AssemblyName).exe&quot; -Channel &quot;$(PclChannel)&quot;&#xD;&#xA;" IgnoreExitCode="true" StandardOutputImportance="low" StandardErrorImportance="low" />
+    <Exec Command="&quot;$(PclPowerShell)&quot; -NoProfile -NonInteractive -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\scripts\Copy-VersionedArtifact.ps1&quot; -ExePath &quot;$(PublishDir)$(AssemblyName).exe&quot; -Channel &quot;$(PclChannel)&quot;&#xD;&#xA;" IgnoreExitCode="false" StandardOutputImportance="low" StandardErrorImportance="low" />
   </Target>
   <!--
     构建号「每次编译 +0.01」（2026-11-14 用户裁决，规则见《分支与发布规范》§5.2.1）：
@@ -265,6 +280,6 @@
     也会自动置 PclNoBump=true。
   -->
   <Target Name="PclBuildSeqBump" AfterTargets="PclVersionedArtifact" Condition="'$(PclNoBump)' != 'true'">
-    <Exec Command="powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\scripts\Get-BuildSmallVersion.ps1&quot; -RepoRoot &quot;$(MSBuildProjectDirectory)\..&quot; -BumpSeq" IgnoreExitCode="true" StandardOutputImportance="low" StandardErrorImportance="low" />
+    <Exec Command="&quot;$(PclPowerShell)&quot; -NoProfile -NonInteractive -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\scripts\Get-BuildSmallVersion.ps1&quot; -RepoRoot &quot;$(MSBuildProjectDirectory)\..&quot; -BumpSeq" IgnoreExitCode="false" StandardOutputImportance="low" StandardErrorImportance="low" />
   </Target>
 </Project>

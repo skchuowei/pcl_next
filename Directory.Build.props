@@ -64,6 +64,20 @@
     <PclNoBump Condition="'$(PclNoBump)' == '' AND '$(PublishProfile)' != ''">true</PclNoBump>
 
     <!--
+      构建脚本解释器（2026-11-27 修复）：此前各 Exec 直接写 `powershell ...`，依赖 PATH。
+      一旦 PATH 里没有 Windows PowerShell（例如只剩 pwsh，或被工具链的 shim 环境裁剪），
+      四条 Exec 全部静默失败（IgnoreExitCode=true），表现为：
+        · PclBuildInfo 不生成 obj\PclBuildInfo.g.cs → exe 里的产品版本长期停在旧值；
+        · PclVersionedArtifact 不产出 PCL-Next-...-<构建号>.exe；
+        · PclBuildSeqBump 不执行 → obj\pcl-build.seq 冻结，编译次数不再 +1，
+          同一提交下反复编译永远得到同一个 M.mm。
+      改为先按绝对路径找 Windows PowerShell（不依赖 PATH），找不到才退回 PATH 里的名字。
+      pwsh(7) 同样能跑这些脚本，若机器上只有 pwsh，可显式 -p:PclPowerShell=pwsh 覆盖。
+    -->
+    <PclPowerShell Condition="'$(PclPowerShell)' == '' And '$(OS)' == 'Windows_NT' And Exists('$(SystemRoot)\System32\WindowsPowerShell\v1.0\powershell.exe')">$(SystemRoot)\System32\WindowsPowerShell\v1.0\powershell.exe</PclPowerShell>
+    <PclPowerShell Condition="'$(PclPowerShell)' == ''">powershell</PclPowerShell>
+
+    <!--
       产物目录里使用的版本段：版本名 + 构建号，形如 2.100.0.3-0.20。
       加构建号的目的：同名版本的不同提交编出来的目录不再互相覆盖，
       看目录名就能判断里面是第几个提交编的（构建号单调递增，见 §5.2.1）。
