@@ -385,8 +385,18 @@ public sealed class DownloadOptions
     /// </summary>
     public int RateLimitCooldownMilliseconds { get; init; } = 5000;
 
-    /// <summary>调试用：每个连接随机延迟，模拟不稳定网络。</summary>
+    /// <summary>
+    /// 调试用：每个连接随机延迟，模拟不稳定网络。</summary>
     public int DebugMaxDelayMilliseconds { get; init; } = 0;
+
+    /// <summary>
+    /// 实验性：校验失败时**只补下缺失区间**，而不是整文件重下。默认关闭（与既有线上行为一致）。
+    /// <para/>仅在失败原因能定位到具体区间时生效（分块覆盖出现缺口/重复块，且重叠导致
+    /// 「有效字节之和」虚高到 FileSize 从而提前进入合并）。此时引擎会丢弃重复分块、保留已下好的
+    /// <c>.tmp</c>，只把缺失区间登记为待下载块。哈希/大小不符这类无法定位的失败，仍走整文件重下。
+    /// <para/>dev 通道由宿主层默认打开（见 VB 侧「调试与实验 → 校验失败时只重下缺失区间」）。
+    /// </summary>
+    public bool RedownloadGapsOnVerifyFailure { get; init; }
 
     /// <summary>日志回调（信息级）。</summary>
     public Action<string>? Log { get; init; }

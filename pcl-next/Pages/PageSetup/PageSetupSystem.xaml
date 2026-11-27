@@ -26,6 +26,9 @@
                         <local:MyCheckBox Grid.Column="1" Text="调试模式" Height="22" x:Name="CheckDebugMode" local:SettingService.Key="SystemDebugMode" ToolTip="显示调试信息与更多错误信息。&#xa;这会导致启动器性能略有下降，若无特殊需要不建议开启。" />
                         <local:MyCheckBox Grid.Column="2" Text="添加延迟" Height="22" x:Name="CheckDebugDelay" local:SettingService.Key="SystemDebugDelay" ToolTip="在各个环节添加随机的延迟，拖慢加载速度，以测试部分功能是否正常运行。&#xa;这会严重影响启动器运行，若无特殊需要不建议开启。" />
                     </Grid>
+                    <Grid Margin="0,10,0,0">
+                        <local:MyCheckBox Height="22" x:Name="CheckDebugVerifyHoleResume" Text="校验失败时只重下缺失区间" local:SettingService.Key="SystemDebugVerifyHoleResume" ToolTip="实验性：下载完成但校验不通过时，只丢弃重复分块、补下没有下到的区间，不把已经下好的数据全部扔掉重下。&#xa;仅在能定位到具体缺失区间时生效（分块覆盖出现缺口）；哈希不符这类无法定位的失败仍会整文件重下。&#xa;开发版默认开启，其余版本默认关闭。" />
+                    </Grid>
                 </StackPanel>
             </local:MyCard>
     </local:MyScrollViewer>

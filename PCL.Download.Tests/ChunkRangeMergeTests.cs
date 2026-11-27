@@ -114,9 +114,8 @@ public class ChunkRangeMergeTests
         var a = MakeChunk(task, 0, 59_999, 60_000);
         var b = MakeChunk(task, 40_000, 99_999, 60_000);
 
-        var ex = Assert.Throws<MergeVerifyException>(() => MergeToBytes(task, a, b));
-        Assert.Contains("重叠", ex.Message);
-        Assert.Contains("40000", ex.Message);
+        var ex = Assert.ThrowsAny<MergeVerifyException>(() => MergeToBytes(task, a, b));
+        Assert.Contains("重复分块", ex.Message);
     }
 
     /// <summary>
@@ -131,7 +130,7 @@ public class ChunkRangeMergeTests
         var a = MakeChunk(task, 0, 39_999, 40_000);
         var b = MakeChunk(task, 70_000, 99_999, 30_000);
 
-        var ex = Assert.Throws<MergeVerifyException>(() => MergeToBytes(task, a, b));
+        var ex = Assert.ThrowsAny<MergeVerifyException>(() => MergeToBytes(task, a, b));
         Assert.Contains("缺口", ex.Message);
     }
 
@@ -176,5 +175,108 @@ public class ChunkRangeMergeTests
         var merged = await File.ReadAllBytesAsync(target);
         Assert.Equal(data.Length, merged.Length);
         Assert.Equal(Convert.ToHexString(SHA1.HashData(data)), Convert.ToHexString(SHA1.HashData(merged)));
+    }
+
+    /// <summary>
+    /// 开关打开时，覆盖失败的恢复只能「丢重复块 + 登记缺口」，且进度必须回退到真实覆盖量：
+    /// 否则进度虚高会让引擎以为数据已齐、再进一次合并，又撞同一处缺口。
+    /// </summary>
+    [Fact]
+    public void 覆盖失败_开关打开_只丢重复块并登记缺口()
+    {
+        const long size = 100_000;
+        var task = NewTask(TempPath("salvage.bin"), size);
+
+        // 0~59,999 与 40,000~99,999 重叠 20,000 B：有效字节之和 120,000 ≥ FileSize，
+        // 于是「字节够了」提前进合并，但 60,000~99,999 这段其实没有独立负责者
+        var kept = MakeChunk(task, 0, 59_999, 60_000);
+        var duplicate = MakeChunk(task, 40_000, 99_999, 60_000);
+        task.Chunks.AddRange([kept, duplicate]);
+        task.DownloadDone = 120_000; // 实际投递过的字节（含重复）
+
+        Assert.True(task.IsDataComplete, "重叠造成的虚高应仍能触发合并（这正是要处理的场景）");
+
+        var options = new DownloadOptions { RedownloadGapsOnVerifyFailure = true };
+        var ex = new MergeCoverageException("缺口 60000~99999", [(60_000L, 99_999L)]);
+
+        Assert.True(task.TrySalvageCoverage(options, ex, out var retryMerge));
+        Assert.False(retryMerge, "还有缺口，不能直接重试合并");
+
+        Assert.False(task.IsDataComplete, "缺口补齐前不得再次进合并");
+        Assert.Equal(DownloadFileState.WaitingToDownload, task.State);
+        Assert.Equal(60_000, task.DownloadDone); // 回退到真实唯一覆盖量
+
+        Assert.Equal(0, kept.Undone(task));                 // 已下好的分块保留
+        Assert.Equal(0, duplicate.EffectiveDone(task));     // 重复块被清空
+        var gap = task.Chunks.Single(c => c.Start == 60_000);
+        Assert.Equal(99_999, gap.End(task));
+        Assert.Equal(40_000, gap.Undone(task));             // 待补 60,000~99,999
+        Assert.Equal(ChunkPhase.Canceled, gap.Phase);       // 调度器按「断点续传」认领
+    }
+
+    /// <summary>
+    /// 开关关闭（线上默认）时不得改动任何状态：仍走整文件重下。
+    /// </summary>
+    [Fact]
+    public void 覆盖失败_开关关闭_不做任何抢救()
+    {
+        const long size = 100_000;
+        var task = NewTask(TempPath("salvage-off.bin"), size);
+        var kept = MakeChunk(task, 0, 59_999, 60_000);
+        var duplicate = MakeChunk(task, 40_000, 99_999, 60_000);
+        task.Chunks.AddRange([kept, duplicate]);
+        task.DownloadDone = 120_000;
+
+        var ex = new MergeCoverageException("缺口", [(60_000L, 99_999L)]);
+        Assert.False(task.TrySalvageCoverage(new DownloadOptions(), ex, out _));
+
+        Assert.Equal(DownloadFileState.WaitingToCheck, task.State);
+        Assert.Equal(120_000, task.DownloadDone);
+        Assert.Equal(60_000, duplicate.EffectiveDone(task));
+        Assert.DoesNotContain(task.Chunks, c => c.Start == 60_000);
+    }
+
+    /// <summary>
+    /// 只有重复块、没有缺口：剔除重复块后覆盖已齐，应直接重试合并，不重下任何字节。
+    /// </summary>
+    [Fact]
+    public void 仅重复块无缺口_剔除后直接重试合并()
+    {
+        const long size = 100_000;
+        var task = NewTask(TempPath("salvage-dup.bin"), size);
+        var full = MakeChunk(task, 0, 99_999, 100_000);
+        var duplicate = MakeChunk(task, 50_000, 99_999, 50_000);
+        task.Chunks.AddRange([full, duplicate]);
+        task.DownloadDone = 150_000;
+
+        var ex = new MergeCoverageException("重复 50000~99999", []);
+        Assert.True(task.TrySalvageCoverage(
+            new DownloadOptions { RedownloadGapsOnVerifyFailure = true }, ex, out var retryMerge));
+
+        Assert.True(retryMerge);
+        Assert.Equal(100_000, task.DownloadDone);
+        Assert.True(task.IsDataComplete, "重复块剔干净后覆盖已齐");
+        Assert.Equal(0, duplicate.EffectiveDone(task));
+        Assert.Equal(100_000, full.EffectiveDone(task));
+    }
+
+    /// <summary>
+    /// 缺口反复出现说明账本不可信：超过上限后必须放弃抢救，由调用方退回整文件重下，不能无限打转。
+    /// </summary>
+    [Fact]
+    public void 缺口反复出现_超过上限后不再抢救()
+    {
+        const long size = 100_000;
+        var task = NewTask(TempPath("salvage-cap.bin"), size);
+        task.Chunks.AddRange([
+            MakeChunk(task, 0, 59_999, 60_000),
+            MakeChunk(task, 40_000, 99_999, 60_000),
+        ]);
+        task.DownloadDone = 120_000;
+
+        var options = new DownloadOptions { RedownloadGapsOnVerifyFailure = true };
+        var ex = new MergeCoverageException("缺口", [(60_000L, 99_999L)]);
+        for (var i = 0; i < 3; i++) Assert.True(task.TrySalvageCoverage(options, ex, out _));
+        Assert.False(task.TrySalvageCoverage(options, ex, out _));
     }
 }

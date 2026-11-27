@@ -133,6 +133,10 @@ namespace PCL
                     // 多源并行：同一文件的分块可分配给不同源同时下载（关闭后退回竞速赢家独占）
                     MultiSourceParallel = GetBoolSetting("ToolDownloadMultiSource", true),
                     MultiSourceMaxSources = ClampChunkSetting("ToolDownloadMultiSourceMax"),
+                    // 实验性：校验失败只补下缺失区间（不整文件重下）。
+                    // dev 通道默认开启，其余通道默认关闭，可在「调试与实验」页按需切换。
+                    RedownloadGapsOnVerifyFailure = GetBoolSetting(
+                        "SystemDebugVerifyHoleResume", ModBuildChannel.Channel == ModBuildChannel.Channels.Dev),
                     Log = new Action<string>(m => Logger.Info(m)),
                     LogWarn = new Action<Exception, string>((ex, m) => Logger.Warn(ex, m))
                 };

@@ -155,6 +155,13 @@ internal sealed class FileTask
     private const int MaxVerifyRestarts = 2;
     private int _verifyFailureCount;
 
+    /// <summary>
+    /// 「只补下缺失区间」这种恢复方式的最大次数：缺口反复出现说明账本本身不可信，
+    /// 再撑下去就是无限循环，直接退回整文件重下。
+    /// </summary>
+    private const int MaxGapSalvages = 3;
+    private int _gapSalvageCount;
+
     /// <summary>合并入口租约：0=未进入，1=已进入。保证同一文件只会有一个合并过程。</summary>
     private int _mergeEntered;
 
@@ -1584,12 +1591,21 @@ internal sealed class FileTask
                 // 校验不过 = 分块数据本身有问题，重合并没有意义，只能整文件重下（有次数上限）
                 if (ex is MergeVerifyException)
                 {
+                    // 覆盖缺口型失败能定位到具体区间：按开关只丢重复块、只补缺口，
+                    // 把「28.6 MB 里 27 MB 已下好、只差一段」的场合从整文件重下压成补一小段。
+                    if (ex is MergeCoverageException coverage &&
+                        TrySalvageCoverage(options, coverage, out var retryMerge))
+                    {
+                        if (retryMerge) continue; // 重复块已剔除、覆盖已齐，直接重跑合并
+                        return;                   // 缺口已登记为待下载区间，交给调度器续传
+                    }
+
                     if (++_verifyFailureCount > MaxVerifyRestarts)
                     {
                         Fail(ex);
                         return;
                     }
-                    options.LogWarn?.Invoke(ex, $"校验不通过，整文件重下（第 {_verifyFailureCount} 次，{LocalName}）");
+                    options.LogWarn?.Invoke(ex, $"{LocalName}：校验不通过，整文件重下（第 {_verifyFailureCount} 次）");
                     Interlocked.Exchange(ref _mergeEntered, 0);
                     Reset(options);
                     State = DownloadFileState.WaitingToDownload;
@@ -1614,7 +1630,7 @@ internal sealed class FileTask
 
     /// <summary>
     /// 按**字节偏移**把各分块的有效字节写进 output，并校验区间覆盖（缺口或重叠直接抛
-    /// <see cref="MergeVerifyException"/>）。
+    /// <see cref="MergeCoverageException"/>，且**在落盘之前**就判定）。
     /// <para/>旧实现是「按 Start 排序后把每个分块的 Done 个字节依次 append」：只要某一段落被
     /// 切给新分块而旧分块已经多写过一遍，同一段字节就在结果文件里出现两次，文件比 FileSize 长
     /// （真机 30,423,278 B vs 29,975,184 B，随即触发整文件重下，慢网下 5 分钟无进展）。
@@ -1622,7 +1638,14 @@ internal sealed class FileTask
     /// </summary>
     internal void MergeByOffset(FileStream output, IReadOnlyList<Chunk> chunks)
     {
-        var coverage = new List<(long Start, long End)>(chunks.Count);
+        if (!IsUnknownSize)
+        {
+            var plan = BuildCoveragePlan(chunks);
+            if (plan.Gaps.Count > 0 || plan.DuplicateBytes > 0)
+                throw new MergeCoverageException(BuildCoverageMessage(plan), plan.Gaps);
+            chunks = plan.Accepted;
+        }
+
         var buffer = new byte[1024 * 256];
         foreach (var chunk in chunks)
         {
@@ -1641,26 +1664,148 @@ internal sealed class FileTask
                 output.Write(buffer, 0, read);
                 remaining -= read;
             }
-            coverage.Add((chunk.Start, chunk.Start + length - 1));
         }
+    }
 
-        if (IsUnknownSize) return;
+    /// <summary>一次覆盖计算的结果：哪几块可用、丢掉了多少重复字节、还缺哪几段。</summary>
+    internal sealed class CoveragePlan
+    {
+        public List<Chunk> Accepted { get; } = [];
+        public List<(long Start, long End)> Gaps { get; } = [];
+        public long AcceptedBytes;
+        public long DuplicateBytes;
+        public int DuplicateChunks;
+    }
 
+    /// <summary>
+    /// 计算当前分块对文件的**唯一覆盖**。按 Start 排序后贪心接受：与已接受区间重叠的分块整块丢弃
+    /// （分块数据是从 Start 起连续写的，前段重了就没法只保留后段），中间空出来的区间记为缺口。
+    /// </summary>
+    internal CoveragePlan BuildCoveragePlan(IEnumerable<Chunk> chunks)
+    {
+        var plan = new CoveragePlan();
+        var ordered = chunks
+            .Where(c => c.TempPath is not null && c.EffectiveDone(this) > 0)
+            .OrderBy(c => c.Start)
+            .ToList();
         var expected = 0L;
-        foreach (var (first, last) in coverage)
+        foreach (var chunk in ordered)
         {
-            if (first > expected)
-                throw new MergeVerifyException(
-                    $"分块合并出现缺口：{expected}~{first - 1}（{first - expected} B）没有任何分块负责，下一块起于 {first}");
+            var length = chunk.EffectiveDone(this);
+            var first = chunk.Start;
+            var last = first + length - 1;
             if (first < expected)
-                throw new MergeVerifyException(
-                    $"分块区间重叠：{first}~{expected - 1}（{expected - first} B）被写了两次，下一块起于 {first}");
+            {
+                plan.DuplicateBytes += length;
+                plan.DuplicateChunks++;
+                continue;
+            }
+            if (first > expected) plan.Gaps.Add((expected, first - 1));
+            plan.Accepted.Add(chunk);
+            plan.AcceptedBytes += length;
             expected = last + 1;
         }
-        if (expected != FileSize)
-            throw new MergeVerifyException(
-                $"分块覆盖长度与文件大小不符：覆盖 {expected} B，应为 {FileSize} B");
+        if (!IsUnknownSize && FileSize > expected) plan.Gaps.Add((expected, FileSize - 1));
+        return plan;
     }
+
+    private string BuildCoverageMessage(CoveragePlan plan)
+    {
+        var parts = new List<string>();
+        if (plan.Gaps.Count > 0)
+            parts.Add("缺口 " + string.Join("、", plan.Gaps.Select(g => $"{g.Start}~{g.End}")));
+        if (plan.DuplicateChunks > 0)
+            parts.Add($"重复分块 {plan.DuplicateChunks} 个（{plan.DuplicateBytes} B）");
+        return $"分块覆盖不完整：{string.Join("；", parts)}（有效覆盖 {plan.AcceptedBytes} B，文件 {FileSize} B）";
+    }
+
+    /// <summary>
+    /// 校验失败且失败原因能定位到具体区间（缺口/重复块）时，**只丢重复块、只补缺口**，
+    /// 保留已经下好的 .tmp，避免整文件重下。
+    /// <para/>返回 false 表示这种恢复不适用（开关关闭、大小未知、反复失败超上限），调用方退回整文件重下。
+    /// <paramref name="retryMerge"/> 为 true 表示重复块已剔除、覆盖已齐，直接重跑合并即可，不必重下。
+    /// </summary>
+    internal bool TrySalvageCoverage(DownloadOptions options, MergeCoverageException ex, out bool retryMerge)
+    {
+        retryMerge = false;
+        if (!options.RedownloadGapsOnVerifyFailure) return false;
+        if (IsUnknownSize || FileSize <= 0) return false;
+
+        lock (ChunksLock)
+        {
+            var plan = BuildCoveragePlan(Chunks);
+            if (plan.Gaps.Count == 0 && plan.DuplicateBytes == 0) return false;
+
+            // 1) 剔除重复分块：把它们的区间长度压到 0 并删掉 .tmp，
+            //    既避免以后再被写进合并，也让进度账本回到真实值。
+            foreach (var chunk in Chunks)
+            {
+                if (plan.Accepted.Contains(chunk)) continue;
+                if (chunk.EffectiveDone(this) <= 0) continue;
+                chunk.Superseded = true;
+                if (!chunk.IsEnded) chunk.Phase = ChunkPhase.Canceled;
+                chunk.SetRangeEnd(chunk.Start - 1);
+                if (chunk.TempPath is not null)
+                {
+                    try { File.Delete(chunk.TempPath); } catch { }
+                    chunk.TempPath = null;
+                }
+            }
+
+            // 2) 进度回退到真实覆盖量（与 Reset 的账本口径一致，避免进度虚高）
+            var covered = 0L;
+            foreach (var chunk in Chunks) covered += chunk.EffectiveDone(this);
+            var delta = covered - Interlocked.Read(ref DownloadDone);
+            if (delta != 0)
+            {
+                Interlocked.Exchange(ref DownloadDone, covered);
+                Interlocked.Add(ref BytesDownloaded, delta);
+            }
+
+            // 3) 已经没有缺口：重复块剔干净了，合并本身就能过
+            if (plan.Gaps.Count == 0)
+            {
+                retryMerge = true;
+                options.Log?.Invoke(
+                    $"{LocalName}：剔除 {plan.DuplicateChunks} 个重复分块（{plan.DuplicateBytes} B），重试合并");
+                return true;
+            }
+
+            // 4) 缺口反复出现说明账本不可信，别在这里无限打转
+            if (_gapSalvageCount >= MaxGapSalvages) return false;
+            _gapSalvageCount++;
+
+            var source = Sources.FirstOrDefault(s => !s.IsFailed) ?? Sources.FirstOrDefault();
+            if (source is null) return false;
+
+            try { File.Delete(Request.LocalPath); } catch { }
+
+            foreach (var (first, last) in plan.Gaps)
+            {
+                // 登记为「已取消、有未下载区间」的占位块：调度器的断点续传分支会直接认领它，
+                // 续传点 = 区间起点，右端 = 区间终点
+                var gap = new Chunk
+                {
+                    Start = first,
+                    Source = source,
+                    Phase = ChunkPhase.Canceled,
+                    Done = 0,
+                };
+                gap.SetRangeEnd(last);
+                Chunks.Add(gap);
+            }
+
+            options.LogWarn?.Invoke(ex,
+                $"{LocalName}：校验失败但可定位区间，只补下缺口（{plan.Gaps.Count} 段 / " +
+                $"{plan.Gaps.Sum(g => g.End - g.Start + 1)} B，保留已下载 {plan.AcceptedBytes} B，不整文件重下）");
+
+            Interlocked.Exchange(ref _mergeEntered, 0);
+            State = DownloadFileState.WaitingToDownload;
+            retryMerge = false;
+            return true;
+        }
+    }
+
 
     public void Fail(Exception? ex)
     {
@@ -1716,7 +1861,22 @@ public sealed class HttpStatusCodeException : HttpRequestException
 /// 合并完成后校验不通过（哈希/大小不符）：数据本身有问题，与本地 I/O 无关，
 /// 处理方式是整文件重下而非重试合并。
 /// </summary>
-internal sealed class MergeVerifyException : Exception
+internal class MergeVerifyException : Exception
 {
     public MergeVerifyException(string message) : base(message) { }
+}
+
+/// <summary>
+/// 校验失败的子类：失败原因能**定位到具体区间**（分块覆盖有缺口/重复），
+/// 因此有机会「只丢重复块、只补缺口」，不必把已经下好的数据全部扔掉重下。
+/// </summary>
+internal sealed class MergeCoverageException : MergeVerifyException
+{
+    public MergeCoverageException(string message, IReadOnlyList<(long Start, long End)> gaps) : base(message)
+    {
+        Gaps = gaps;
+    }
+
+    /// <summary>没有任何分块负责的区间（闭区间）。</summary>
+    public IReadOnlyList<(long Start, long End)> Gaps { get; }
 }
